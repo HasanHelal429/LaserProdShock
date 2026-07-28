@@ -120,6 +120,12 @@ not, and work while a run is still going.
   the target**. That is physically right, but it makes the drive a boundary quantity — keep
   the target far enough from the injection face that the transition is observable rather than
   present from t = 0. `make_inputs.py` warns when a corona exceeds 1e-3 n_cr at the face.
+- **Movie frames clean themselves up.** `make_movies.py` writes PNGs to
+  `media/<ID>/_frames_<name>/` and deletes the directory once ffmpeg succeeds; leftovers
+  from an interrupted encode are swept at startup (so stale frames cannot be globbed into a
+  new, shorter movie). `--keep-frames` retains them, and a failed encode keeps them
+  automatically. Never leave frame directories behind by hand -- they are several times the
+  size of the movie they produced.
 - **Analyse the step-0 deposition profile.** Later `profile_intervals` dumps drift as the
   kicks move electrons.
 - **`ray_cfl = 0.25` (default) is not asymptotic for turning-point problems** —

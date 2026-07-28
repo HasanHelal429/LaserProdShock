@@ -45,7 +45,7 @@ def _laser_curve(cfg, sc, rd):
     return np.asarray(hist.t) * 1e12, np.asarray(hist.f_abs(P))
 
 
-def movie_fields(cfg, sc, rid, rd, fps):
+def movie_fields(cfg, sc, rid, rd, fps, keep=False):
     """n_e(z) + B_y(z) lineouts, with f_abs(t) tracking underneath."""
     import matplotlib.pyplot as plt
     from plot_fields import load_series, electron_density
@@ -123,10 +123,10 @@ def movie_fields(cfg, sc, rid, rd, fps):
                     bbox_inches="tight", facecolor=lpp.SURFACE)
         plt.close(fig)
     return lpp.encode(d, os.path.join(lpp.media_dir(run_id=rid), "movie_fields.mp4"),
-                      fps=fps)
+                      fps=fps, cleanup=not keep)
 
 
-def movie_phase(cfg, sc, rid, rd, fps):
+def movie_phase(cfg, sc, rid, rd, fps, keep=False):
     """Ion (z, u_z) phase space, additive two-colour."""
     import matplotlib.pyplot as plt
     import yt
@@ -185,10 +185,10 @@ def movie_phase(cfg, sc, rid, rd, fps):
                     bbox_inches="tight", facecolor=lpp.SURFACE)
         plt.close(fig)
     return lpp.encode(d, os.path.join(lpp.media_dir(run_id=rid), "movie_phase.mp4"),
-                      fps=fps)
+                      fps=fps, cleanup=not keep)
 
 
-def movie_map2d(cfg, sc, rid, rd, fps):
+def movie_map2d(cfg, sc, rid, rd, fps, keep=False):
     """n_e(x, z) map for a 2D run."""
     import matplotlib.pyplot as plt
     import yt
@@ -233,7 +233,7 @@ def movie_map2d(cfg, sc, rid, rd, fps):
                     bbox_inches="tight", facecolor=lpp.SURFACE)
         plt.close(fig)
     return lpp.encode(d, os.path.join(lpp.media_dir(run_id=rid), "movie_map2d.mp4"),
-                      fps=fps)
+                      fps=fps, cleanup=not keep)
 
 
 def main() -> int:
@@ -242,6 +242,10 @@ def main() -> int:
     ap.add_argument("run_dir")
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--only", choices=["fields", "phase", "map2d"], default=None)
+    ap.add_argument("--keep-frames", action="store_true",
+                    help="keep the per-frame PNGs after encoding (for debugging a bad "
+                         "movie); by default they are deleted, since they are a build "
+                         "artifact of the mp4 and much larger than it")
     args = ap.parse_args()
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # sibling scripts
@@ -251,13 +255,21 @@ def main() -> int:
     rd = cfg["_run_dir"]
     print(f"{rid}: making movies at {args.fps} fps")
 
+    # Leftovers from an interrupted run would otherwise be silently spliced into a new
+    # movie by ffmpeg's frame globbing, and would accumulate on disk.
+    stale = lpp.cleanup_frame_dirs(rid)
+    if stale:
+        print(f"  removed {len(stale)} leftover frame director"
+              f"{'y' if len(stale) == 1 else 'ies'} from an earlier run")
+
+    keep = args.keep_frames
     want = {args.only} if args.only else {"fields", "phase", "map2d"}
     if "fields" in want:
-        movie_fields(cfg, sc, rid, rd, args.fps)
+        movie_fields(cfg, sc, rid, rd, args.fps, keep)
     if "phase" in want:
-        movie_phase(cfg, sc, rid, rd, args.fps)
+        movie_phase(cfg, sc, rid, rd, args.fps, keep)
     if "map2d" in want and sc.dims == 2:
-        movie_map2d(cfg, sc, rid, rd, args.fps)
+        movie_map2d(cfg, sc, rid, rd, args.fps, keep)
     return 0
 
 

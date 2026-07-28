@@ -156,7 +156,13 @@ Three movies per run, into `media/<ID>/`:
 Per-frame autoscaling is the easiest way to make a movie useless — a plume that grows by
 two decades looks stationary if its axis grows with it.
 
-Frames are written to `media/<ID>/_frames_<name>/` and the directory is cleared first, so a
-shorter re-run cannot leave stale frames spliced onto the end of the new movie. Encoding is
-libx264 with `-pix_fmt yuv420p` and an even-dimension scale filter, both required for the
-result to play in a browser.
+**Frames are temporary and are deleted automatically.** They go to
+`media/<ID>/_frames_<name>/` and the directory is removed as soon as the encode succeeds —
+the PNGs are a build artifact of the mp4 and are several times larger than it (sweeping the
+first batch reclaimed 43 MB against 13 MB of kept output). Leftovers from an interrupted
+encode are swept at startup, which also prevents ffmpeg globbing stale frames into a new,
+shorter movie. Frames are kept when ffmpeg *fails*, since then they are the only record of
+what went wrong, and `--keep-frames` retains them deliberately for debugging.
+
+Encoding is libx264 with `-pix_fmt yuv420p` and an even-dimension scale filter, both
+required for the result to play in a browser.

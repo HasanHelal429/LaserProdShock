@@ -391,13 +391,19 @@ FFMPEG = (os.environ.get("FFMPEG") or __import__("shutil").which("ffmpeg")
           or "/usr/bin/ffmpeg")
 
 
-def encode(framedir, out, fps=10):
+def encode(framedir, out, fps=10, cleanup=True):
     """Encode ``frame_%04d.png`` in ``framedir`` to an mp4 at ``out`` (libx264).
 
     ``-pix_fmt yuv420p`` and the even-dimension scale filter are both required for the
     result to play in browsers and QuickTime; libx264 rejects odd pixel dimensions, which
     a matplotlib figure will happily produce.
+
+    ``cleanup`` (default) DELETES the frame directory once the encode succeeds -- the
+    frames are a build artifact of the mp4 and a long run's worth of PNGs is far larger
+    than the movie they produced. They are deliberately kept when ffmpeg fails, because
+    then they are the only way to see what went wrong.
     """
+    import shutil
     import subprocess
 
     subprocess.run(
@@ -406,8 +412,30 @@ def encode(framedir, out, fps=10):
          "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
          "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", out],
         check=True)
-    print(f"  movie:  {out}")
+    size = os.path.getsize(out) / 1e6
+    if cleanup:
+        n = len([f for f in os.listdir(framedir) if f.startswith("frame_")])
+        shutil.rmtree(framedir, ignore_errors=True)
+        print(f"  movie:  {out}  ({size:.1f} MB; {n} frames removed)")
+    else:
+        print(f"  movie:  {out}  ({size:.1f} MB; frames kept in "
+              f"{os.path.basename(framedir)})")
     return out
+
+
+def cleanup_frame_dirs(run_id=None):
+    """Remove any leftover ``_frames_*`` directories (e.g. from an interrupted encode)."""
+    import shutil
+
+    root = media_dir(run_id=run_id) if run_id else MEDIA
+    removed = []
+    for dirpath, dirnames, _ in os.walk(root):
+        for d in list(dirnames):
+            if d.startswith("_frames_"):
+                shutil.rmtree(os.path.join(dirpath, d), ignore_errors=True)
+                removed.append(os.path.join(dirpath, d))
+                dirnames.remove(d)
+    return removed
 
 
 def movie_dir(run_id, name):
