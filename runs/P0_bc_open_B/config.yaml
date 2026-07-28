@@ -1,0 +1,101 @@
+# P0_bc_open_B — does `open` (pec fields) coexist with a UNIFORM APPLIED B0?
+#
+# THE CENTRAL PHASE-0 QUESTION. A laser-driven magnetized shock run wants three things
+# that pull against each other:
+#   1. a uniform applied B0 across the domain;
+#   2. absorbing particle boundaries, so the runaway ablation front leaves;
+#   3. a laser injection face, which is also a field and particle boundary.
+#
+# Periodic gives (1) and (3) but not (2) -- that is P0_bc_periodic's failure.
+# Silver-Mueller `absorbing` gives (2) and (3) but is INCOMPATIBLE with the projection
+# B-divergence cleaner that runs whenever an external B is set (it accepts only
+# periodic/pec/pmc/neumann, and pmc/neumann would zero the tangential B0).
+# So `open` = pec fields + absorbing particles is the only candidate that can give all
+# three, and KinShock2020 uses it successfully with a background B. This run tests
+# whether that carries over to a laser run.
+#
+# Pass criteria: B is uniform to round-off at t = 0; div(B) stays clean; no wall
+# artifact in B or E propagates measurably into the interior; the front still leaves.
+#
+# An ambient plasma is required here at all -- B0 = vA*sqrt(mu0*n_amb*Mi) is undefined
+# without a density to reference. n_amb = 0.06 n_cr (the 25:1 contrast of
+# run_laser_shock) and vA = 0.003 c give B0 = 74.7 T, 1/wci0 = 7.6 ps.
+#
+# NOTE the domain is only ~+-1.5 rho_i0, far too small for shock physics. That is fine:
+# this is a boundary test. Phase 2 sizes the box for gyro-scale physics.
+
+meta:
+  run_id: P0_bc_open_B
+  phase: 0
+  description: >
+    P0_bc_open with an ambient plasma and a uniform perpendicular B0 = 74.7 T, testing
+    whether pec field boundaries + absorbing particles coexist with a background field
+    and its divergence cleaner in a laser run.
+  reference: "TEST_PLAN.md 5.0, 5.2; KinShock2020 deck._BC_MAP ('open')"
+  deck: inputs_P0_bc_open_B
+
+reference:
+  length_scale: critical     # kept as d_e,cr for comparability with the other P0 runs
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 8000
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 20
+    scale_length_de: 15
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+    shape: planar
+    center_de: -50           # flat top [-60,-40]; laser-facing face at -40
+  ambient:
+    density_over_ncr: 0.06   # 25:1 contrast; the beam must cross it near-losslessly
+    theta_e: 5.0e-3
+    theta_i: 5.0e-5
+
+field:
+  orientation: perpendicular   # B0 along y (out of plane), transverse to z
+  vA_over_c: 0.003             # -> B0 = 74.7 T
+
+geometry:
+  dims: 1
+  normal_axis: z
+  axis: {lo_de: -100, hi_de: 100}
+  dz_over_de: 0.5
+  boundary:
+    axis: {lo: open, hi: open}
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 24000
+  ppc: {target: 200, ambient: 48}
+
+diagnostics:
+  plotfile_intervals: 2400
+  reduced_intervals: 200
+  field_intervals: 400
+  phase_intervals: 1200
+
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+
+targets:
+  note: "B_y/B0 must stay 1.000 in the far upstream; the ambient traverse must eat
+         <2% of the beam so the upstream is not pre-heated"

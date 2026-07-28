@@ -11,8 +11,9 @@ Comput. Phys. Commun. 318, 109419) and asks what it takes to drive a real shock 
 **The question.** *Can a ray-traced laser drive a piston that produces a verifiable
 collisionless shock in WarpX, and what does the laser have to be for that to happen?*
 
-**Status.** Scaffolding in place; Phase 0 not started. See `TEST_PLAN.md` §11 for the
-checklist and `RESULTS.md` for current state.
+**Status.** Phase-0 tooling built and the five boundary/geometry runs are executing. The
+config schema, deck renderer, gates G1–G7 and the laser diagnostics all work in 1D and 2D;
+71 tests pass. See `TEST_PLAN.md` §11 for the checklist and `RESULTS.md` for current state.
 
 ## The campaign
 
@@ -68,7 +69,9 @@ scripts/launch.sh -b -L      runs/<ID>          # detach + progress logger
 python scripts/run_checks.py runs/<ID>          # derived scales + gates G1-G7
 ```
 
-Only `launch.sh` and `run_progress_logger.py` are built. Everything else is Phase-0 work.
+Built: the whole Phase-0 chain above, plus `laser_report.py`. Phase 1–3 analysis
+(`phase_space.py`, `tune_shock.py`, `make_figures.py`, `sweep.py`) is still to come —
+`scripts/README.md` carries the status table.
 
 **Environment.** conda env `/opt/anaconda3/envs/physics`; WarpX at
 `/home/hhelal/warpx-cda/build/bin/warpx.{1d,2d,3d}` (OMP/CPU, double precision).

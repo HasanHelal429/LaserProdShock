@@ -1,0 +1,104 @@
+# P0_bc_inject — what happens when the ablation plume reaches the LASER INJECTION FACE?
+#
+# Established by reading the operator source (LaserDeposition.cpp ~line 916):
+#
+#     c0[m_axis] = m_inject_hi ? phi[m_axis] : plo[m_axis];
+#
+# rays are launched EXACTLY ON the injection boundary plane, not one cell inside it. So
+# the boundary cell's plasma is traversed and absorbs from the very first RK4 step, and
+# `deposit` clamps its cell index into the valid box. Nothing special happens at the
+# face -- which means the beam absorbs in whatever plasma has arrived there.
+#
+# That is physically right (a real beam is absorbed in the blow-off plasma it has to
+# cross), but it has a consequence worth measuring before Phase 1 relies on it: since
+# the ablation plume always flows BACK UP THE BEAM, it eventually reaches the launch
+# plane, and from then on the laser is being absorbed at the boundary rather than at
+# the target. If that transition also interacts with the pec wall / absorbing particle
+# boundary, the drive history becomes a boundary artifact.
+#
+# THE TEST: identical to P0_bc_open_B except the target is moved from z = -200 to
+# z = -60 d_e, i.e. its coronal ramp starts ~30 d_e from the +z injection face instead
+# of ~110. The plume reaches the launch plane early in the run, so the transition is
+# inside the observation window rather than at the end of it. Compare E_abs(t),
+# f_abs(t) and the deposition profile against P0_bc_open_B.
+
+meta:
+  run_id: P0_bc_inject
+  phase: 0
+  description: >
+    P0_bc_open_B with the target moved close to the laser injection face, so the
+    ablation plume crosses the ray launch plane early. Does the drive history become a
+    boundary artifact once plasma sits on the injection boundary?
+  reference: "TEST_PLAN.md 5.1, 5.2; LaserDeposition.cpp ray launch at plo/phi"
+  deck: inputs_P0_bc_inject
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 4000    # more dumps: the profile SHOULD move toward the face
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 20
+    scale_length_de: 15
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+    shape: planar
+    center_de: 40            # <-- THE ONLY PHYSICAL DIFFERENCE (P0_bc_open_B: -50):
+                             # face at +50, so the beam has a 50 d_e clear path at
+                             # t=0 (corona is 1e-5 n_cr at the face) but the plume
+                             # reaches the launch plane well inside the run.
+  ambient:
+    density_over_ncr: 0.06
+    theta_e: 5.0e-3
+    theta_i: 5.0e-5
+
+field:
+  orientation: perpendicular
+  vA_over_c: 0.003
+
+geometry:
+  dims: 1
+  normal_axis: z
+  axis: {lo_de: -100, hi_de: 100}
+  dz_over_de: 0.5
+  boundary:
+    axis: {lo: open, hi: open}
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 24000
+  ppc: {target: 200, ambient: 48}
+
+diagnostics:
+  plotfile_intervals: 2400
+  reduced_intervals: 200
+  field_intervals: 400
+  phase_intervals: 1200
+
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+
+targets:
+  note: "if f_abs(t) diverges from P0_bc_open_B only AFTER the plume reaches the launch
+         plane, the effect is physical absorption in the blow-off; if it diverges from
+         t = 0, the target position itself changed the drive and the runs are not
+         comparable"

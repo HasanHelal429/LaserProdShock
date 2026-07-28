@@ -19,9 +19,9 @@ python scripts/<script>.py <run_dir> [options]
 |---|---|---|---|---|
 | `launch.sh` | **The** way to start a run | `config.yaml`, `README.md`, deck | `<run_dir>/{run.log,diags/}` | **built** |
 | `run_progress_logger.py` | Sidecar wall-clock progress/ETA + live absorption-shutoff readout | `run.log`, deck | `<run_dir>/progress.log` | **built** |
-| `make_inputs.py` | `config.yaml` → deck (`--verify`, `--check`) | `config.yaml` | `inputs_<id>` | Phase 0 |
-| `run_checks.py` | Derived scales + numerical gates G1–G7 | `config.yaml`, plotfiles, reduced diags | `media/testing/*.png` | Phase 0 |
-| `laser_report.py` | `LASERDEP` history + per-cell profile dumps → `f_abs(t)`, `E_abs`, `t_s`, `Tlocalfrac` | `run.log`, `diags/laserdep_profile_*.txt` | `media/<ID>/laser_*.png` | Phase 0 |
+| `make_inputs.py` | `config.yaml` → deck (`--verify`, `--check`) | `config.yaml` | `inputs_<id>` | **built** |
+| `run_checks.py` | Derived scales + numerical gates G1–G7 + a pre-run figure | `config.yaml`, `run.log`, reduced diags | `media/<ID>/checks.png`, `gates.png` | **built** |
+| `laser_report.py` | `LASERDEP` history + per-cell profile dumps → `f_abs(t)`, `E_abs`, `t_s`, `Tlocalfrac` | `run.log`, `diags/laserdep_profile_*.txt` | `media/<ID>/laser_*.png` | **built** |
 | `plot_ablation.py` | Vacuum ablation: plume profiles, `v_p`, `T_e(t)`, energy budget | `config.yaml`, plotfiles | `media/<ID>/ablation_*.png` | Phase 1 |
 | `phase_space.py` | **The arbiter** — `f(u_z)` upstream/downstream, reflected-ion fraction | `config.yaml`, plotfiles | `media/<ID>/phase_*.png` | Phase 2 |
 | `tune_shock.py` | Fit `v_sh` + front **by eye** → `shock_fit.yaml` | `config.yaml`, plotfiles | `<run_dir>/shock_fit.yaml` | Phase 2 |
@@ -92,3 +92,31 @@ Normally started by `launch.sh -L`; standalone:
 ```bash
 python scripts/run_progress_logger.py runs/P1_vac_1d --every-pct 5 --poll 20
 ```
+
+
+---
+
+## Figure conventions
+
+Every analysis script writes into `media/<run_id>/` and prints the path. Two rules the
+figures never break, both enforced in `laserprod.plotting`:
+
+- **No dual axis.** Two measures of different scale go in stacked panels sharing an
+  x-axis, never twin y-axes. Overlaying an absorbed *power* on a *density* is how a
+  shutoff gets misread as a compression.
+- **Status is never colour alone.** Gate rows carry a colour chip, a glyph and a word,
+  so a red cell still means something in greyscale, in print, or to a reader who cannot
+  see red.
+
+The three categorical series colours (target / ambient / laser) were **validated, not
+eyeballed** — checked with the `dataviz` skill's `validate_palette.js` in the order they
+are assigned. All hard checks pass on the light surface (worst adjacent CVD ΔE 23.1
+protan / 9.6 tritan; worst normal-vision ΔE 24.0). The one WARN is sub-3:1 contrast on
+the aqua and yellow slots, whose required relief is *visible labels* — which is why every
+series is directly labelled rather than identified by colour alone.
+
+**Figure titles are descriptive, never assertive.** A panel states what the data shows,
+computed from that run's own numbers — it does not restate the hypothesis the run is
+testing. (`laser_report.py`'s coupled-energy panel computes the late/early `dE/dt` ratio
+and says whether the run saturated, because the first run through it did **not**, and a
+title claiming otherwise would have been wrong on the page.)

@@ -85,3 +85,98 @@ Next: Phase 0 (`TEST_PLAN.md` §5) — finalise the config schema, build
 `units`/`config`/`deck` + `make_inputs.py` + `run_checks.py` + `laser_report.py`, then the
 five short boundary runs, ending in a recorded decision on the default boundary
 configuration.
+
+---
+
+## 2026-07-28 — Phase 0 tooling built; boundary runs launched; three source questions closed
+
+### Tooling (all of `TEST_PLAN.md` §5.1 except the exit-overshoot measurement)
+
+`src/laserprod/{units,config,deck,io,plotting}` plus `scripts/{make_inputs,run_checks,
+laser_report,compare_runs}.py`. **71 tests pass** (`tests/test_units.py`,
+`test_gates.py`, `test_structures.py`). pytest was not installed anywhere on this
+machine — `KinShock2020/tests/` had never been runnable — so it was added to the
+`physics` env. Note the scripts import matplotlib/yaml from base anaconda but **yt lives
+only in the `physics` env**, so plotfile-reading tools (Phase 1+) must run under
+`/opt/anaconda3/envs/physics/bin/python`.
+
+**Dimension-general by construction.** 1D and 2D come out of one code path: every
+list-valued input (`amr.n_cell`, `prob_lo/hi`, the four boundary-token lists,
+`num_particles_per_cell_each_dim`, `beam_center`, `beam_focus`) is built from
+`units.axis_names(dims)`, so 2D emits WarpX XZ ordering `(x, z)` with the propagation
+axis last. `dz` is set by `dz_over_de` and the transverse cell by `dx_over_dz`;
+`timestep()` applies the full Yee CFL `dt = cfl/(c√Σ1/dx²)`, which is why a 2D deck can
+use a nominally larger `cfl`. Verified: the 2D deck renders `amr.n_cell = 80 400`,
+`boundary.field_lo = periodic pec`, `ppc = 4 4`, and `B0` on **y** (out of the XZ plane —
+the right choice for a 2D perpendicular shock, and why the 1D runs use y too).
+
+**The gates reproduce the upstream failure and its fix to three digits.** At
+`cfl = 0.75`, `dz = 0.5 d_e,ambient`, target 1.5 n_cr, G1 gives `ω_pe dt = 1.875` (deck:
+1.91) and FAILs. At `cfl = 0.35` it gives 0.875 initially, **1.07** at the 1.49×
+compression the target actually reached (deck: 1.07) and puts the hard limit of 2 at
+**7.837 n_cr** (deck: 7.84). That agreement is what makes G1 a check on physics rather
+than on an arbitrary threshold, and it is pinned in `test_gates.py`.
+
+**Length-unit cost, now quantified.** All five P0 runs use `length_scale: critical`
+(`d_e,cr = λ₀/2π = 0.1676 µm`) so their geometry is comparable and vacuum runs need no
+ambient to reference. That is **4× finer than `d_e,amb`**, hence 4× smaller `dz` *and*
+`dt` — 16× the cost for the same physical box — but it improves both gates by the same
+factor: G1 = 0.214 rather than 1.875, and `dz/λ_D`(cold target) = **61 rather than 245**.
+So the "~250× Debye-under-resolved" concern recorded on 2026-07-28 above is specific to
+ambient-referenced `dz`; at critical-referenced `dz` it is 61. Phase 2 will switch to
+`ambient` for gyro-scale boxes, where cost dominates.
+
+### Three source-code questions closed (`TEST_PLAN.md` §5.1)
+
+1. **A finite pulse is expressible.** `laser_deposition.intervals` is an
+   `IntervalsParser` (`LaserDeposition.cpp:255`), so `start:stop:period` gates the drive.
+   H4 can be tested by varying duration at fixed `I₀`.
+2. **Rays launch EXACTLY ON the injection face** —
+   `c0[m_axis] = m_inject_hi ? phi[m_axis] : plo[m_axis]` (`:916`), transverse positions
+   at sub-cell centres. The boundary cell's plasma absorbs from the first RK4 step, so
+   once the plume reaches the launch plane the beam is absorbed *in the plume*.
+   `validate()` now warns when a corona exceeds 1e-3 n_cr at the face.
+3. **Exit-boundary overshoot: mechanism confirmed.** The domain-exit test
+   (`if (c[m_axis] < plo || c[m_axis] > phi) break;`) runs **after** the step's deposit,
+   so the ray always takes one full RK4 arc-length step past the far boundary and
+   deposits it into the clamped final cell. Energy is *created*. Affected cell = the last
+   one at the **far** (non-injection) face. Still to measure for a
+   target-near-boundary geometry.
+
+### First results — `P0_bc_periodic` and `P0_bc_open` (both 24 000 steps, 2.35 ps, ~6 min at 4 threads)
+
+**The wrap hazard is confirmed by the cleanest possible signature.** With all-periodic
+boundaries the macroparticle count is **exactly** constant, 52418 → 52418
+(0.000 % lost): nothing can leave, so the runaway ablation front has nowhere to go but
+around. With `open` (pec fields + absorbing particles) the count is flat until
+**t ≈ 0.9 ps** and then falls at an accelerating rate, reaching 0.23 % lost by 2.35 ps —
+the front arriving and being absorbed. `media/P0_boundary_decision/compare.png`.
+
+**The boundary change did not perturb the drive.** `f_abs(t)` overlays between the two
+runs for the whole run, and `E_abs` agrees to 1.5 % (3.774e5 vs 3.719e5 J/m²). So the
+pair is a controlled comparison, which is the precondition for reading anything into the
+difference.
+
+**Gate G6 closes to ~0.6 %, and that is the important number.** For `P0_bc_periodic` at
+2.35 ps: tracer `E_abs = 3.774e5`, particle `ΔKE = 3.724e5`, `ΔE_field = 2865`, sum
+`3.753e5` J/m² — a **+0.55 %** gap. `P0_bc_open` closes to +1.45 % (it also loses energy
+through the boundary, which is not in the sum). **Grid heating is therefore not
+significant here despite `dz/λ_D = 61`**, which is a materially better position than the
+plan assumed and reduces (but does not remove) the pressure on the G3 laser-off controls.
+
+**Absorption is self-limiting, measured.** `f_abs` starts at **1.000** (predicted: the
+τ = 1 surface sits at z = −29 d_e, i.e. 11 d_e *in front of* the flat top, inside the
+coronal ramp) and shuts off to ~0.12 within ~0.1 ps; half-peak shutoff at **19.7 fs**.
+`Tlocalfrac` rises 0.54 → 1.000 by 0.45 ps as the plasma heats above the floor.
+
+**H2 needs refinement — a first correction to the plan.** H2 predicts coupled energy
+saturates once the drive shuts off. It does **not** here: `f_abs` falls to a **~0.12
+floor rather than to zero**, so `E_abs` keeps climbing almost linearly (3.8e5 J/m² by
+2.35 ps and still rising). The shutoff is a large drop, not an extinction. `laser_report`
+now computes the late/early `dE/dt` ratio and states in the panel title whether the run
+saturated, rather than asserting H2 — the first draft asserted it and would have been
+wrong on the page.
+
+Still executing: `P0_bc_open_B` (the central question — pec + uniform B0 + div-B
+cleaner), `P0_bc_inject`, `P0_bc_2d`. The Phase-0 **boundary decision** needs all five
+and is not yet recorded.

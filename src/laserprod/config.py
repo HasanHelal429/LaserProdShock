@@ -1,0 +1,363 @@
+"""Load, validate and gate a per-run LaserProdShock config.
+
+The config holds only PRIMARY quantities; :mod:`laserprod.units` derives the rest.
+
+Two kinds of check live here:
+
+``validate``
+    **structural** checks — things that would make WarpX abort, or that are silently
+    wrong (a single periodic face, oblique incidence in 1D, Silver-Mueller fields
+    with a background B). These are hard errors where WarpX would abort anyway, and
+    warnings where the deck is merely suspicious.
+
+``gates``
+    the **numerical gates G1-G7** of ``TEST_PLAN.md`` 6, each of which exists because
+    it was violated somewhere in the prior work. Gates never raise: they return a
+    list of :class:`Gate` results so ``run_checks.py`` can print them, plot them, and
+    a run README can record them. A deck may legitimately sit outside a gate (the
+    cold target *always* fails G2), but it may not do so silently.
+"""
+
+from __future__ import annotations
+
+import math
+import os
+from dataclasses import dataclass
+
+import yaml
+
+from . import units
+
+# Semantic boundary names understood by the config (deck.py maps them to WarpX
+# tokens). Kept here so validate() can check names before deck.render() runs.
+BOUNDARY_NAMES = ("periodic", "reflecting", "open", "absorbing")
+
+REQUIRED_SECTIONS = ["meta", "laser", "reference", "plasma", "geometry", "numerics"]
+
+
+# --------------------------------------------------------------------------- #
+# loading
+# --------------------------------------------------------------------------- #
+def load(path: str) -> dict:
+    """Load a config from a YAML file or a run directory (containing config.yaml)."""
+    if os.path.isdir(path):
+        path = os.path.join(path, "config.yaml")
+    with open(path, "r") as fh:
+        cfg = yaml.safe_load(fh)
+    cfg["_path"] = os.path.abspath(path)
+    cfg["_run_dir"] = os.path.dirname(cfg["_path"])
+    missing = [k for k in REQUIRED_SECTIONS if k not in cfg]
+    if missing:
+        raise KeyError(f"config missing required section(s): {missing}")
+    return cfg
+
+
+def derive(cfg: dict) -> units.Scales:
+    """Convenience: config dict -> derived :class:`laserprod.units.Scales`."""
+    return units.derive(cfg)
+
+
+def run_id(cfg: dict) -> str:
+    return str(cfg.get("meta", {}).get("run_id") or
+               os.path.basename(cfg.get("_run_dir", "unknown")))
+
+
+# --------------------------------------------------------------------------- #
+# boundary helpers (dimension-general)
+# --------------------------------------------------------------------------- #
+def boundary_faces(cfg: dict) -> dict:
+    """``{axis_name: (lo_name, hi_name)}`` in WarpX axis order.
+
+    The config's ``geometry.boundary`` has an ``axis`` entry (the propagation axis)
+    and, in 2D, a ``transverse`` entry. Each is either a single name applied to both
+    faces or a ``{lo, hi}`` mapping.
+    """
+    geo = cfg["geometry"]
+    b = geo.get("boundary") or {}
+    names = units.axis_names(int(geo["dims"]))
+    normal = str(geo.get("normal_axis", "z"))
+
+    def pair(spec, default="periodic"):
+        if spec is None:
+            return (default, default)
+        if isinstance(spec, dict):
+            return (str(spec.get("lo", default)), str(spec.get("hi", default)))
+        return (str(spec), str(spec))
+
+    out = {}
+    for ax in names:
+        out[ax] = pair(b.get("axis")) if ax == normal else pair(b.get("transverse"))
+    return out
+
+
+def has_background_field(cfg: dict) -> bool:
+    fld = cfg.get("field") or {}
+    return (str(fld.get("orientation", "none")) != "none"
+            and float(fld.get("vA_over_c", 0.0) or 0.0) != 0.0)
+
+
+def is_vacuum(cfg: dict) -> bool:
+    return not (cfg.get("plasma") or {}).get("ambient")
+
+
+# --------------------------------------------------------------------------- #
+# structural validation
+# --------------------------------------------------------------------------- #
+def validate(cfg: dict) -> list[str]:
+    """Structural checks. Returns warning strings; raises only on a hard error."""
+    warns: list[str] = []
+    geo, las, num = cfg["geometry"], cfg["laser"], cfg["numerics"]
+    dims = int(geo["dims"])
+
+    if dims not in (1, 2, 3):
+        raise ValueError(f"geometry.dims must be 1, 2 or 3 (got {dims})")
+
+    normal = str(geo.get("normal_axis", "z"))
+    if normal != "z":
+        raise ValueError(
+            f"geometry.normal_axis = {normal!r}: only 'z' is supported. The laser "
+            "propagates along the target normal, and WarpX's 1D geometry is z-only, "
+            "so every deck in this project keeps the propagation axis on z (2D is "
+            "XZ, with x transverse).")
+    if str(las.get("direction", "z")) != normal:
+        raise ValueError(f"laser.direction ({las.get('direction')}) must equal "
+                         f"geometry.normal_axis ({normal})")
+
+    if dims == 1:
+        if geo.get("transverse"):
+            warns.append("geometry.transverse is ignored in 1D")
+        if abs(float(las.get("incidence_angle_deg", 0.0))) > 1e-12:
+            raise ValueError("laser.incidence_angle_deg must be 0 in 1D (oblique "
+                             "incidence needs a transverse dimension to refract into)")
+        beam = las.get("beam") or {}
+        if str(beam.get("profile", "uniform")) != "uniform":
+            warns.append("laser.beam.profile is meaningless in 1D (no transverse "
+                         "dimension); it will be written as 'uniform'")
+    else:
+        if not geo.get("transverse"):
+            raise ValueError(f"geometry.transverse.{{lo_de,hi_de}} is required in {dims}D")
+
+    # --- boundaries ---
+    faces = boundary_faces(cfg)
+    for ax, (lo, hi) in faces.items():
+        for name in (lo, hi):
+            if name not in BOUNDARY_NAMES:
+                raise ValueError(f"unknown boundary {name!r} on axis {ax}; expected "
+                                 f"one of {list(BOUNDARY_NAMES)}")
+        n_per = (lo == "periodic") + (hi == "periodic")
+        if n_per == 1:
+            raise ValueError(
+                f"axis {ax}: exactly one face is 'periodic' -- WarpX requires both "
+                f"faces periodic together or neither (got lo={lo}, hi={hi})")
+
+    if has_background_field(cfg):
+        bad = [ax for ax, p in faces.items() if "absorbing" in p]
+        if bad:
+            warns.append(
+                f"boundary 'absorbing' (Silver-Mueller) on axis {bad} is incompatible "
+                "with the B-field divergence cleaner that runs when a background B is "
+                "set -- use 'open' (pec fields + absorbing particles) instead")
+
+    # The hazard that cost two decks upstream: a free expansion behind periodic
+    # boundaries wraps its runaway ion front back onto the upstream.
+    ax_faces = faces[normal]
+    if "periodic" in ax_faces and not (cfg.get("meta", {}).get("expect_wrap")):
+        warns.append(
+            "propagation axis is periodic: a free ablation expansion has a runaway "
+            "ion front (measured at 0.20 c upstream) that will WRAP and pollute the "
+            "far side, and WarpX forces particle BCs periodic when field BCs are. "
+            "Set meta.expect_wrap: true if this is a deliberate control run.")
+
+    # --- laser block ---
+    beam = las.get("beam") or {}
+    prof = str(beam.get("profile", "uniform"))
+    if prof not in ("uniform", "gaussian", "super_gaussian"):
+        raise ValueError(f"laser.beam.profile must be uniform|gaussian|"
+                         f"super_gaussian (got {prof!r})")
+    if prof != "uniform" and not beam.get("waist_de"):
+        raise ValueError(f"laser.beam.waist_de is required for beam profile {prof!r}")
+    if beam.get("focus_de") is not None and len(beam["focus_de"]) != dims:
+        raise ValueError(f"laser.beam.focus_de needs one entry per dimension "
+                         f"({dims}), got {len(beam['focus_de'])}")
+    if str(las.get("inject_side", "lo")) not in ("lo", "hi"):
+        raise ValueError("laser.inject_side must be 'lo' or 'hi'")
+    if str(las.get("temperature_mode", "local")) not in ("local", "fixed"):
+        raise ValueError("laser.temperature_mode must be 'local' or 'fixed'")
+    if float(las.get("intensity", 0.0)) < 0:
+        raise ValueError("laser.intensity must be non-negative")
+    rc = float(las.get("ray_cfl", 0.25))
+    if not (0.0 < rc <= 1.0):
+        raise ValueError("laser.ray_cfl must be in (0, 1]")
+
+    # --- geometry sanity vs the target ---
+    # --- does the target fit, and does it touch the injection face? ---
+    # Both questions are about DENSITY, not about a nominal extent: the corona is a
+    # Gaussian on the laser-facing side only, so "where the target ends" means "where
+    # its density stops mattering optically". n_edge below is that threshold.
+    sc = units.derive(cfg)
+    tgt = cfg["plasma"]["target"]
+    z_t = float(tgt.get("center_de", 0.0)) * sc.de_ref
+    half_t = 0.5 * sc.thickness
+    inject_hi = str(las.get("inject_side", "lo")) == "hi"
+    n_edge = 1e-3 * sc.n_cr                 # optically negligible at any Z_eff lnLambda
+    reach = 0.0
+    if sc.scale_length > 0 and sc.n_targ > n_edge:
+        reach = sc.scale_length * math.sqrt(math.log(sc.n_targ / n_edge))
+    face_pos = z_t + half_t if inject_hi else z_t - half_t
+    if inject_hi:
+        z_min, z_max = z_t - half_t, face_pos + reach
+    else:
+        z_min, z_max = face_pos - reach, z_t + half_t
+    if z_min < sc.domain_lo or z_max > sc.domain_hi:
+        warns.append(
+            f"the target spans [{z_min/sc.de_ref:.0f}, {z_max/sc.de_ref:.0f}] d_e "
+            f"(flat top {sc.thickness/sc.de_ref:.0f} d_e plus the one-sided corona out "
+            f"to 1e-3 n_cr) but the domain is [{sc.domain_lo/sc.de_ref:.0f}, "
+            f"{sc.domain_hi/sc.de_ref:.0f}] d_e")
+
+    # Plasma sitting ON the injection face is not a harmless overlap: rays launch
+    # exactly on that plane (LaserDeposition.cpp), so the beam would be absorbed in the
+    # boundary cell from step 0 and the drive becomes a boundary quantity.
+    face = sc.domain_hi if inject_hi else sc.domain_lo
+    d_face = abs(face - face_pos)
+    n_at_face = (sc.n_targ * math.exp(-(d_face / sc.scale_length) ** 2)
+                 if sc.scale_length > 0 else (sc.n_targ if d_face <= 0 else 0.0))
+    if n_at_face > n_edge and not cfg.get("meta", {}).get("expect_face_plasma"):
+        warns.append(
+            f"the target's corona is {n_at_face/sc.n_cr:.2g} n_cr at the laser "
+            "injection face, and rays launch EXACTLY ON that face -- the beam will be "
+            "absorbed in the boundary cell from step 0. Set meta.expect_face_plasma: "
+            "true if that is the point of the run.")
+
+    if float(geo.get("dx_over_dz", 1.0)) != 1.0 and dims > 1:
+        warns.append(
+            f"dx_over_dz = {geo['dx_over_dz']}: the ray tracer's arc-length step is "
+            "ray_cfl * min(dx) -- non-square cells make the ray step finer than the "
+            "coarse direction needs, raising cost without accuracy")
+
+    if is_vacuum(cfg) and has_background_field(cfg):
+        warns.append("a background field is set but there is no ambient plasma: vA "
+                     "and B0 are undefined without n_amb, so the field is ignored")
+    return warns
+
+
+# --------------------------------------------------------------------------- #
+# the numerical gates (TEST_PLAN.md 6)
+# --------------------------------------------------------------------------- #
+@dataclass
+class Gate:
+    key: str          # 'G1' ...
+    label: str
+    status: str       # 'pass' | 'warn' | 'fail' | 'info' | 'post'
+    value: float | None
+    detail: str
+
+    @property
+    def ok(self) -> bool:
+        return self.status in ("pass", "info")
+
+
+def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
+    """Evaluate the pre-run numerical gates. Never raises."""
+    sc = sc or units.derive(cfg)
+    g = (cfg.get("gates") or {})
+    out: list[Gate] = []
+
+    # --- G1: omega_pe*dt at the PEAK compressed density ---
+    lim = float(g.get("omega_pe_dt_max", 1.2))
+    comp = float(g.get("compression_factor", 2.0))
+    status = "pass" if sc.wpe_dt_peak <= lim else (
+        "warn" if sc.wpe_dt_peak < 2.0 else "fail")
+    out.append(Gate(
+        "G1", f"omega_pe*dt at {comp:g}x compression", status, sc.wpe_dt_peak,
+        f"initial {sc.wpe_dt_targ:.3f} at {sc.n_targ_over_ncr:.2f} n_cr; "
+        f"{sc.wpe_dt_peak:.3f} at {comp:g}x; limit 2 reached at "
+        f"{sc.n_over_ncr_at_wpe_dt_2:.2f} n_cr (budget {lim:g}). "
+        "The grid CFL cannot see this limit -- it is set by dz/c and knows nothing "
+        "about how dense the plasma is."))
+
+    # --- G2: dz/lambda_D per region ---
+    lim2 = float(g.get("dz_over_lambdaD_max", 8.0))
+    parts = [f"target(cold) {sc.dz_over_lD_targ:.0f}"]
+    if sc.dz_over_lD_amb is not None:
+        parts.append(f"ambient {sc.dz_over_lD_amb:.1f}")
+    amb_bad = sc.dz_over_lD_amb is not None and sc.dz_over_lD_amb > lim2
+    out.append(Gate(
+        "G2", "dz/lambda_D per region", "warn" if amb_bad else "info",
+        sc.dz_over_lD_targ,
+        ", ".join(parts) + f" (ambient budget {lim2:g}). "
+        "The cold near-critical target is Debye-under-resolved by construction on "
+        "one uniform grid -- this is a MEASUREMENT, made meaningful by G3, not a "
+        "pass/fail. Economise via ppc/domain/duration, never by coarsening dz (G7)."))
+
+    # --- G3: laser-off control ---
+    off = (cfg.get("controls") or {}).get("laser_off")
+    rd = cfg.get("_run_dir", "")
+    if float(cfg["laser"].get("intensity", 0.0)) == 0.0:
+        out.append(Gate("G3", "laser-off control", "info", None,
+                        "this run IS a laser-off control (intensity = 0)"))
+    elif off:
+        sib = os.path.join(os.path.dirname(rd), str(off)) if rd else str(off)
+        exists = os.path.isdir(sib)
+        out.append(Gate("G3", "laser-off control", "pass" if exists else "warn", None,
+                        f"declared control {off!r}"
+                        + ("" if exists else " -- but that run directory does not exist")))
+    else:
+        out.append(Gate("G3", "laser-off control", "warn", None,
+                        "no controls.laser_off declared. The cold target is Debye-"
+                        "under-resolved (G2), so grid heating can only be separated "
+                        "from laser heating by an identical laser-off run."))
+
+    # --- G4: ray_cfl / turning point ---
+    interior_crit = sc.n_targ_over_ncr > 1.0
+    declared = bool((cfg.get("controls") or {}).get("ray_cfl_ladder"))
+    out.append(Gate(
+        "G4", "ray_cfl convergence", "info" if not interior_crit else
+        ("pass" if declared else "warn"), float(cfg["laser"].get("ray_cfl", 0.25)),
+        (f"target peak {sc.n_targ_over_ncr:.2f} n_cr > 1: there IS an interior "
+         "critical surface, and ray_cfl convergence is non-monotonic for "
+         "turning-point problems (the 0.25 default sits near a 2.5% excursion). "
+         "Declare controls.ray_cfl_ladder once checked."
+         if interior_crit else
+         f"target peak {sc.n_targ_over_ncr:.2f} n_cr < 1: underdense, no turning "
+         "point, and uniform slabs are exact at any ray_cfl.")))
+
+    # --- G5: ppc for local temperature mode ---
+    ppc = (cfg["numerics"].get("ppc") or {})
+    ppc_t = int(ppc.get("target", 0))
+    local = str(cfg["laser"].get("temperature_mode", "local")) == "local"
+    lim5 = int(g.get("ppc_target_min", 200))
+    status = "info" if not local else ("pass" if ppc_t >= lim5 else "warn")
+    # Order-of-magnitude bias on <T^-3/2>: with N macroparticles per cell the
+    # temperature has relative spread ~sqrt(2/3N), giving a bias ~(15/8)(2/3N). This
+    # OVER-estimates the measured values (it gives 5% where 25 ppc was measured at ~3%,
+    # and 0.16% where 800 ppc was measured at <0.1%), so quote it as an upper bound.
+    bias = (15.0 / 8.0) * (2.0 / (3.0 * ppc_t)) if ppc_t else float("nan")
+    out.append(Gate(
+        "G5", "ppc for local T_e", status, float(ppc_t),
+        f"target ppc {ppc_t}, mode {'local' if local else 'fixed'}. "
+        + (f"Absorption bias <~{bias*100:.1f}% (upper bound; T^-3/2 is convex, so "
+           f"per-cell noise biases K HIGH -- measured ~3% at 25 ppc, <0.1% at 800; "
+           f"budget {lim5} ppc). Watch Tlocalfrac."
+           if local else "fixed mode: no ppc-driven absorption bias.")))
+
+    # --- G6: energy closure (post-run) ---
+    out.append(Gate("G6", "energy closure", "post", None,
+                    "post-run: tracer E_abs (immune to grid heating) vs the particle "
+                    "KE gain. Their difference IS the grid-heating budget."))
+
+    # --- G7: dz provenance ---
+    out.append(Gate("G7", "dz unchanged when economising", "info",
+                    float(cfg["geometry"]["dz_over_de"]),
+                    f"dz = {cfg['geometry']['dz_over_de']} d_e,{sc.length_scale} "
+                    f"= {sc.dz*1e6:.4f} um. The free parameter is dz/lambda_D (G2), "
+                    "not resolution in d_e: coarsening 0.5 -> 1.0 d_e blew a run up "
+                    "upstream (ambient to u ~ 0.15 c, B_y/B_0 = 82)."))
+    return out
+
+
+def gate_summary(gs: list[Gate]) -> str:
+    n = {k: sum(1 for x in gs if x.status == k) for k in
+         ("pass", "warn", "fail", "info", "post")}
+    return (f"{n['pass']} pass, {n['warn']} warn, {n['fail']} fail, "
+            f"{n['info']} info, {n['post']} post-run")

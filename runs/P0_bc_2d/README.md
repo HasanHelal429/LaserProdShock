@@ -1,0 +1,83 @@
+# P0_bc_2d — the transverse boundary, and the 1D↔2D planar baseline
+
+**Phase.** 0, `TEST_PLAN.md` §5.2
+
+**Question.** 2D adds a transverse axis, and with it a boundary choice that has no 1D
+analogue. The two options are not two spellings of the same thing:
+
+- **transverse periodic** — the drive is *exactly planar* and a uniform beam is
+  effectively infinite. This is the configuration in which a 2D run must reproduce 1D on
+  axis, so it is the **1D↔2D validation**. It is what the known-good upstream
+  `run_laser_shock_2d` deck used. **This run.**
+- **transverse open** — a finite system: plasma leaves sideways, lateral rarefaction is
+  real, and a finite beam spot means something. Required for the Phase-1/3 finite-spot
+  physics (planarity, H5), but it introduces edge effects whose reach must be measured
+  against the box width.
+
+The periodic case comes first deliberately: if the planar 2D run does *not* match 1D,
+then a later 2D↔1D discrepancy would have two candidate causes (dimensionality and the
+transverse boundary) instead of one.
+
+**Expected.** On-axis `n_e(z)`, `f_abs(t)` and `E_abs(t)` match `P0_bc_open_B` within
+noise over the overlapping window (0 → 0.79 ps). All transverse structure stays flat: a
+uniform beam on a planar target with periodic transverse boundaries has no x dependence
+to develop, so any x structure that appears is numerical.
+**Falsified by.** An on-axis discrepancy against `P0_bc_open_B` larger than the ppc noise
+floor, or transverse structure growing out of nothing. Either is a bug or a boundary
+artifact, not physics — and both must be resolved before any 2D physics claim.
+
+## Setup
+
+The 1D `P0_bc_open_B` extended to 2D (WarpX XZ). Same target, laser, field, domain along
+z and duration in dt. Transverse extent ±20 d_e (80 cells) with square cells
+(`dx_over_dz: 1.0`), because the ray tracer's arc-length step is `ray_cfl × min(dx)` and
+non-square cells make the ray step finer than the coarse direction needs.
+
+B0 is along **y**, out of the x–z plane — the standard choice for a 2D perpendicular
+shock, and why the 1D runs already use y.
+
+`cfl = 0.5`, not 0.35: with square cells the 2D Yee CFL already carries a factor
+1/√2, and 0.5 is the setting the known-good 2D deck used. ω_pe·dt = 0.306 at compression,
+so G1 has ample margin either way.
+
+**Two scopes this run does NOT have.** (1) The transverse extent is ~0.5 ρ_i0
+(ρ_i0 = 40.8 d_e here), so this is not gyro-scale 2D physics — Phase 2 sizes the
+transverse box against ρ_i0, which `TEST_PLAN.md` §2.1 shows is affordable. (2) At 8000
+steps it covers 0.79 ps, a third of the 1D runs' window, so the on-axis comparison is
+over 0 → 0.79 ps only, and the plume does not reach the axial boundary. Neither limits
+the question being asked.
+
+Parent: `P0_bc_open_B`. Declared follow-up: `P0_bc_2d_open` (transverse `open`).
+
+## Cost
+
+80 × 400 = 32 000 cells × 4 species × 16 ppc (4×4 per dim) ≈ 2.0M macroparticles,
+8000 steps (dt = 0.0988 fs → 0.79 ps). Substantially the most expensive P0 run.
+See `progress.log`.
+
+## Gates
+
+| Gate | Value | Pass? |
+|---|---|---|
+| G1 ω_pe·dt at 2× compression | 0.306 | PASS |
+| G2 dz/λ_D | target 61, ambient 1.73 | info |
+| G3 laser-off control | none declared | WARN |
+| G4 ray_cfl | 0.25, interior critical surface | WARN |
+| G5 ppc / Tlocalfrac | 16 target ppc — **budget relaxed to 16 for this run** | PASS (relaxed) |
+| G6 energy closure | | post-run |
+
+**G5 is knowingly relaxed.** Local-`T_e` mode needs several hundred macroparticles per
+cell for sub-percent absorbed power, because `T^{-3/2}` is convex and per-cell noise
+biases `K` high (~3% at 25 ppc). At 16 ppc the absorption here is biased high by roughly
+8%, so **this run's `f_abs` is not an absorption measurement** — it is a boundary and
+dimensionality test, and the 1D↔2D comparison is against a 1D run at 200 ppc, which
+means a systematic offset in `f_abs` of that order is expected and is not evidence of a
+2D effect. Phase 1's 2D runs raise ppc for the absorption numbers.
+
+## Result
+
+*(not yet run)*
+
+## Retracted
+
+Nothing.

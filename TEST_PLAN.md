@@ -6,9 +6,10 @@
 `ParticleHeater` + `TargetInjector` piston surrogate that `KinShock2020` used to replicate
 Schaeffer et al. 2020.
 
-**Status.** Planning document. Phase 0 has not started. The repository scaffolding
-(`scripts/launch.sh`, `scripts/run_progress_logger.py`, the docs and folder layout) is in
-place; everything under "Tooling" in §4 is still to be built.
+**Status.** **Phase 0 tooling is built and the boundary runs are executing** (2026-07-28).
+The config schema (§3), the deck renderer, gates G1–G7, the laser diagnostics and the
+cross-run comparison all work in 1D and 2D from one code path; 71 tests pass. The three
+source-code questions of §5.1 are resolved. Phases 1–3 remain as written.
 
 **The one-sentence question.** *Can a ray-traced laser drive a piston that produces a
 verifiable collisionless shock in WarpX, and what does the laser have to be for that to
@@ -117,6 +118,14 @@ that have one (continuity with `KinShock2020` and `run_laser_shock`), `critical`
 runs. `laserprod.units` reports all three. *This is the single most confusable thing in the
 project* — see the two-different-"20"s trap that `KinShock2020`'s `CLAUDE.md` documents for
 collisionality, and do not repeat its shape here.
+
+**It is also a cost decision, not just a label.** All five Phase-0 runs use `critical`, so
+their geometry is directly comparable and a vacuum run needs no ambient to reference. But
+`d_e,cr = 0.1676 µm` is **4× finer than `d_e,amb`**, so at the same `dz_over_de` the cell is
+4× smaller and `dt` 4× shorter — 16× the cost for the same physical box. The upside is that
+`ω_pe·dt` and `dz/λ_D` both improve by the same factor (G1 = 0.21 rather than 1.88;
+`dz/λ_D` = 61 rather than 245). Phase 1's vacuum runs keep `critical`; Phase 2 switches to
+`ambient` for gyro-scale boxes, where the cost matters more than the resolution does.
 
 Worked example for the `run_laser_shock` parameters (target 1.5 n_cr, ambient 0.06 n_cr,
 25:1 contrast, m_i/m_e = 100, v_A = 0.003 c):
@@ -368,18 +377,32 @@ Finalise the config schema (§3) and build `make_inputs.py` + `run_checks.py` +
 `laser_report.py`. The boundary-token map is ported, but `transverse` faces and the
 `inject_side` interaction are new and get their own map entries.
 
-Also settle, by reading the operator source rather than guessing:
+**Three questions settled by reading the operator source — RESOLVED 2026-07-28:**
 
-- Does `laser_deposition.intervals` accept `start:stop:period`, so a **finite pulse** can be
-  expressed? (If not, pulse duration is not controllable and H2/H4 must be tested by
-  changing `max_step` instead — which confounds duration with observation window.)
-- What the ray tracer does at the injection face when the first cell holds plasma.
-- Whether the documented **exit-boundary overshoot** (the ray takes a partial extra
-  arc-length step past the far boundary and *creates* energy in the final cell — read
-  +24.9 % high at default `ray_cfl`) matters here. In the upstream slab tests it inflated
-  total absorption by ≤ 0.04 %; in a **vacuum ablation run the target sits close to the far
-  boundary**, so the affected cell may be inside the physics. Quantify, then decide whether
-  to clip the last step upstream.
+1. **A finite pulse IS expressible.** `laser_deposition.intervals` is parsed by
+   `ablastr::utils::text::IntervalsParser` (`LaserDeposition.cpp:255`), so
+   `start:stop:period` works and pulse duration is a first-class knob. H4 can therefore be
+   tested by varying duration at fixed `I₀`, without confounding it with the observation
+   window. The config exposes it as `laser.intervals`.
+2. **Rays launch EXACTLY ON the injection face**, not one cell inside it:
+   `c0[m_axis] = m_inject_hi ? phi[m_axis] : plo[m_axis]` (`LaserDeposition.cpp:916`), with
+   transverse positions at sub-cell centres. So the boundary cell's plasma is traversed and
+   absorbs from the first RK4 step, and `deposit` clamps its index into the valid box.
+   Nothing special happens at the face — which means **the beam is absorbed in whatever
+   plasma has reached the launch plane**. Physically right (a real beam crosses its own
+   blow-off), but it makes the drive a boundary quantity once the plume arrives, which is
+   what `P0_bc_inject` measures. `config.validate` now warns when a target's corona is
+   optically significant (> 10⁻³ n_cr) *at* the injection face.
+3. **The exit-boundary overshoot is confirmed, and its mechanism is now known.** The
+   domain-exit test
+   (`if (c[m_axis] < plo[m_axis] || c[m_axis] > phi[m_axis]) break;`) happens **after** the
+   step's deposit, so the ray always takes one full RK4 arc-length step past the far
+   boundary and deposits it into the clamped final cell — energy is *created*, not
+   misplaced. The affected cell is the last one at the **far** (non-injection) face. In the
+   upstream slab tests this inflated total absorption by ≤ 0.04 % while reading +24.9 % high
+   in that one cell. **Still to do**: quantify it for a target-near-boundary geometry, then
+   decide whether to clip the last step upstream (fixing it is in scope — finding a bug is a
+   valid outcome of a test campaign).
 
 ### 5.2 The runs
 
@@ -621,16 +644,22 @@ boundaries, is the project's headline output.
 ## 11. Checklist
 
 **Phase 0 — boundaries and geometry**
-- [ ] Finalise `config.yaml` schema; decide the `length_scale` default and document the trap
-- [ ] `src/laserprod/{units,config,deck}` + `scripts/make_inputs.py` (+ `--verify`, `--check`)
-- [ ] `scripts/run_checks.py` implementing gates G1–G7
-- [ ] `scripts/laser_report.py` (`LASERDEP` history + profile dumps)
-- [ ] Read the operator source: `intervals` pulse gating, injection-face behaviour with plasma, exit-boundary overshoot
-- [ ] `P0_bc_periodic` — reproduce and quantify the wrap failure
-- [ ] `P0_bc_open`, `P0_bc_open_B` — `pec` + absorbing particles + uniform `B₀`
-- [ ] `P0_bc_inject` — injection face vs outflowing plume
-- [ ] `P0_bc_2d` — transverse periodic vs open, and the width at which it stops mattering
+- [x] Finalise `config.yaml` schema; decide the `length_scale` default and document the trap
+- [x] `src/laserprod/{units,config,deck,io,plotting}` + `scripts/make_inputs.py`
+      (+ `--verify`, `--check`) — dimension-general 1D/2D from one code path
+- [x] `scripts/run_checks.py` implementing gates G1–G7, with a pre-run figure
+- [x] `scripts/laser_report.py` (`LASERDEP` history + profile dumps)
+- [x] `scripts/compare_runs.py` — cross-run overlay, the actual Phase-0 evidence
+- [x] `tests/` — 71 checks: units identities, every gate firing on a violating config,
+      per-run README presence, deck round-trip, boundary-token consistency
+- [x] Read the operator source: `intervals` pulse gating (works), injection-face
+      behaviour (rays launch ON the face), exit-boundary overshoot (mechanism confirmed) — §5.1
+- [x] `P0_bc_periodic` — wrap failure reproduced: particle number **exactly** constant
+- [~] `P0_bc_open`, `P0_bc_open_B` — running
+- [~] `P0_bc_inject` — running
+- [~] `P0_bc_2d` — transverse periodic (the planar baseline); `P0_bc_2d_open` is the follow-up
 - [ ] **Decision recorded**: the default boundary configuration, with rejected alternatives and why
+- [ ] Quantify the exit-boundary overshoot for a target-near-boundary geometry
 
 **Phase 1 — vacuum ablation**
 - [ ] `P1_vac_1d` + `P1_vac_1d_off` (G3) + `ray_cfl` check (G4)

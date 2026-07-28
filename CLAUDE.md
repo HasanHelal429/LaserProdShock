@@ -59,8 +59,10 @@ python scripts/phase_space.py  runs/<ID>                # THE ARBITER -- before 
 python scripts/tune_shock.py   runs/<ID>                # fit v_sh + front BY EYE -> shock_fit.yaml
 python scripts/make_figures.py runs/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
 ```
-Only `launch.sh` and `run_progress_logger.py` exist so far; the rest is Phase-0 work
-(`TEST_PLAN.md` §3, §11).
+Built: `launch.sh`, `run_progress_logger.py`, `make_inputs.py`, `run_checks.py`,
+`laser_report.py`, and `src/laserprod/{units,config,deck,io,plotting}`. Still to build:
+`phase_space.py`, `tune_shock.py`, `make_figures.py`, `make_movies.py`, `plot_ablation.py`,
+`sweep.py` and `laserprod.metrics` (Phase 1-3; see `TEST_PLAN.md` §11).
 
 ## Hard-won conventions & gotchas
 
@@ -102,15 +104,26 @@ Only `launch.sh` and `run_progress_logger.py` exist so far; the rest is Phase-0 
 - **Thickening the target does not raise the Mach number.** Coupled energy and mass both
   scale with thickness, so `v = √(2E/m)` is unchanged. Thickness buys piston *momentum*
   (drive distance).
+- **A finite pulse is expressed through `intervals`.** `laser_deposition.intervals` is an
+  `IntervalsParser`, so `start:stop:period` gates the drive on and off — there is no
+  pulse-shape parameter. Verified in the source, 2026-07-28.
+- **Rays launch EXACTLY ON the injection face** (`c0[axis] = inject_hi ? phi : plo`), not one
+  cell inside it. So the boundary cell's plasma absorbs from the first RK4 step, and once the
+  ablation plume reaches the launch plane **the beam is absorbed in the plume rather than at
+  the target**. That is physically right, but it makes the drive a boundary quantity — keep
+  the target far enough from the injection face that the transition is observable rather than
+  present from t = 0. `make_inputs.py` warns when a corona exceeds 1e-3 n_cr at the face.
 - **Analyse the step-0 deposition profile.** Later `profile_intervals` dumps drift as the
   kicks move electrons.
 - **`ray_cfl = 0.25` (default) is not asymptotic for turning-point problems** —
   convergence in the arc-length step is non-monotonic and the default sits near a 2.5 %
   excursion. Uniform slabs are exact at any `ray_cfl`. Check it whenever the target has an
   interior critical surface.
-- **Known operator bug: exit-boundary overshoot.** The ray takes a partial extra arc-length
-  step past the far boundary and deposits it in the final cell, which reads **+24.9 %** high
-  at default `ray_cfl`; the energy is *created*, not misplaced. ≤ 0.04 % of total absorption
+- **Known operator bug: exit-boundary overshoot.** The domain-exit test happens *after* the
+  step's deposit, so the ray always takes one full RK4 arc-length step past the far boundary
+  and deposits it into the clamped final cell — which reads **+24.9 %** high at default
+  `ray_cfl`. The energy is *created*, not misplaced, and the affected cell is the last one at
+  the **far** (non-injection) face. ≤ 0.04 % of total absorption
   upstream, but a vacuum-ablation target sits near that boundary. Quantify before trusting
   the last cell. Fixing it upstream is in scope — finding a bug is a valid outcome of a test
   campaign.

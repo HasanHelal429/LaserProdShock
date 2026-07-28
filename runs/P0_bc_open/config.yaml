@@ -1,0 +1,87 @@
+# P0_bc_open — the candidate fix: pec fields + absorbing particles, B0 = 0.
+#
+# Identical to P0_bc_periodic in every physical primary; ONLY the boundary changes,
+# periodic -> open. `open` maps to (field = pec, particle = absorbing): the runaway
+# ablation front should now LEAVE the domain instead of wrapping onto the far side.
+#
+# What this run has to establish beyond "the ions left":
+#   - what the pec field wall reflects back (spurious E_z, a wall sheath, charge
+#     accumulation) and how far into the domain that intrusion reaches;
+#   - that E_abs is unchanged from the periodic run while the plume is still far from
+#     either boundary, i.e. the boundary change did not perturb the drive itself.
+#
+# B0 = 0 here on purpose: this isolates the PARTICLE boundary question. Whether pec
+# also coexists with a uniform applied B0 is the separate question P0_bc_open_B asks,
+# and keeping them apart means a failure has one candidate cause.
+
+meta:
+  run_id: P0_bc_open
+  phase: 0
+  description: >
+    P0_bc_periodic with open (pec fields + absorbing particles) boundaries and no
+    background field. Does the runaway ablation front leave cleanly, and what does
+    the pec wall reflect back?
+  reference: "TEST_PLAN.md 5.2"
+  deck: inputs_P0_bc_open
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 8000
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 20
+    scale_length_de: 15
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+    shape: planar
+    center_de: -50           # flat top [-60,-40]; laser-facing face at -40
+  ambient: null              # VACUUM
+
+field:
+  orientation: none
+
+geometry:
+  dims: 1
+  normal_axis: z
+  axis: {lo_de: -100, hi_de: 100}
+  dz_over_de: 0.5
+  boundary:
+    axis: {lo: open, hi: open}   # <-- THE ONLY DIFFERENCE FROM P0_bc_periodic
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 24000
+  ppc: {target: 200, ambient: 48}
+
+diagnostics:
+  plotfile_intervals: 2400
+  reduced_intervals: 200
+  field_intervals: 400
+  phase_intervals: 1200
+
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+
+targets:
+  note: "particle number must FALL as the front leaves (PN reduced diag); E_abs must
+         match P0_bc_periodic while the plume is far from both boundaries"

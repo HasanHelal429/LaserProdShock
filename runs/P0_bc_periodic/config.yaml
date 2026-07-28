@@ -1,0 +1,90 @@
+# P0_bc_periodic — the KNOWN FAILURE, reproduced on purpose.
+#
+# All-periodic boundaries on the propagation axis. WarpX ties particle boundaries to
+# field boundaries (Source/Particles/ParticleBoundaries.cpp), so periodic fields force
+# periodic particles, and a free ablation expansion has a runaway ion front (measured
+# at 0.20 c upstream) that then WRAPS onto the far side of the domain and pollutes it.
+# Two deck versions died this way upstream, and no vacuum gap was large enough.
+#
+# This run exists so that failure is quantified once, in this repository, at these
+# parameters -- so no later run has to re-litigate whether periodic "might be fine".
+# meta.expect_wrap silences the validator warning that fires for exactly this case.
+#
+# LENGTH UNIT: all five P0 runs use d_e at CRITICAL density, d_e,cr = lam0/2pi =
+# 0.1676 um, so their geometry numbers are directly comparable. It is also the only
+# length scale defined for a vacuum run (there is no ambient to reference).
+
+meta:
+  run_id: P0_bc_periodic
+  phase: 0
+  description: >
+    1D laser ablation of a 1.5 n_cr target into vacuum with all-periodic boundaries.
+    Deliberate reproduction of the runaway-ion-front wrap failure, to quantify it.
+  reference: "TEST_PLAN.md 5.2; warpx-cda/laser_deposition/run_laser_shock/ (the failure)"
+  deck: inputs_P0_bc_periodic
+  expect_wrap: true          # acknowledges the periodic-axis hazard: control run
+
+reference:
+  length_scale: critical     # lengths below are in d_e,cr = lam0/2pi = 0.1676 um
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18          # W/m^2
+  direction: z
+  inject_side: hi            # laser enters at +z and travels -z; plume flows back +z
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0           # mid-Z stand-in, and a VERY strong knob -- see CLAUDE.md
+  temperature_mode: local    # the default, and the right one: K responds to its own heating
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 8000    # dumps at steps 0, 8000, ...; ANALYSE STEP 0
+
+plasma:
+  target:
+    density_over_ncr: 1.5    # overdense -> the beam turns inside the target
+    thickness_de: 20
+    scale_length_de: 15      # Gaussian coronal ramp on the laser-facing side
+    theta_e_init: 1.0e-4     # 51 eV, cold
+    theta_i_init: 1.0e-6
+    shape: planar
+    center_de: -50           # flat top [-60,-40]; laser-facing face at -40
+  ambient: null              # VACUUM
+
+field:
+  orientation: none          # B0 = 0: this run is about particle boundaries only
+
+geometry:
+  dims: 1
+  normal_axis: z
+  axis: {lo_de: -100, hi_de: 100}
+  dz_over_de: 0.5
+  boundary:
+    axis: {lo: periodic, hi: periodic}
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 24000            # ~2.3 ps: long enough for the rarefaction front to reach a boundary
+  ppc: {target: 200, ambient: 48}
+
+diagnostics:
+  plotfile_intervals: 2400
+  reduced_intervals: 200
+  field_intervals: 400
+  phase_intervals: 1200      # phase space is how the wrap is actually seen
+
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+
+controls:
+  laser_off: P0_bc_periodic_off   # not yet created; G3 will flag it
+
+targets:
+  note: "no physics target -- this run's deliverable is the wrap rate and how much
+         of the domain it contaminates"
