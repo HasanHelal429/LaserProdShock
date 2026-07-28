@@ -382,3 +382,39 @@ def colorbar(fig, im, ax, label):
     cb.set_label(label, fontsize=8)
     cb.ax.tick_params(labelsize=7)
     return cb
+
+
+# --------------------------------------------------------------------------- #
+# movie encoding
+# --------------------------------------------------------------------------- #
+FFMPEG = (os.environ.get("FFMPEG") or __import__("shutil").which("ffmpeg")
+          or "/usr/bin/ffmpeg")
+
+
+def encode(framedir, out, fps=10):
+    """Encode ``frame_%04d.png`` in ``framedir`` to an mp4 at ``out`` (libx264).
+
+    ``-pix_fmt yuv420p`` and the even-dimension scale filter are both required for the
+    result to play in browsers and QuickTime; libx264 rejects odd pixel dimensions, which
+    a matplotlib figure will happily produce.
+    """
+    import subprocess
+
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error", "-framerate", str(fps),
+         "-i", os.path.join(framedir, "frame_%04d.png"),
+         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+         "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", out],
+        check=True)
+    print(f"  movie:  {out}")
+    return out
+
+
+def movie_dir(run_id, name):
+    """Scratch directory for movie frames (under media/, so it is gitignored)."""
+    d = os.path.join(media_dir(run_id=run_id), f"_frames_{name}")
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):                       # start clean: stale frames would be
+        if f.startswith("frame_"):                # silently spliced into the new movie
+            os.remove(os.path.join(d, f))
+    return d

@@ -55,14 +55,21 @@ scripts/launch.sh -b -L runs/<ID>                       # launch WarpX (+ progre
 python scripts/make_inputs.py runs/<ID> --verify        # deck == config?
 python scripts/run_checks.py   runs/<ID>                # derived scales + gates G1-G7
 python scripts/laser_report.py runs/<ID>                # f_abs(t), E_abs, t_s, Tlocalfrac
+python scripts/plot_fields.py  runs/<ID>                # streaks + lineouts (needs yt: physics env)
 python scripts/phase_space.py  runs/<ID>                # THE ARBITER -- before any shock claim
+python scripts/make_movies.py  runs/<ID>                # movies (needs yt + ffmpeg)
 python scripts/tune_shock.py   runs/<ID>                # fit v_sh + front BY EYE -> shock_fit.yaml
 python scripts/make_figures.py runs/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
 ```
 Built: `launch.sh`, `run_progress_logger.py`, `make_inputs.py`, `run_checks.py`,
-`laser_report.py`, and `src/laserprod/{units,config,deck,io,plotting}`. Still to build:
-`phase_space.py`, `tune_shock.py`, `make_figures.py`, `make_movies.py`, `plot_ablation.py`,
-`sweep.py` and `laserprod.metrics` (Phase 1-3; see `TEST_PLAN.md` §11).
+`laser_report.py`, `compare_runs.py`, `plot_fields.py`, `phase_space.py`, `make_movies.py`,
+and `src/laserprod/{units,config,deck,io,plotting}`. Still to build: `tune_shock.py`,
+`make_figures.py`, `plot_ablation.py`, `sweep.py` and `laserprod.metrics` (Phase 1-3).
+
+**The plotfile tools need the `physics` env** (yt is not in base anaconda):
+`/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/<ID>`. The
+config/log-based tools (`make_inputs`, `run_checks`, `laser_report`, `compare_runs`) do
+not, and work while a run is still going.
 
 ## Hard-won conventions & gotchas
 
