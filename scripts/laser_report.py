@@ -116,10 +116,8 @@ def profile_figure(cfg, sc, path, run_id):
     if not tab:
         print(f"  (profile table {path} is empty)")
         return None
-    cols = list(tab)
-    # trailing three columns are n_e, H, P_abs; everything before is coordinates
-    ne, H, Pabs = tab[cols[-3]], tab[cols[-2]], tab[cols[-1]]
-    zc = tab[cols[-4]] if len(cols) >= 4 else list(range(len(ne)))
+    ne, H, Pabs = tab["n_e"], tab["H"], tab["P_abs"]
+    zc = tab.get("z", list(range(len(ne))))
     z_de = [v / sc.de_ref for v in zc]
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11.0, 6.0), sharex=True)

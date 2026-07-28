@@ -277,3 +277,122 @@ Next: the exit-boundary overshoot measurement (the one Phase-0 item left), then 
 keep the ambient out of the heated species list while a vacuum run has no ambient anyway
 — finding (a) means the Phase-2 ambient temperature is now a *drive* parameter, not just
 an upstream one.
+
+---
+
+## 2026-07-28 (later) — Spatial diagnostics, the exit-overshoot measurement, and three corrections
+
+### New tooling
+
+`scripts/plot_fields.py` ((z,t) streaks of n_e, B_y, E_z + lineouts + a 2D x–z snapshot),
+`scripts/phase_space.py` (ion (z,u_z) — the arbiter), and
+`laserprod.config.geometry_diagram()`, which renders an ASCII geometry sketch **from the
+config** so a run README's diagram cannot drift from what the deck builds
+(`make_inputs.py <run> --diagram`; now required in every run README and checked by
+`tests/test_structures.py`). 78 tests pass.
+
+Two colour-mapping errors were found and fixed by looking at the output. The B_y/B₀
+diverging map was centred on the **data midpoint** (1.9 for a 0.5–3.3 range), so an
+undisturbed B/B₀ = 1 rendered blue as if it were already a cavity; it is now centred on
+1.0. And E_z was scaled by its extremes, which are grid noise.
+
+### What the pictures show
+
+**The pec wall builds a growing B pile-up, and it is now bounded.** `|B_y/B₀ − 1|` at the
+wall goes 0.00 → 0.17 → 0.76 → 1.55 → **2.39** at t = 0, 0.59, 1.17, 1.76, 2.35 ps —
+monotonic, not saturating. It penetrates **6–9 d_e (12–18 cells)**, against an interior
+99th-percentile deviation of 0.46. **Practical rule: exclude the outer ~10 d_e from
+analysis, and re-check the reach for longer runs, because the artifact grows.**
+`plot_fields.py` now shades that exclusion band automatically.
+
+**E_z is not usefully resolved at these parameters**: raw rms **4.3×10⁹ V/m**, comparable
+to or above the ambipolar field itself, so the map is boxcar-smoothed over 9 cells and the
+panel says so. Any E_z-based conclusion here would be a conclusion about grid noise.
+
+**The ablation is a textbook isothermal rarefaction fan.** Phase space shows the linear
+u_z(z) ramp developing, with the target-ion front (99.9th percentile) accelerating
+3.27 → 3.83 → 5.97 → **9.17 C_s** over 0 → 2.35 ps. This is the cleanest confirmation so
+far that the laser is driving the ablation the model says it should.
+
+### CORRECTION — what was actually leaving through the open boundaries
+
+The 2026-07-28 entry above attributed the `open`-boundary particle loss to "the runaway
+front arriving and being absorbed". **That is wrong, and the per-species numbers say so:**
+
+- `P0_bc_open` (vacuum): **0.45 % of target *electrons*** left; target ions lost **1
+  macroparticle out of 26 209**. At 2.35 ps the target ions span z ∈ [−88, +22] d_e with
+  **none** beyond |z| > 90 — the ion front never reached a boundary. What leaves is the
+  fast *electron* tail.
+- `P0_bc_open_B` and `P0_bc_inject` (with ambient): the target species lost **0.00 %** and
+  the entire 5.84 % is **ambient** — electrons 15.67 % and ions 15.71 %, almost equal.
+  Equal electron and ion loss is not a thermal tail, it is **bulk ambient drain at the open
+  walls**: the ambient fills the domain up to the boundary, and any ambient ion within
+  ~v_th,i·t of a face leaves. With θ_i = 5×10⁻⁵ (v_th,i = 2.1×10⁶ m/s) over 2.35 ps that is
+  ~30 d_e of each 100 d_e half-width, and a simple flux estimate gives 3.2 %/ps against
+  6.7 %/ps measured.
+
+So the wrap hazard's **mechanism** is confirmed (nothing can leave a periodic domain), but
+its **consequence** — the ion front wrapping and polluting the far side — has *not* been
+demonstrated at these run lengths, because the ion front does not reach a boundary in
+2.35 ps. The boundary decision stands on the mechanism plus the B₀ and drive results, not
+on observed pollution.
+
+### NEW PHASE-2 CONSTRAINT — the ambient drains at open walls
+
+At ~6.7 %/ps for a 200 d_e domain, a Phase-2 run of 2.5 gyroperiods (≈19 ps) would drain
+the ambient **many times over**. The drain fraction scales as v_th,i·t/L, so the levers are
+a larger domain, a colder ambient, or particle-injecting/thermal boundaries. **This must be
+resolved before `P2_mag`**, and it is a direct consequence of choosing `open` — periodic
+would not drain, which is the one thing periodic is good at. Added to the Phase-2 checklist.
+
+### The exit-boundary overshoot — MEASURED, and the upstream description is not reproduced
+
+`studies/exit_overshoot/`: a uniform **underdense** slab (0.5 n_cr) filling the domain so
+the ray transits and exits the far face — the Phase-0 runs cannot test this, because their
+overdense target turns the ray and sends it back out the *injection* face. τ = 1.265,
+400 cells, `temperature_mode: fixed`, a 10¹⁴ W/m² probe so the profile stays static, and
+`max_step = 2` because only the step-0 dump is needed. Ten `ray_cfl` values, seconds each.
+
+| ray_cfl | exit cell | interior mean | interior cell-to-cell rms | TOTAL absorbed |
+|---|---|---|---|---|
+| 0.05 | −26.4 % | +0.05 % | 0.73 % | −0.12 % |
+| 0.10 | −19.3 % | +0.18 % | 1.45 % | +0.04 % |
+| 0.25 | **−7.9 %** | −0.13 % | 3.64 % | −0.30 % |
+| 0.50 | +11.1 % | −0.36 % | 7.30 % | −0.53 % |
+| 1.00 | −24.7 % | −1.45 % | 19.95 % | −2.00 % |
+
+**Findings.**
+
+1. **The dominant per-cell error is not the boundary — it is cell-to-cell aliasing over
+   the whole domain.** Deposition is lumped at each RK4 step's *endpoint*
+   (`deposit` is called once per step at the current position), so with a step of
+   `ray_cfl × dz` the number of endpoints landing in a given cell varies. The rms scatter
+   is 0.73 % at `ray_cfl = 0.05`, 3.6 % at 0.25 and **20 %** at 1.0. The exit cell is one
+   sample of that pattern, not a separate mechanism.
+2. **The overshoot mechanism is real but is superposed on a deficit.** On the smooth branch
+   `ray_cfl ≤ 0.25` the exit-cell error follows ≈ (−27 % + ray_cfl), i.e. the predicted
+   `+ray_cfl` extra step *is* being added, on top of a systematic ~−27 % shortfall in that
+   cell. Beyond 0.25 the alignment scatter dominates (−45 % at 0.75).
+3. **No net energy creation was observed.** The total absorbed power is **low**, not high:
+   −0.12 % to −0.30 % for `ray_cfl ≤ 0.25`, degrading to −2.0 % at 1.0. Independently the
+   operator's own `LASERDEP Pabs`/I₀ = 0.7156 against the analytic 1 − e^−τ = 0.7178,
+   agreeing to **0.31 %**. **This does not reproduce the upstream description** (+24.9 %
+   high in the final cell, energy *created*, inflating total absorption by ≤ 0.04 %). The
+   geometry differs from theirs, so this is a partial non-reproduction rather than a
+   contradiction — but the upstream figure should not be quoted for this project's runs.
+
+**Practical rules, which is what the measurement was for.** (a) Discard the boundary cell
+in any spatial deposition analysis. (b) Keep `ray_cfl ≤ 0.25` for per-cell profile work
+(alias ≤ 3.6 %) and ≤ 0.1 for ≤ 1.5 %. (c) Integrated absorption is safe to ≤ 0.3 % at
+`ray_cfl ≤ 0.25` — so gate G4 matters for *profiles*, much less for *energetics*.
+
+### Bug fixed in the profile-table reader
+
+`read_profile_table` assumed the last three columns were `(n_e, H, P_abs)`. The dump
+actually has **six** columns in 1D — `z, n_e, H, P_abs, theta_e, A` — so it was silently
+returning `A` as `P_abs`. The `#` lines are prose, not a column-name row, so the layout is
+now parsed positionally from the front and the columns are returned under names (`z`,
+`n_e`, `H`, `P_abs`, `theta_e`, `A`). This affected `laser_report.py`'s profile figure for
+every run made before this entry; those figures have been regenerated.
+
+`runs/P0_bc_2d_open` (transverse `open`, the declared follow-up) is running.

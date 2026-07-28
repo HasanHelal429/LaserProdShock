@@ -1,0 +1,85 @@
+meta:
+  run_id: P0_bc_2d_open
+  phase: 0
+  description: 'P0_bc_2d with TRANSVERSE OPEN boundaries instead of periodic: a finite
+    system in which plasma can leave sideways, so lateral rarefaction is real and
+    a finite beam spot means something. Measures the sideways loss rate and how far
+    the transverse wall reaches in, against the planar (periodic) baseline.'
+  reference: TEST_PLAN.md 5.2; warpx-cda/laser_deposition/run_laser_shock_2d/
+  deck: inputs_P0_bc_2d_open
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 4000
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 20
+    scale_length_de: 15
+    theta_e_init: 0.0001
+    theta_i_init: 1.0e-06
+    shape: planar
+    center_de: -50
+  ambient:
+    density_over_ncr: 0.06
+    theta_e: 0.005
+    theta_i: 5.0e-05
+field:
+  orientation: perpendicular
+  vA_over_c: 0.003
+geometry:
+  dims: 2
+  normal_axis: z
+  axis:
+    lo_de: -100
+    hi_de: 100
+  transverse:
+    lo_de: -20
+    hi_de: 20
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: open
+      hi: open
+numerics:
+  cfl: 0.5
+  particle_shape: 2
+  max_step: 8000
+  ppc:
+    target: 16
+    ambient: 16
+diagnostics:
+  plotfile_intervals: 1000
+  reduced_intervals: 50
+  field_intervals: 200
+  phase_intervals: 500
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 16
+targets:
+  note: on-axis n_e(z), f_abs(t) and E_abs(t) should match P0_bc_2d while the transverse
+    wall is far from the axis; the difference IS the edge effect, and its reach in
+    d_e sets the minimum transverse box for finite-spot physics
+controls:
+  planar_baseline: P0_bc_2d

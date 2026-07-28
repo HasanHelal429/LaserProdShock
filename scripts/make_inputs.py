@@ -38,11 +38,19 @@ def main() -> int:
     ap.add_argument("--verify", action="store_true",
                     help="verify warpx_used_inputs against config.yaml (post-run)")
     ap.add_argument("--quiet", "-q", action="store_true", help="less chatter")
+    ap.add_argument("--diagram", action="store_true",
+                    help="print the run's ASCII geometry diagram (for its README.md) "
+                         "and exit")
     args = ap.parse_args()
 
     cfg = lpconfig.load(args.run_dir)
     rid = lpconfig.run_id(cfg)
     sc = lpconfig.derive(cfg)
+
+    if args.diagram:
+        # Generated from the config, so a README's diagram cannot drift from the deck.
+        print(lpconfig.geometry_diagram(cfg))
+        return 0
 
     # --- structural validation (hard errors raise out of load/validate) ---
     warns = lpconfig.validate(cfg)

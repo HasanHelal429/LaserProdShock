@@ -1,0 +1,89 @@
+# Base config for the exit-boundary overshoot measurement.
+#
+# GEOMETRY CHOSEN SO THE RAY ACTUALLY EXITS THE FAR FACE. The Phase-0 runs all use an
+# OVERDENSE target (1.5 n_cr), so their rays turn at the critical surface and leave back
+# through the INJECTION face -- they never test the far boundary. Here the slab is
+# uniform and UNDERDENSE (0.5 n_cr) and fills the whole domain, so the ray transits and
+# exits at z = lo, which is where the overshoot lands.
+#
+# tau is tuned to ~0.94 (n = 0.5 n_cr, Z_eff = 1, lnLambda = 4, theta = 1e-4) so the exit
+# cell still carries ~39% of the incident intensity: with tau >> 1 the beam would be gone
+# before the boundary and the overshoot would be invisible; with tau << 1 the absorbed
+# power per cell would be at the noise floor.
+#
+# max_step = 2 because ONLY THE STEP-0 PROFILE DUMP IS NEEDED -- the measurement is of the
+# ray tracer's own deposition against the initial, exactly-known density. Each variant
+# runs in seconds.
+
+meta:
+  run_id: OVERRIDDEN
+  phase: 0
+  description: >
+    Uniform underdense slab, ray transits and exits the far boundary. Measures the
+    exit-boundary overshoot: the domain-exit test runs AFTER the step's deposit, so the
+    ray always takes one full RK4 arc-length step past the boundary and deposits it into
+    the clamped final cell, creating energy.
+  reference: "TEST_PLAN.md 5.1 item 3; LaserDeposition.cpp domain-exit test after deposit"
+  deck: OVERRIDDEN
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e14          # low: a probe, so the profile stays static at step 0
+  direction: z
+  inject_side: hi            # ray travels -z and exits at z = lo
+  incidence_angle_deg: 0.0
+  Z_eff: 1.0
+  coulomb_log: 4.0
+  temperature_mode: fixed    # FIXED, not local: the analytic reference assumes a known
+                             # uniform T_e, and local mode would add per-cell moment
+                             # noise that has nothing to do with the overshoot
+  intervals: 1
+  ray_cfl: 0.25              # <-- THE SWEPT PARAMETER
+  profile_intervals: 1       # dumps at steps 0, 1, 2; analyse step 0
+
+plasma:
+  target:
+    density_over_ncr: 0.5    # underdense: no turning point, the ray transits
+    thickness_de: 200        # fills the domain exactly
+    scale_length_de: 0       # sharp edges, so the analytic march is exact
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+    shape: planar
+    center_de: 0
+  ambient: null
+
+field:
+  orientation: none
+
+geometry:
+  dims: 1
+  normal_axis: z
+  axis: {lo_de: -100, hi_de: 100}
+  dz_over_de: 0.5
+  boundary:
+    axis: {lo: open, hi: open}
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 2
+  ppc: {target: 200, ambient: 48}
+
+diagnostics:
+  plotfile_intervals: 2
+  reduced_intervals: 1
+
+gates:
+  compression_factor: 1.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+
+targets:
+  note: "the last cell at the EXIT face should read high by an amount that scales with
+         ray_cfl; everything else should match an analytic Beer-Lambert march"

@@ -26,6 +26,25 @@ to develop, so any x structure that appears is numerical.
 floor, or transverse structure growing out of nothing. Either is a bug or a boundary
 artifact, not physics — and both must be resolved before any 2D physics claim.
 
+## Geometry
+
+```
+2D  |  propagation axis z  |  lengths in d_e at critical density = 0.1676 um
+
+                                                               <== laser
+      .............########~~~~~~~~~~~~~................................
+      ^                                                                ^
+      open                                                          open
+      z = -100                                                  z = +100
+
+  #  target flat top : 1.5 n_cr, 20 d_e thick, centred at -50 d_e
+  ~  coronal ramp   : Gaussian, L_n = 15 d_e on the LASER-FACING side (face at z = -40)
+  .  ambient        : 0.06 n_cr, theta_e = 0.005  (fills BOTH sides -- no vacuum gap)
+  x  transverse     : -20 .. 20 d_e, boundaries periodic/periodic
+  B  field          : B0 = 74.7 T along y (perpendicular to z), 1/w_ci0 = 7.61 ps
+  grid              : 80 x 400 cells, dz = 0.5 d_e, dt = 0.09882 fs, 8000 steps = 0.7906 ps
+```
+
 ## Setup
 
 The 1D `P0_bc_open_B` extended to 2D (WarpX XZ). Same target, laser, field, domain along

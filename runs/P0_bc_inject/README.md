@@ -26,6 +26,24 @@ mean the target's position alone changed the drive and the two runs are not comp
 or the absorbed power showing a discontinuity or non-monotonic jump exactly at the
 arrival time, which would indicate boundary coupling rather than absorption.
 
+## Geometry
+
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1676 um
+
+                                                               <== laser
+      ..........................................########~~~~~~~~~~~~~...
+      ^                                                                ^
+      open                                                          open
+      z = -100                                                  z = +100
+
+  #  target flat top : 1.5 n_cr, 20 d_e thick, centred at +40 d_e
+  ~  coronal ramp   : Gaussian, L_n = 15 d_e on the LASER-FACING side (face at z = +50)
+  .  ambient        : 0.06 n_cr, theta_e = 0.005  (fills BOTH sides -- no vacuum gap)
+  B  field          : B0 = 74.7 T along y (perpendicular to z), 1/w_ci0 = 7.61 ps
+  grid              : 400 cells, dz = 0.5 d_e, dt = 0.09783 fs, 24000 steps = 2.348 ps
+```
+
 ## Setup
 
 Identical to `P0_bc_open_B` except `plasma.target.center_de: -50 → 40`, putting the

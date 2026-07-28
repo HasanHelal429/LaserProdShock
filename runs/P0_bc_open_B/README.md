@@ -27,6 +27,24 @@ the far upstream; or wall artifacts in `B_y`/`E_z` that intrude measurably. Any 
 forks the plan (§5.3): either a large sacrificial buffer region, or a documented artifact
 with a stated validity window in time.
 
+## Geometry
+
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1676 um
+
+                                                               <== laser
+      .............########~~~~~~~~~~~~~................................
+      ^                                                                ^
+      open                                                          open
+      z = -100                                                  z = +100
+
+  #  target flat top : 1.5 n_cr, 20 d_e thick, centred at -50 d_e
+  ~  coronal ramp   : Gaussian, L_n = 15 d_e on the LASER-FACING side (face at z = -40)
+  .  ambient        : 0.06 n_cr, theta_e = 0.005  (fills BOTH sides -- no vacuum gap)
+  B  field          : B0 = 74.7 T along y (perpendicular to z), 1/w_ci0 = 7.61 ps
+  grid              : 400 cells, dz = 0.5 d_e, dt = 0.09783 fs, 24000 steps = 2.348 ps
+```
+
 ## Setup
 
 `P0_bc_open` plus an ambient plasma and a perpendicular field. The ambient is required

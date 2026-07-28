@@ -313,3 +313,72 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg, n_targ=None, n_amb=None
     ax_tau.set_xlabel(f"z  [d$_e$ at {sc.length_scale} density]")
     style_axes(ax_tau)
     return K, tau, f_abs_pred
+
+
+# --------------------------------------------------------------------------- #
+# colour maps for spatial fields
+# --------------------------------------------------------------------------- #
+# Sequential = ONE hue, light -> dark (never a rainbow). Diverging = two hues with a
+# NEUTRAL GREY midpoint, used only for quantities that genuinely change sign -- B_y/B_0
+# does, inside a diamagnetic cavity, and painting that with a sequential map hides the
+# reversal that is the whole point.
+def _seg(name, stops):
+    from matplotlib.colors import LinearSegmentedColormap
+    return LinearSegmentedColormap.from_list(name, stops)
+
+
+CMAP_DENSITY = _seg("lps_density", ["#fcfcfb", "#f6c9b3", C_TARGET, "#7a2f11"])
+CMAP_AMBIENT = _seg("lps_ambient", ["#fcfcfb", "#b9d2f0", C_AMBIENT, "#123c6e"])
+CMAP_LASER = _seg("lps_laser", ["#fcfcfb", "#a9e3c9", C_LASER, "#0c5c40"])
+CMAP_DIVERGING = _seg("lps_div", [C_AMBIENT, "#b9d2f0", "#e8e7e0", "#f6c9b3", C_TARGET])
+
+
+def streak(ax, arr, z_de, t_ps, cmap, label, vmin=None, vmax=None, log=False,
+           symmetric=False, center=None, clip_pct=None):
+    """Draw a (z, t) streak image. Returns the image handle.
+
+    ``symmetric`` centres a diverging scale on zero (what a signed field wants).
+    ``center`` centres it on a MEANINGFUL REFERENCE instead -- use 1.0 for B/B_0, so the
+    neutral grey lands on "undisturbed field" and blue/orange read as cavity/compression.
+    Centring a diverging map on the data midpoint instead is a real misreading: with a
+    range 0.5-3.3 the midpoint is 1.9, so an undisturbed B/B_0 = 1 renders as if it were
+    already a cavity.
+    ``clip_pct`` sets the scale from a percentile rather than the extremes, so a field
+    dominated by grid noise (E_z at dz/lambda_D >> 1) still shows its structure.
+    """
+    import numpy as np
+    from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
+
+    a = np.asarray(arr)
+    if center is not None:
+        lo = float(np.nanmin(a)) if vmin is None else vmin
+        hi = float(np.nanmax(a)) if vmax is None else vmax
+        if clip_pct:
+            lo = float(np.nanpercentile(a, 100 - clip_pct))
+            hi = float(np.nanpercentile(a, clip_pct))
+        lo, hi = min(lo, center - 1e-9), max(hi, center + 1e-9)
+        norm = TwoSlopeNorm(vmin=lo, vcenter=center, vmax=hi)
+    elif symmetric:
+        m = (float(np.nanpercentile(np.abs(a), clip_pct)) if clip_pct
+             else float(np.nanmax(np.abs(a)))) or 1.0
+        norm = Normalize(vmin=-m, vmax=m)
+    elif log:
+        pos = a[a > 0]
+        lo = vmin or (float(np.nanpercentile(pos, 1)) if pos.size else 1e-3)
+        norm = LogNorm(vmin=max(lo, 1e-12), vmax=vmax or float(np.nanmax(a)))
+    else:
+        norm = Normalize(vmin=vmin if vmin is not None else float(np.nanmin(a)),
+                         vmax=vmax if vmax is not None else float(np.nanmax(a)))
+    im = ax.imshow(a, origin="lower", aspect="auto", interpolation="nearest",
+                   cmap=cmap, norm=norm,
+                   extent=[z_de[0], z_de[-1], t_ps[0], t_ps[-1]])
+    ax.set_ylabel("t  [ps]")
+    ax.set_title(label, loc="left", fontweight="bold")
+    return im
+
+
+def colorbar(fig, im, ax, label):
+    cb = fig.colorbar(im, ax=ax, pad=0.012, fraction=0.035)
+    cb.set_label(label, fontsize=8)
+    cb.ax.tick_params(labelsize=7)
+    return cb

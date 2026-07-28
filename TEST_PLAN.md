@@ -662,7 +662,16 @@ boundaries, is the project's headline output.
       axis, periodic transverse. B₀ verified uniform to **ratio 1.000000** against
       `B₀²/(2µ₀)L` with pec boundaries; rejected alternatives and reasons in RESULTS
       2026-07-28
-- [ ] Quantify the exit-boundary overshoot for a target-near-boundary geometry
+- [x] Quantify the exit-boundary overshoot (`studies/exit_overshoot/`): the dominant
+      per-cell error is cell-to-cell ALIASING from endpoint-lumped deposition (rms 0.7 %
+      at ray_cfl 0.05, 3.6 % at 0.25, 20 % at 1.0), not the boundary; the total absorbed
+      is LOW by 0.1-0.3 % for ray_cfl <= 0.25, so no net energy creation was seen and the
+      upstream +24.9 %/energy-created description is not reproduced. Rules: discard the
+      boundary cell, keep ray_cfl <= 0.25 for profiles, energetics are safe to 0.3 %.
+- [x] `P0_bc_2d_open` (transverse open) launched
+- [ ] **Phase-2 blocker found in Phase 0**: with `open` walls the ambient DRAINS at
+      ~6.7 %/ps for a 200 d_e domain (measured), so a 2.5-gyroperiod run would empty it.
+      Resolve before `P2_mag` -- larger domain, colder ambient, or injecting boundaries.
 
 **Phase 1 — vacuum ablation**
 - [ ] `P1_vac_1d` + `P1_vac_1d_off` (G3) + `ray_cfl` check (G4)

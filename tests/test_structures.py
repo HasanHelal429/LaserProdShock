@@ -35,7 +35,8 @@ def test_every_run_has_a_readme(run_dir):
     path = os.path.join(run_dir, "README.md")
     assert os.path.isfile(path), f"{os.path.basename(run_dir)} has no README.md"
     text = open(path).read()
-    for heading in ("**Phase.**", "**Question.**", "## Result", "## Retracted"):
+    for heading in ("**Phase.**", "**Question.**", "## Geometry", "## Result",
+                    "## Retracted"):
         assert heading in text, f"{os.path.basename(run_dir)} README lacks {heading}"
 
 

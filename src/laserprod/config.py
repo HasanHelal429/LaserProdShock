@@ -365,3 +365,99 @@ def gate_summary(gs: list[Gate]) -> str:
          ("pass", "warn", "fail", "info", "post")}
     return (f"{n['pass']} pass, {n['warn']} warn, {n['fail']} fail, "
             f"{n['info']} info, {n['post']} post-run")
+
+
+# --------------------------------------------------------------------------- #
+# ASCII geometry diagram (for run READMEs)
+# --------------------------------------------------------------------------- #
+def geometry_diagram(cfg: dict, width: int = 66) -> str:
+    """An ASCII sketch of the run's geometry, GENERATED FROM THE CONFIG.
+
+    Generated rather than hand-drawn so it cannot drift away from what the deck actually
+    builds -- the same reason the density panel in ``run_checks`` is sampled from the
+    deck's own ``density_function``. Shows the propagation axis with the target slab, its
+    coronal ramp, the ambient fill, the boundary condition on each face, and which face
+    the laser enters through; in 2D it adds the transverse extent and its boundaries.
+    """
+    sc = units.derive(cfg)
+    geo, las = cfg["geometry"], cfg["laser"]
+    tgt = cfg["plasma"]["target"]
+    dims = int(geo["dims"])
+    de = sc.de_ref
+    z_lo, z_hi = sc.domain_lo / de, sc.domain_hi / de
+    span = z_hi - z_lo
+    inject_hi = str(las.get("inject_side", "lo")) == "hi"
+    faces = boundary_faces(cfg)
+    ax_lo, ax_hi = faces[str(geo.get("normal_axis", "z"))]
+
+    centre = float(tgt.get("center_de", 0.0))
+    half = 0.5 * float(tgt["thickness_de"])
+    Ln = float(tgt.get("scale_length_de", 0.0))
+    face = centre + half if inject_hi else centre - half
+
+    def col(z_de):
+        return max(0, min(width - 1, int(round((z_de - z_lo) / span * (width - 1)))))
+
+    # the bar: '#' flat top, '~' corona (out to 1e-3 n_cr), '.' ambient, ' ' vacuum
+    fill = "." if not is_vacuum(cfg) else " "
+    bar = [fill] * width
+    reach = 0.0
+    if Ln > 0 and sc.n_targ > 1e-3 * sc.n_cr:
+        reach = Ln * math.sqrt(math.log(sc.n_targ / (1e-3 * sc.n_cr)))
+    c0, c1 = col(centre - half), col(centre + half)
+    if inject_hi:
+        for c in range(c1, col(face + reach) + 1):
+            bar[c] = "~"
+    else:
+        for c in range(col(face - reach), c0 + 1):
+            bar[c] = "~"
+    for c in range(c0, c1 + 1):
+        bar[c] = "#"
+
+    L = []
+    a = L.append
+    a("```")
+    a(f"{dims}D  |  propagation axis z  |  lengths in d_e at "
+      f"{sc.length_scale} density = {de*1e6:.4f} um")
+    a("")
+    arrow_row = [" "] * width
+    lab = "<== laser" if inject_hi else "laser ==>"
+    if inject_hi:
+        for i, ch in enumerate(lab):
+            arrow_row[width - len(lab) + i] = ch
+    else:
+        for i, ch in enumerate(lab):
+            arrow_row[i] = ch
+    a("      " + "".join(arrow_row))
+    a("      " + "".join(bar))
+    a("      " + "^" + " " * (width - 2) + "^")
+    a(f"      {ax_lo:<{max(len(ax_lo), 1)}}" + " " * max(1, width - len(ax_lo)
+                                                         - len(ax_hi)) + f"{ax_hi}")
+    a(f"      z = {z_lo:+.0f}" + " " * max(1, width - 16) + f"z = {z_hi:+.0f}")
+    a("")
+    a(f"  #  target flat top : {tgt['density_over_ncr']:g} n_cr, "
+      f"{tgt['thickness_de']:g} d_e thick, centred at {centre:+g} d_e")
+    if Ln > 0:
+        a(f"  ~  coronal ramp   : Gaussian, L_n = {Ln:g} d_e on the LASER-FACING side "
+          f"(face at z = {face:+g})")
+    if is_vacuum(cfg):
+        a("  ' ' vacuum        : no ambient plasma")
+    else:
+        amb = cfg["plasma"]["ambient"]
+        a(f"  .  ambient        : {amb['density_over_ncr']:g} n_cr, theta_e = "
+          f"{amb['theta_e']:g}  (fills BOTH sides -- no vacuum gap)")
+    if dims > 1:
+        tr = geo["transverse"]
+        t_lo, t_hi = faces["x"]
+        a(f"  x  transverse     : {tr['lo_de']:g} .. {tr['hi_de']:g} d_e, "
+          f"boundaries {t_lo}/{t_hi}")
+    if sc.B0 is not None:
+        axis = {"perpendicular": "y", "perpendicular_y": "y",
+                "perpendicular_x": "x"}[str(cfg["field"]["orientation"])]
+        a(f"  B  field          : B0 = {sc.B0:.3g} T along {axis} "
+          f"(perpendicular to z), 1/w_ci0 = {sc.wci0_inv*1e12:.3g} ps")
+    a(f"  grid              : {' x '.join(str(c) for c in sc.n_cell)} cells, "
+      f"dz = {geo['dz_over_de']:g} d_e, dt = {sc.dt*1e15:.4g} fs, "
+      f"{sc.max_step} steps = {sc.t_end*1e12:.4g} ps")
+    a("```")
+    return "\n".join(L)

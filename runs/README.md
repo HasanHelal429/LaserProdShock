@@ -32,6 +32,15 @@ Write the top half **before** launching (it is the hypothesis), the bottom half 
 **Expected.** <what should happen if the hypothesis holds, with numbers>
 **Falsified by.** <what observation would say the hypothesis is wrong>
 
+## Geometry
+<paste the GENERATED diagram -- never hand-draw it:
+
+    python scripts/make_inputs.py runs/<ID> --diagram
+
+It is built from config.yaml (target slab, coronal ramp, ambient fill, boundary condition
+per face, which face the laser enters, transverse extent in 2D, B0 axis, grid and
+duration), so it cannot drift away from what the deck actually builds.>
+
 ## Setup
 <what differs from its parent run, and why. Link the parent by ID. Densities in n_cr,
 lengths in d_e,ref (say which), speeds in c or v_A (say which).>
