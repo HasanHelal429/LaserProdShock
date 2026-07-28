@@ -416,3 +416,71 @@ is *below* the noise floor, so there is **no coherent x structure** — which is
 uniform beam on a planar target with periodic transverse boundaries must give, and it is
 the precondition for `P0_bc_2d_open` attributing any x structure to the transverse
 boundary rather than to dimensionality.
+
+---
+
+## 2026-07-28 (later still) — `P0_bc_2d_open`: transverse `open` closes Phase 0
+
+8000 steps (0.791 ps) in 20 min at 4 threads; `--verify` OK. Byte-identical to `P0_bc_2d`
+except `geometry.boundary.transverse: periodic → open`.
+
+**The comparison is controlled at t = 0, bit-identically.** The transverse `n_e` difference
+against the planar run has an **interior median of 0.000 %** and is confined to **exactly
+two columns per side**, at **0.365×** and **0.861×** the interior density. That is the
+`particle_shape = 2` deposition losing its periodic wrap — a quadratic shape spans three
+cells, so the outermost two are under-counted.
+
+**New trap: the edge-column deficit changes the ray physics for a near-critical target.**
+At 0.365× the interior value, a 1.5 n_cr target reads **0.55 n_cr — underdense** in the
+outermost column, so the ray transits instead of turning. `f_abs(0)` is 0.2594 vs 0.2466,
+a 5.2 % offset from four columns of eighty. **Rule for finite-spot 2D work: use a beam
+profile that is negligible at the transverse walls** — which the physics wants anyway, and
+which makes this artifact irrelevant — and exclude the outer two cells from analysis.
+
+*(This also means the falsification criterion written in that run's README —* "`f_abs`
+diverging from t = 0 means the boundary changed the drive" *— was wrongly framed. It did not
+anticipate that a transverse boundary alters the density* deposition *in edge columns, and
+hence their absorption, at t = 0. The interior-identity check is the one that matters.)*
+
+**The axis stays usable.** The transverse deficit (>5 % from centre) reaches 1.0 d_e (2
+cells) at t = 0, 2.0 d_e at 0.40 ps and **3.5 d_e at 0.79 ps** — growing, but only 3.5 of
+the 20 d_e half-width, leaving **±16.5 d_e clean**; centre density falls just 3 %. The
+transverse `pec` walls build a `B_y` excursion reaching **1.9**, comparable to the axial
+walls.
+
+**The energy drain is the headline, and it is severe.**
+
+| | `P0_bc_2d` (periodic ⊥) | `P0_bc_2d_open` (open ⊥) |
+|---|---|---|
+| particles lost | 4.61 % | **30.83 %** |
+| ambient electrons / ions | 6.51 % / 6.45 % | **47.74 % / 30.00 %** |
+| target electrons / ions | 0.00 % / 0.00 % | 14.11 % / 7.82 % |
+| total particle KE | −4.3 % | **−42.9 %** |
+
+In 0.791 ps — **0.10 gyroperiods** — nearly half the ambient electrons and **43 % of the
+total kinetic energy** are gone. The explaining scale: at θ_e = 5×10⁻³ the ambient electron
+thermal speed is 0.0707 c, so an electron covers ~100 d_e in 0.79 ps against a transverse
+extent of 40 d_e. A hot electron population is simply not confined by a box that small.
+
+### This sharpens the Phase-2 drain blocker into a box-size requirement
+
+The axial-drain figure recorded earlier (~6.7 %/ps for a 200 d_e axial domain) is the *mild*
+case. With transverse `open` at ±20 d_e the loss is ~40 %/ps in particles and ~54 %/ps in
+energy. Since the drain fraction scales as `v_th·t/L`, confining the ambient's *electron*
+thermal excursion over a 2.5-gyroperiod (19 ps) run needs `L ≳ v_th,e·t` ≈ **2400 d_e** in
+every open direction — utterly unaffordable transversely. **So Phase 2 must either keep the
+transverse direction periodic (quasi-1D, as Schaeffer's own runs did with 12 transverse
+cells), or use a colder ambient, or use particle-injecting/thermal boundaries.** A fully 2D
+finite-spot magnetized shock with open transverse walls is not reachable by making the box
+bigger.
+
+That is a real constraint discovered in Phase 0 rather than in Phase 2, which is what
+Phase 0 was for. Note it does **not** retract the `TEST_PLAN.md` §2.1 observation that
+`ρ_i0 ≈ 65 d_e` makes a gyro-scale transverse box affordable — that box is affordable, it
+just cannot have *open* transverse walls holding a hot ambient.
+
+### Phase 0 is complete
+
+Six runs, the boundary decision recorded, both transverse options characterised, the
+exit-overshoot measured, and every run carrying a generated geometry diagram, a figure set,
+movies and a gate table. `media/P0_2d_transverse/compare.png` is the controlled 2D pair.

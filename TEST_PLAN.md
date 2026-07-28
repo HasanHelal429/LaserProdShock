@@ -668,10 +668,18 @@ boundaries, is the project's headline output.
       is LOW by 0.1-0.3 % for ray_cfl <= 0.25, so no net energy creation was seen and the
       upstream +24.9 %/energy-created description is not reproduced. Rules: discard the
       boundary cell, keep ray_cfl <= 0.25 for profiles, energetics are safe to 0.3 %.
-- [x] `P0_bc_2d_open` (transverse open) launched
-- [ ] **Phase-2 blocker found in Phase 0**: with `open` walls the ambient DRAINS at
-      ~6.7 %/ps for a 200 d_e domain (measured), so a 2.5-gyroperiod run would empty it.
-      Resolve before `P2_mag` -- larger domain, colder ambient, or injecting boundaries.
+- [x] `P0_bc_2d_open` (transverse open) complete: interior bit-identical to the planar
+      run at t=0; the axis stays clean to +-16.5 of 20 d_e; but 30.8% of particles and
+      42.9% of KE leave in 0.10 gyroperiods, and the outer TWO columns read 0.365x/0.861x
+      density (particle_shape=2 losing the periodic wrap), which flips a 1.5 n_cr target
+      to 0.55 n_cr underdense there
+- [ ] **Phase-2 blocker found in Phase 0 -- now a box-size requirement.** With `open`
+      walls the ambient drains at ~6.7 %/ps axially (200 d_e) and ~40 %/ps transversely
+      (+-20 d_e). Confining the ambient ELECTRON thermal excursion over 2.5 gyroperiods
+      needs L >~ v_th,e t = 2400 d_e per open direction -- unaffordable. So Phase 2 must
+      keep the transverse direction PERIODIC (quasi-1D, as Schaeffer did with 12
+      transverse cells), or use a colder ambient, or injecting/thermal boundaries. Not
+      solvable by enlarging the box.
 
 **Phase 1 — vacuum ablation**
 - [ ] `P1_vac_1d` + `P1_vac_1d_off` (G3) + `ray_cfl` check (G4)
