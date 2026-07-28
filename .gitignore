@@ -1,0 +1,34 @@
+# --- WarpX simulation output (large, machine-specific, regenerable from the decks) ---
+runs/**/diags/
+runs/**/diags_movies/
+runs/**/diags_movie/
+
+# --- studies scratch (WarpX variant runs, regenerable from the runner) ---
+studies/**/scratch/
+
+# --- any media ---
+media/
+
+# --- run logs (large with verbose=1; findings are recorded in RESULTS.md) ---
+*.log
+!progress.log
+
+# --- generated / transient ---
+runs/**/config.generated.yaml
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# --- OS / editor cruft ---
+.DS_Store
+*.swp
+
+# AMReX backtrace dumps
+Backtrace.*
+
+# --- job scratch (regen logs, ad-hoc; keepers live in scripts/) ---
+tmp/
+
+# --- progress-logger stdout (the findings live in progress.log / RESULTS.md) ---
+runs/**/*.out
