@@ -14,7 +14,7 @@
 #   dt = 0.0978 fs   t_end = 2.3479 ps   n_cell = 400
 #   GATE G1 omega_pe*dt: 0.214 initial, 0.303 at compression; hits 2 at 130.61 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 61, ambient 1.7
-#   predicted absorption: tau(flat top) = 70.6, f_abs ~ 1.000; ambient traverse eats 0.007%
+#   predicted absorption: tau(flat top) = 14.4, f_abs ~ 1.000; ambient traverse eats 0.007%
 #   B0 = 74.74 T   1/wci0 = 7.6073 ps   rho_i0 = 40.8 d_e   M_A = 1.00  M_ms = 0.39  (0.31 gyroperiods)
 # ==========================================================================
 

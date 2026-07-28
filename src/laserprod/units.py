@@ -90,6 +90,29 @@ def nu_ei_ib(n_e: float, theta_e: float, Z_eff: float, coulomb_log: float) -> fl
             / ((4.0 * math.pi * EPS0) ** 2 * math.sqrt(ME) * kT ** 1.5))
 
 
+def theta_group(n_targ: float, theta_targ: float,
+                n_amb: float | None, theta_amb: float | None) -> float:
+    """Density-weighted GROUP electron temperature, as the operator measures it.
+
+    ``laser_deposition.species`` lists every electron population that (a) is heated and
+    (b) contributes to ``n_e`` -- the operator does not let those be separated. In
+    ``temperature_mode = local`` it forms one *group* temperature from the combined
+    moments, so a hot ambient raises the temperature that ``K ~ T_e^{-3/2}`` sees even
+    where the cold target dominates the density.
+
+    This matters enormously and was measured, not assumed: with a 0.06 n_cr ambient at
+    theta = 5e-3 against a target at theta = 1e-4, the group temperature in the CORONA
+    (where the tau = 1 surface actually sits) is ~25x the target's, so K falls 43-129x
+    and the measured absorbed fraction dropped from 1.000 (vacuum) to 0.28. A prediction
+    evaluated at the target's cold theta is wrong by that factor -- see RESULTS
+    2026-07-28.
+    """
+    if not n_amb or theta_amb is None:
+        return theta_targ
+    tot = n_targ + n_amb
+    return (n_targ * theta_targ + n_amb * theta_amb) / tot if tot > 0 else theta_targ
+
+
 def K_ib(n_e: float, theta_e: float, n_cr: float, Z_eff: float,
          coulomb_log: float) -> float:
     """Inverse-bremsstrahlung absorption coefficient K [1/m].
@@ -137,6 +160,7 @@ class Scales:
     n_targ_over_ncr: float
     de_targ: float
     theta_e_targ: float       # initial target electron theta
+    theta_e_group: float      # density-weighted GROUP theta at the target peak
     Cs_targ: float            # ion-acoustic speed at theta_e_targ [m/s]
     thickness: float          # flat-top thickness [m]
     scale_length: float       # coronal Gaussian scale length [m]
@@ -241,7 +265,8 @@ class Scales:
 
         add("laser", ["lam0", "n_cr", "n_cr_cm3", "de_cr_um", "intensity",
                       "intensity_W_cm2"])
-        add("target", ["n_targ_over_ncr", "Te_targ_eV", "Cs_targ_over_c",
+        add("target", ["n_targ_over_ncr", "Te_targ_eV", "theta_e_group",
+                       "Cs_targ_over_c",
                        "areal_ne", "K_targ", "abs_depth_targ", "tau_est",
                        "f_abs_est"])
         add("ambient", ["n_amb_over_ncr", "de_amb", "di_amb_um", "tau_amb",
@@ -379,7 +404,12 @@ def derive(cfg: dict) -> Scales:
     # --- absorption estimate (pre-run sanity: will this target even absorb?) ---
     Z_eff = float(las.get("Z_eff", 1.0))
     lnL = float(las.get("coulomb_log", 2.0))
-    K_targ = K_ib(min(n_targ, 0.999 * n_cr), theta_e_targ, n_cr, Z_eff, lnL)
+    # Evaluate K at the GROUP temperature the operator will actually measure, not at the
+    # target's cold theta: with an ambient in the heated species list the group theta in
+    # the corona is far hotter and K falls by 1-2 orders of magnitude (see theta_group).
+    th_grp_targ = theta_group(n_targ, theta_e_targ, n_amb, theta_e_amb)
+    K_targ = K_ib(min(n_targ + (n_amb or 0.0), 0.999 * n_cr), th_grp_targ, n_cr,
+                  Z_eff, lnL)
     abs_depth = 1.0 / K_targ if K_targ > 0 else float("inf")
     tau_est = K_targ * thickness
     f_abs_est = 1.0 - math.exp(-2.0 * min(tau_est, 500.0))
@@ -425,7 +455,7 @@ def derive(cfg: dict) -> Scales:
         mass_ratio=mass_ratio, mi=mi,
         length_scale=length_scale, de_ref=de_ref,
         n_targ=n_targ, n_targ_over_ncr=n_targ / n_cr, de_targ=de_targ,
-        theta_e_targ=theta_e_targ, Cs_targ=Cs_targ,
+        theta_e_targ=theta_e_targ, theta_e_group=th_grp_targ, Cs_targ=Cs_targ,
         thickness=thickness, scale_length=scale_length,
         areal_ne=n_targ * thickness,
         dims=dims, dz=dz, dx=dx, dt=dt, n_cell=n_cell,

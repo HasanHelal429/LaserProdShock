@@ -6,7 +6,9 @@
 `ParticleHeater` + `TargetInjector` piston surrogate that `KinShock2020` used to replicate
 Schaeffer et al. 2020.
 
-**Status.** **Phase 0 tooling is built and the boundary runs are executing** (2026-07-28).
+**Status.** **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
+done, and the boundary decision recorded (`open` on the propagation axis + periodic
+transverse; B₀ uniform to 1.000000 under pec).
 The config schema (§3), the deck renderer, gates G1–G7, the laser diagnostics and the
 cross-run comparison all work in 1D and 2D from one code path; 71 tests pass. The three
 source-code questions of §5.1 are resolved. Phases 1–3 remain as written.
@@ -444,7 +446,7 @@ Not a phase — a checklist `run_checks.py` enforces. Each gate exists because i
 | **G3** | **Laser-off control** for every physics run | spurious `ΔE` ≪ `E_abs` | The only honest way to separate grid heating from laser heating given G2. An identical deck with the laser disabled, run for the same duration. Non-negotiable for Phase 1 and 2 headline results. |
 | **G4** | `ray_cfl` convergence | non-monotonic; default 0.25 sits near a 2.5 % excursion | Documented upstream: the default is **not** in the asymptotic regime for turning-point problems (uniform slabs are exact at any `ray_cfl`). Any run whose target has an interior critical surface needs a `ray_cfl` check. |
 | **G5** | ppc for `temperature_mode = local` | several hundred/cell for sub-% `P_abs` | `T^{-3/2}` is convex, so per-cell noise biases absorption **high**: ~3 % at 25 ppc, < 0.1 % at 800. The target needs high ppc; the ambient does not. Report `Tlocalfrac`. |
-| **G6** | Energy closure | tracer `E_abs` vs particle KE gain | The `LASERDEP` accounting is immune to grid heating; the particle energy is not. Their difference *is* the grid-heating budget, and closes G3 quantitatively. |
+| **G6** | Energy closure | tracer `E_abs` vs (particle KE + field energy) gain | The `LASERDEP` accounting is immune to grid heating; the particle energy is not. Their difference is the grid-heating budget **only when boundary losses are small** — absorbed particles carry energy out and WarpX does not report it, so at 5.8 %/17 % particle loss the raw gap read +218 %/+235 % (RESULTS 2026-07-28). Always quote the loss fraction beside it. Measured +0.55 % at 0 % loss, so grid heating is *not* significant at `dz/λ_D = 61`. |
 | **G7** | `dz` unchanged when economising | — | Savings come from ppc, domain and duration. Coarsening `dz` at fixed `d_e` raised `dz/λ_D` to 14 and blew a run up (ambient to `u ~ 0.15 c`, `B_y/B₀` to 82). The free parameter is `dz/λ_D`, not resolution in `d_e`. |
 
 ---
@@ -655,10 +657,11 @@ boundaries, is the project's headline output.
 - [x] Read the operator source: `intervals` pulse gating (works), injection-face
       behaviour (rays launch ON the face), exit-boundary overshoot (mechanism confirmed) — §5.1
 - [x] `P0_bc_periodic` — wrap failure reproduced: particle number **exactly** constant
-- [~] `P0_bc_open`, `P0_bc_open_B` — running
-- [~] `P0_bc_inject` — running
-- [~] `P0_bc_2d` — transverse periodic (the planar baseline); `P0_bc_2d_open` is the follow-up
-- [ ] **Decision recorded**: the default boundary configuration, with rejected alternatives and why
+- [x] `P0_bc_open`, `P0_bc_open_B`, `P0_bc_inject`, `P0_bc_2d` — all complete
+- [x] **Decision recorded**: `open` (pec fields + absorbing particles) on the propagation
+      axis, periodic transverse. B₀ verified uniform to **ratio 1.000000** against
+      `B₀²/(2µ₀)L` with pec boundaries; rejected alternatives and reasons in RESULTS
+      2026-07-28
 - [ ] Quantify the exit-boundary overshoot for a target-near-boundary geometry
 
 **Phase 1 — vacuum ablation**

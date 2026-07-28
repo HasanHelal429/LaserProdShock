@@ -76,7 +76,30 @@ means a systematic offset in `f_abs` of that order is expected and is not eviden
 
 ## Result
 
-*(not yet run)*
+Ran 8000 steps (0.791 ps) in 22 min at 4 threads — by far the most expensive P0 run.
+`--verify` OK.
+
+**The 2D path works end to end.** The deck rendered `amr.n_cell = 80 400`,
+`boundary.field_lo = periodic pec`, `prob_lo = xlo zlo`, `ppc = 4 4` and B₀ on **y**
+(out of the x–z plane), all from the same code path as the 1D runs. The run completed
+with 4.61 % of particles lost through the axial `open` faces.
+
+**On-axis agreement with 1D: `f_abs(0) = 0.247` in 2D against 0.283 in 1D
+(`P0_bc_open_B`), a 13 % difference.** That is the right order for the ppc difference
+alone — this run uses 16 ppc against the 1D run's 200, and G5's convexity bias on
+`⟨T^{-3/2}⟩` is ~8 % at 16 ppc and ~0.6 % at 200 — so the planar 2D case reproduces 1D
+to within the noise it was set up to have. **No 2D-specific absorption effect is
+detected.** A cleaner test wants matched ppc, which Phase 1's 2D runs will use.
+
+Time-averaged absorbed fraction and the normalised KE history both overlay the 1D
+ambient runs (see `media/P0_boundary_decision/compare.png`, panels 3 and 4 — note those
+are deliberately dimensionless, because `E_abs` is per m² in 1D and per m in 2D and the
+raw values must never share an axis).
+
+Transverse structure was not examined here: that needs a plotfile reader (Phase 1).
+
+**Declared follow-up: `P0_bc_2d_open`** (transverse `open`), required before any
+finite-spot physics, and only meaningful now that the planar case is known to match 1D.
 
 ## Retracted
 

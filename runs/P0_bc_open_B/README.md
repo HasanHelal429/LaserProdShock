@@ -64,7 +64,33 @@ Predicted: the ambient traverse eats **0.047%** of the beam, so the upstream sta
 
 ## Result
 
-*(not yet run)*
+Ran 24 000 steps (2.348 ps) in 9 min at 4 threads. `--verify` OK.
+
+**YES — `pec` fields carry a uniform applied B₀ exactly, alongside absorbing particles.**
+This was the central Phase-0 question.
+
+- **Field energy at t = 0 is 74496 J/m² against the analytic `B₀²/(2µ₀)·L` = 74496 —
+  ratio 1.000000**, with B₀ = 74.74 T. The projection div-B cleaner runs without
+  complaint and the run completes. B₀ is applied on **y** (out-of-plane).
+- Particles leave: **5.84 % lost**, so the front is absorbed as in `P0_bc_open`.
+- Field energy rises to 1.213× its initial value — the plasma's diamagnetic response
+  compressing the field, which is the physics this project is here to drive.
+
+**Unexpected: `f_abs(0) = 0.283`, not 1.000.** Adding the ambient cut initial absorption
+**3.6×**. This is *not* a boundary effect and not a 2D effect (the 2D run gives 0.247).
+The mechanism — see RESULTS 2026-07-28 finding (a) — is that
+`laser_deposition.species` lists every electron population that is both heated *and*
+counted in `n_e`, so the ambient electrons must be included for a correct refractive
+index, and their θ = 5e-3 then enters the **group** temperature that `K ∝ T_e^{−3/2}`
+sees. In the corona, where the τ = 1 surface sits, the group θ is ~25× the target's and
+**K falls 43–129×**. Consequence for Phase 2: **the ambient temperature is a drive
+parameter, not merely an upstream one.**
+
+Shutoff is correspondingly slower, **210 fs** vs 19.7 fs in vacuum.
+
+**G6 reads +218 % and must NOT be read as grid heating** — 5.84 % of particles left
+carrying their energy out, so total KE actually *falls* (2.448e6 → 2.178e6 J/m²) while
+the laser adds 2.16e5. G6's definition has been corrected accordingly (`TEST_PLAN.md` §6).
 
 ## Retracted
 

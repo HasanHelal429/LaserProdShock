@@ -57,7 +57,31 @@ Parent: `P0_bc_open_B`.
 
 ## Result
 
-*(not yet run)*
+Ran 24 000 steps (2.348 ps) in 8 min at 4 threads. `--verify` OK.
+
+**The drive at t = 0 is unchanged, and the later divergence is physical.**
+`f_abs(0) = 0.283`, identical to `P0_bc_open_B` — so moving the target from −50 to
++40 d_e did **not** by itself change the drive, which is what the falsification criterion
+demanded. The runs are comparable.
+
+- **17.05 % of particles lost**, the largest of the five, as intended: with the
+  laser-facing face at +50 d_e the plume reaches the +z injection face early and flows
+  out through it.
+- `E_abs` = 2.106e5 J/m², 2 % below `P0_bc_open_B` — the beam is absorbed in the
+  blow-off plasma at the launch plane rather than at the target, and the total coupled
+  energy is barely affected. No discontinuity or non-monotonic jump at the arrival time,
+  so there is no sign of boundary *coupling* as opposed to ordinary absorption.
+- This matches what the source says must happen: rays launch **exactly on** the injection
+  plane (`c0[m_axis] = m_inject_hi ? phi : plo`), so the boundary cell's plasma absorbs
+  from the first RK4 step.
+
+**Practical rule for Phase 1–3**: a target may sit near the injection face without
+corrupting the drive, but once the plume crosses the launch plane the deposition profile
+migrates to the boundary, so the *spatial* deposition diagnostic (not the integrated
+`E_abs`) is what stops being interpretable. Keep the target far enough away that the
+observation window ends before that matters, or accept it and read only `E_abs`.
+
+G6 reads +235 %, which at 17 % particle loss is boundary outflow, not grid heating.
 
 ## Retracted
 

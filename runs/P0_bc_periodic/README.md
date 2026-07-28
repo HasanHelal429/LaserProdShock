@@ -53,7 +53,25 @@ That is a deliberate consequence of the length-unit choice, not luck.
 
 ## Result
 
-*(not yet run)*
+Ran 24 000 steps (2.348 ps) in 6 min at 4 threads. `--verify` OK.
+
+**The wrap hazard is confirmed, by the cleanest possible signature: macroparticle count
+is EXACTLY constant, 52418 → 52418 (0.000 % lost).** Nothing can leave a periodic
+domain, so the runaway ablation front has nowhere to go but around. Hypothesis upheld.
+
+- `f_abs(0) = 1.000` — the target absorbs the whole beam while cold, as predicted
+  (the pre-run predictor gives 0.982 for this vacuum case).
+- Self-limiting shutoff measured at **19.7 fs** (half-peak). `f_abs` then floors near
+  0.15 rather than reaching zero, so `E_abs` keeps climbing to 3.774e5 J/m².
+- τ = 1 sits at z = −29 d_e, **11 d_e in front of** the flat-top face at −40: absorption
+  is in the coronal ramp, where the model says it should be.
+- **Gate G6 closes to +0.55 %** (tracer `E_abs` 3.774e5 vs `ΔKE` 3.724e5 + `ΔE_field`
+  2865 = 3.753e5 J/m²). With zero boundary loss this is a clean read, and it says **grid
+  heating is not significant even at `dz/λ_D = 61`** — better than the plan assumed.
+- `Tlocalfrac` 0.54 → 1.000 by 0.45 ps: the plasma heats above the G5 floor everywhere.
+
+Together with `P0_bc_open` (identical but for the boundary) this is a controlled pair:
+`f_abs(t)` overlays and `E_abs` agrees to 1.5 %, so the boundary did not perturb the drive.
 
 ## Retracted
 

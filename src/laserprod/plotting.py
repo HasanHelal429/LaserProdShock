@@ -215,7 +215,7 @@ def inject_hi_of(cfg) -> bool:
     return str(cfg["laser"].get("inject_side", "lo")) == "hi"
 
 
-def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg):
+def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg, n_targ=None, n_amb=None):
     """Predicted IB absorption along the beam: K(z), then cumulative optical depth.
 
     TWO STACKED PANELS SHARING x, never a dual axis: K spans decades while tau is
@@ -224,28 +224,51 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg):
     """
     Z_eff = float(cfg["laser"].get("Z_eff", 1.0))
     lnL = float(cfg["laser"].get("coulomb_log", 2.0))
-    theta = sc.theta_e_targ
-    from .units import K_ib
+    from .units import K_ib, theta_group
 
+    # K is evaluated at the GROUP temperature the operator measures per cell, not at the
+    # target's cold theta. With a hot ambient in the heated species list that is a 1-2
+    # order-of-magnitude difference exactly where the tau = 1 surface sits, and using the
+    # cold theta over-predicted the absorbed fraction by 3.6x (RESULTS 2026-07-28).
     K = []
-    for n in n_tot:
+    for i, n in enumerate(n_tot):
+        if n <= 0:
+            K.append(0.0)
+            continue
+        th = (theta_group(n_targ[i], sc.theta_e_targ, n_amb[i], sc.theta_e_amb)
+              if (n_targ is not None and n_amb is not None) else sc.theta_e_targ)
         x = min(n / sc.n_cr, 0.999999)
-        K.append(K_ib(x * sc.n_cr, theta, sc.n_cr, Z_eff, lnL) if n > 0 else 0.0)
+        K.append(K_ib(x * sc.n_cr, th, sc.n_cr, Z_eff, lnL))
+
+    # March from the injection face and STOP AT THE TURNING POINT. The ray reflects at
+    # n_e = n_cr cos^2(theta0) and never enters the overdense interior, so integrating
+    # tau through the flat top predicts near-total absorption where the operator measured
+    # 0.28. The absorbed fraction is the DOUBLE pass to the turning point and back,
+    # 1 - exp(-2 tau_turn) -- which is also the closed form the upstream CI tests use.
+    import math as _m
 
     inject_hi = str(cfg["laser"].get("inject_side", "lo")) == "hi"
-    order = range(len(z_de) - 1, -1, -1) if inject_hi else range(len(z_de))
+    theta0 = _m.radians(float(cfg["laser"].get("incidence_angle_deg", 0.0)))
+    n_turn = sc.n_cr * _m.cos(theta0) ** 2
+    order = list(range(len(z_de) - 1, -1, -1)) if inject_hi else list(range(len(z_de)))
     dz = abs(z_de[1] - z_de[0]) * sc.de_ref
-    tau, acc = [0.0] * len(z_de), 0.0
+    tau, acc, z_turn = [0.0] * len(z_de), 0.0, None
     for i in order:
+        if n_tot[i] >= n_turn:
+            z_turn = z_de[i]
+            break
         acc += K[i] * dz
         tau[i] = acc
+    tau_turn = acc
+    f_abs_pred = 1.0 - _m.exp(-2.0 * min(tau_turn, 500.0))
 
     ax_K.plot(z_de, K, color=C_LASER)
     label_line(ax_K, z_de[len(z_de) // 2], max(K) if K else 1.0, "", C_LASER)
     ax_K.set_yscale("log")
     ax_K.set_ylabel("K  [1/m]")
     ax_K.set_title("Predicted inverse-bremsstrahlung absorption at the initial "
-                   "profile (cold T$_e$)", loc="left", fontweight="bold")
+                   "profile, at the GROUP T$_e$ the operator measures", loc="left",
+                   fontweight="bold")
     ax_K.text(0.99, 0.93, f"K ∝ Z$_{{eff}}$ lnΛ n$_e^2$ T$_e^{{-3/2}}$   "
                           f"(Z$_{{eff}}$={Z_eff:g}, lnΛ={lnL:g})",
               transform=ax_K.transAxes, ha="right", va="top", fontsize=7.5,
@@ -275,13 +298,18 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg):
         ax_tau.text(z_stop, 0.04, f"  τ=1 at z = {z_stop:.0f} d$_e$",
                     transform=ax_tau.get_xaxis_transform(), fontsize=7.5,
                     color=INK_2, va="bottom")
-    f_end = 1.0 - pow(2.718281828459045, -min(max(tau), 500.0))
+    if z_turn is not None:
+        ax_tau.axvline(z_turn, color=C_TARGET, lw=1.4, alpha=0.8)
+        ax_tau.text(z_turn, 0.72, "turning point  ", rotation=90, ha="right",
+                    va="bottom", transform=ax_tau.get_xaxis_transform(),
+                    fontsize=7.5, color=C_TARGET, fontweight="bold")
     ax_tau.text(0.99, 0.93,
-                f"cumulative τ from the injection face; single-pass f$_{{abs}}$ = "
-                f"1 − e$^{{-τ}}$ → {f_end:.3f}",
+                f"τ integrated to the TURNING POINT only (the ray never enters the "
+                f"overdense interior)\ndouble-pass f$_{{abs}}$ = 1 − e$^{{-2τ}}$ → "
+                f"{f_abs_pred:.3f}   (τ$_{{turn}}$ = {tau_turn:.3g})",
                 transform=ax_tau.transAxes, ha="right", va="top", fontsize=7.5,
                 color=INK_2)
     ax_tau.set_ylabel("optical depth τ")
     ax_tau.set_xlabel(f"z  [d$_e$ at {sc.length_scale} density]")
     style_axes(ax_tau)
-    return K, tau
+    return K, tau, f_abs_pred

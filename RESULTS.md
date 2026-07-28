@@ -180,3 +180,100 @@ wrong on the page.
 Still executing: `P0_bc_open_B` (the central question — pec + uniform B0 + div-B
 cleaner), `P0_bc_inject`, `P0_bc_2d`. The Phase-0 **boundary decision** needs all five
 and is not yet recorded.
+
+---
+
+## 2026-07-28 — Phase 0 complete: all five boundary runs, and the boundary decision
+
+Wall times at 4 threads (machine was at load 28/32 — another user's GPU jobs plus
+`KinShock2020/R1_coll`): 6, 6, 9, 8, 22 min; ~51 min total. `make_inputs.py --verify`
+reports **OK for all five**, so config → deck → WarpX → `warpx_used_inputs` closes.
+
+| run | dims | axis BC | t / ps | particles lost | f_abs(0) | f_abs(end) | E_abs |
+|---|---|---|---|---|---|---|---|
+| `P0_bc_periodic` | 1 | periodic | 2.348 | **0.000 %** | 1.000 | 0.147 | 3.774e5 J/m² |
+| `P0_bc_open` | 1 | open | 2.348 | 0.227 % | 1.000 | 0.092 | 3.719e5 J/m² |
+| `P0_bc_open_B` | 1 | open + B₀ | 2.348 | 5.84 % | 0.283 | 0.069 | 2.155e5 J/m² |
+| `P0_bc_inject` | 1 | open + B₀, target near face | 2.348 | 17.05 % | 0.283 | 0.050 | 2.106e5 J/m² |
+| `P0_bc_2d` | 2 | open ∥ / periodic ⊥ | 0.791 | 4.61 % | 0.247 | 0.108 | 0.780 J/m |
+
+### THE BOUNDARY DECISION — `open` on the propagation axis, periodic transverse
+
+**`open` = pec fields + absorbing particles is adopted as the default.** The evidence:
+
+1. **Periodic really is disqualified.** Macroparticle count under periodic boundaries is
+   *exactly* constant, 52418 → 52418 (0.000 %). Nothing can leave, so the runaway
+   ablation front has nowhere to go but around. `open` sheds 0.23 % (vacuum) rising to
+   17 % (target near the face) — the absorbing boundary fires.
+2. **`pec` fields carry a uniform applied B₀ exactly.** Field energy at t = 0 is
+   **74496 J/m²** against the analytic `B₀²/(2µ₀)·L = 74496` — **ratio 1.000000**, with
+   B₀ = 74.74 T. The projection div-B cleaner runs without complaint and the run
+   completes. This was the central Phase-0 question and the answer is yes.
+3. **The boundary does not perturb the drive.** `P0_bc_periodic` vs `P0_bc_open` differ in
+   nothing but the boundary: `f_abs(t)` overlays for the whole run and `E_abs` agrees to
+   **1.5 %** (3.774e5 vs 3.719e5). So the pair is a controlled comparison.
+
+Rejected, with reasons: **periodic** (1); **`absorbing`/Silver–Mueller** — incompatible
+with the div-B cleaner that runs whenever an external B is set, which accepts only
+periodic/pec/pmc/neumann and where pmc/neumann would zero the tangential B₀ (not run;
+the incompatibility is structural and `validate()` warns on it); **`reflecting`** — a
+wall, not an outlet, so it cannot absorb the runaway front.
+
+Transverse: **periodic** for planar work. `P0_bc_2d` ran clean with `periodic pec` tokens
+and B₀ out-of-plane on y. The transverse-`open` variant (`P0_bc_2d_open`) remains the
+declared follow-up, needed before any finite-spot physics.
+
+### Two findings that change how the tooling reads absorption
+
+**(a) A hot ambient suppresses absorption 3.6×, through the group temperature.**
+`f_abs(0)` is **1.000** in the vacuum runs but **0.283** with an ambient — and this is
+*not* a 1D/2D effect (1D `P0_bc_open_B` gives 0.283, 2D gives 0.247). The mechanism:
+`laser_deposition.species` lists every electron population that is heated **and** that
+defines `n_e`; the operator does not let those be separated. So the ambient electrons
+must be included for a correct refractive index, and in `temperature_mode = local` their
+temperature necessarily enters the *group* `T_e` that `K ∝ T_e^{−3/2}` sees. With the
+ambient at θ = 5e-3 against a target at θ = 1e-4, the group θ in the **corona** — where
+the τ = 1 surface actually sits — is ~25× the target's, and **K falls 43–129×**.
+This is a real property of the model, not a bug, but it is a trap: a target that looks
+optically thick in isolation is 3.6× less absorbing once a hot ambient surrounds it.
+
+**(b) The pre-run absorption predictor was wrong twice, and is now right.** It first
+evaluated `K` at the target's cold θ everywhere (→ f_abs ≈ 1.000, wrong by 3.6×), and
+integrated τ through the **whole flat top** — but the ray turns at
+`n_e = n_cr cos²θ₀` and never enters the overdense interior. Fixed to (i) use the
+density-weighted group θ per point and (ii) integrate only to the turning point, taking
+the double pass `1 − exp(−2τ_turn)`. It now predicts **0.229 vs 0.283 measured** with an
+ambient and **0.982 vs 1.000** in vacuum — from ~260 % error to ~19 % and 2 %.
+
+### Gate G6 needs a boundary-loss term — correction to §6
+
+G6 as originally written (tracer `E_abs` vs `ΔKE + ΔE_field`) is **only valid when
+boundary losses are negligible**. It closes to **+0.55 %** for `P0_bc_periodic` (0 %
+lost) and **+1.5 %** for `P0_bc_open` (0.23 % lost) — confirming grid heating is *not*
+significant even at `dz/λ_D = 61`. But it reads **+218 %** for `P0_bc_open_B` and
+**+235 %** for `P0_bc_inject`, where 5.8 % and 17 % of particles left carrying their
+energy out: total KE actually *falls* (2.448e6 → 2.178e6 J/m²) while the laser adds
+2.16e5. That escaped energy is not in the sum and WarpX does not report it directly.
+**The gap may only be called a grid-heating budget when the particle-loss fraction is
+small**; `compare_runs.py` now prints the loss fraction beside it and its panel title
+says so.
+
+### Other numbers worth keeping
+
+- **Self-limiting shutoff, measured**: half-peak at **19.7 fs** (vacuum) and **210 fs**
+  (with ambient — slower because absorption starts 3.6× weaker, so the corona heats more
+  slowly). `f_abs` floors near 0.05–0.15 rather than reaching zero, so `E_abs` keeps
+  climbing — **H2's "coupled energy saturates" is not what happens** (recorded above).
+- τ = 1 sits at z = −29 d_e, i.e. **11 d_e in front of** the flat-top face at −40 —
+  absorption is in the coronal ramp, as the model says it should be.
+- `Tlocalfrac` rises 0.54 → 1.000 by 0.45 ps: the plasma heats above the floor
+  everywhere, so G5's floor is not doing the work after the first ~0.5 ps.
+- `P0_bc_inject` loses **17 %** of its particles — the plume reaches the injection face
+  early, as intended. Its `f_abs(0)` matches `P0_bc_open_B` exactly (0.283), so moving
+  the target did **not** change the drive at t = 0; the divergence is later and physical.
+
+Next: the exit-boundary overshoot measurement (the one Phase-0 item left), then Phase 1
+(`P1_vac_1d` + its laser-off control, `P1_vac_2d`). Note Phase 1 must decide whether to
+keep the ambient out of the heated species list while a vacuum run has no ambient anyway
+— finding (a) means the Phase-2 ambient temperature is now a *drive* parameter, not just
+an upstream one.

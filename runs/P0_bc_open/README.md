@@ -46,7 +46,23 @@ Parent: `P0_bc_periodic`.
 
 ## Result
 
-*(not yet run)*
+Ran 24 000 steps (2.348 ps) in 6 min at 4 threads. `--verify` OK.
+
+**The absorbing boundary fires and the drive is unaffected.** Macroparticle count is flat
+until **t ≈ 0.9 ps** and then falls at an accelerating rate, reaching **0.227 % lost** by
+2.348 ps — the runaway front arriving and being absorbed, against exactly 0.000 % for the
+periodic twin. Hypothesis upheld.
+
+- `f_abs(t)` overlays `P0_bc_periodic` for the whole run; `E_abs` agrees to **1.5 %**
+  (3.719e5 vs 3.774e5 J/m²). So the boundary change did not perturb the drive, and the
+  pair is a controlled comparison — the precondition for reading anything into the
+  difference.
+- **G6 closes to +1.5 %**, slightly worse than the periodic run's +0.55 % precisely
+  because energy now also leaves with the absorbed particles (which is not in the sum).
+- No wall pathology was visible in the energy history; a dedicated near-wall field
+  lineout still wants doing once a plotfile reader is in place (Phase 1).
+
+Adopted as the default boundary together with `P0_bc_open_B` — see RESULTS 2026-07-28.
 
 ## Retracted
 

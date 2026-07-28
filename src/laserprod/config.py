@@ -343,8 +343,12 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
 
     # --- G6: energy closure (post-run) ---
     out.append(Gate("G6", "energy closure", "post", None,
-                    "post-run: tracer E_abs (immune to grid heating) vs the particle "
-                    "KE gain. Their difference IS the grid-heating budget."))
+                    "post-run: tracer E_abs (immune to grid heating) vs the particle KE "
+                    "gain + field energy gain. Their difference is the grid-heating "
+                    "budget ONLY WHEN BOUNDARY LOSSES ARE SMALL: absorbed particles "
+                    "carry energy out and WarpX does not report it, so at 5.8% and 17% "
+                    "particle loss the raw gap read +218% and +235% (RESULTS "
+                    "2026-07-28). Always quote the loss fraction beside it."))
 
     # --- G7: dz provenance ---
     out.append(Gate("G7", "dz unchanged when economising", "info",

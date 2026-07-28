@@ -68,7 +68,9 @@ def make_figure(cfg, sc, gates, run_dir, run_id):
     n_tot = [a + b for a, b in zip(n_t, n_a)]
     axK = fig.add_subplot(gs[1], sharex=ax0)
     axT = fig.add_subplot(gs[2], sharex=ax0)
-    lpp.absorption_panel(axK, axT, z_de, n_tot, sc, cfg)
+    _K, _tau, f_pred = lpp.absorption_panel(axK, axT, z_de, n_tot, sc, cfg,
+                                            n_targ=n_t, n_amb=n_a)
+    print(f"  predicted double-pass f_abs to the turning point = {f_pred:.4f}")
     axK.tick_params(labelbottom=False)
     ax0.tick_params(labelbottom=False)
     ax0.set_xlabel("")

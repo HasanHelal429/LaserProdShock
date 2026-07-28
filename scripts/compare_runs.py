@@ -113,7 +113,7 @@ def main() -> int:
         become unreadable. The stagger is in points, not data units, so it works
         whatever the y-scale is.
         """
-        ax.annotate(f" {text}", xy=(x, y), xytext=(4, 9 * (len(runs) - 1 - 2 * i)),
+        ax.annotate(f" {text}", xy=(x, y), xytext=(4, 5.5 * ((len(runs) - 1) / 2.0 - i)),
                     textcoords="offset points", color=color, fontsize=8,
                     fontweight="bold", va="center", ha="left",
                     annotation_clip=False)
@@ -125,23 +125,32 @@ def main() -> int:
         if r["npart"]:
             t = [v * 1e12 for v in r["t_pn"]]
             y = [v / r["npart"][0] for v in r["npart"]]
-            axes[0].plot(t, y, color=c, label=lab)
-            tag(axes[0], t[-1], y[-1], lab, c, i)
+            axes[0].plot(t, y, color=c, label=lab)   # identity via the legend
         # 2. absorbed fraction
         f = r["hist"].f_abs(r["P_inc"])
         if f:
             t = [v * 1e12 for v in r["hist"].t]
             axes[1].plot(t, f, color=c, lw=1.2, label=lab, alpha=0.9)
-        # 3. cumulative absorbed energy
+        # 3. cumulative absorbed energy, as a FRACTION of the incident energy delivered
+        #    so far. Normalising is not cosmetic: Eabs is per unit length in each absent
+        #    dimension, so a 1D run reports J/m^2 and a 2D run J/m. Putting both on one
+        #    axis in raw units would be two different units on the same scale.
         if len(r["hist"]):
             t = [v * 1e12 for v in r["hist"].t]
-            axes[2].plot(t, r["hist"].Eabs, color=c, label=lab)
-            tag(axes[2], t[-1], r["hist"].Eabs[-1], lab, c, i)
-        # 4. particle kinetic energy
+            y = [(E / (r["P_inc"] * tt)) if tt > 0 else float("nan")
+                 for E, tt in zip(r["hist"].Eabs, r["hist"].t)]
+            # drop the first application: its kick covers `intervals`*dt of deposition
+            # while only dt of simulated time has elapsed, so the ratio starts above 1
+            axes[2].plot(t[1:], y[1:], color=c, label=lab)
+            tag(axes[2], t[-1], y[-1], lab, c, i)
+        # 4. particle kinetic energy, normalised to its own t = 0 value -- again so 1D
+        #    and 2D are comparable, and because the ABSOLUTE KE is dominated by the
+        #    ambient's thermal content, which differs between vacuum and ambient runs.
         if r["ke"]:
             t = [v * 1e12 for v in r["t_ke"]]
-            axes[3].plot(t, r["ke"], color=c, label=lab)
-            tag(axes[3], t[-1], r["ke"][-1], lab, c, i)
+            y = [v / r["ke"][0] for v in r["ke"]]
+            axes[3].plot(t, y, color=c, label=lab)
+            tag(axes[3], t[-1], y[-1], lab, c, i)
 
     axes[0].set_ylabel("N / N(t=0)")
     axes[0].set_title("Macroparticle number — THE boundary signature. Periodic is "
@@ -154,15 +163,18 @@ def main() -> int:
                       "here while the plume is far from both faces", loc="left",
                       fontweight="bold")
 
-    axes[2].set_ylabel("E$_{abs}$  [J per absent dim]")
-    axes[2].set_title("Cumulative coupled energy, measured by the ray tracer "
-                      "(grid-heating immune)", loc="left", fontweight="bold")
+    axes[2].set_ylabel("E$_{abs}$ / (P$_{inc}$ t)")
+    axes[2].set_title("Time-averaged absorbed fraction — cumulative coupled energy over "
+                      "the incident energy delivered so far (dimensionless, so 1D and 2D "
+                      "are comparable)", loc="left", fontweight="bold")
 
-    axes[3].set_ylabel("particle KE  [J per absent dim]")
-    axes[3].set_title("Total particle kinetic energy — with the panel above, this is "
-                      "gate G6: the gap is the grid-heating budget", loc="left",
+    axes[3].set_ylabel("KE / KE(t=0)")
+    axes[3].set_title("Total particle kinetic energy, normalised. NOTE a FALLING curve "
+                      "means energy is leaving through the boundary faster than the "
+                      "laser adds it — see the loss fractions in panel 1", loc="left",
                       fontweight="bold")
     axes[3].set_xlabel("t  [ps]")
+    axes[2].set_ylim(0, 1.05)
     for ax in axes:
         lpp.style_axes(ax)
 
