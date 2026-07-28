@@ -61,6 +61,26 @@ Parent: `P0_bc_periodic`.
 | G5 ppc / Tlocalfrac | 200 | PASS |
 | G6 energy closure | | post-run |
 
+## Media
+
+All under `media/P0_bc_open/` — gitignored and regenerable:
+
+- `checks.png`
+- `fields_lineouts.png`
+- `fields_streak.png`
+- `gates.png`
+- `laser_history.png`
+- `laser_profile.png`
+- `movie_fields.mp4`
+- `movie_phase.mp4`
+
+```bash
+python scripts/run_checks.py   runs/P0_bc_open
+python scripts/laser_report.py runs/P0_bc_open
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_open
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_open
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_open
+```
 ## Result
 
 Ran 24 000 steps (2.348 ps) in 6 min at 4 threads. `--verify` OK.

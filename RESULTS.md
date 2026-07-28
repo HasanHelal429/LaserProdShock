@@ -396,3 +396,23 @@ now parsed positionally from the front and the columns are returned under names 
 every run made before this entry; those figures have been regenerated.
 
 `runs/P0_bc_2d_open` (transverse `open`, the declared follow-up) is running.
+
+### Movies added, and the 2D planar flatness criterion is met quantitatively
+
+`scripts/make_movies.py` produces three movies per run into `media/<ID>/`:
+`movie_fields.mp4` (`n_e(z)` and `B_y/B₀(z)` lineouts with the full `f_abs(t)` history
+below and a cursor on the current frame), `movie_phase.mp4` (ion `(z,u_z)`), and
+`movie_map2d.mp4` (`n_e(x,z)`, 2D only). 11 movies over the five completed runs.
+
+Axis limits are fixed across all frames — per-frame autoscaling would make a plume that
+grows two decades look stationary — and the frame directory is cleared before writing so a
+shorter re-run cannot splice stale frames onto the end.
+
+**`P0_bc_2d` passes its transverse-flatness criterion, as a number.** Transverse relative
+spread of `n_e` (std over x per z, where there is meaningful plasma): **0.00 % at t = 0,
+median 5.0 % / max 14.9 % at 0.40 ps, median 5.3 % / max 13.2 % at 0.79 ps**, against a
+per-cell shot-noise floor of `1/√32` = **17.7 %** (16 ppc × 2 electron species). The spread
+is *below* the noise floor, so there is **no coherent x structure** — which is what a
+uniform beam on a planar target with periodic transverse boundaries must give, and it is
+the precondition for `P0_bc_2d_open` attributing any x structure to the transverse
+boundary rather than to dimensionality.

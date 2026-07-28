@@ -68,6 +68,27 @@ Note G1 is far more comfortable here than in the upstream deck (0.21 vs 1.91) be
 `dz` is referenced to the *critical* skin depth, which is 4× finer than `d_e,ambient`.
 That is a deliberate consequence of the length-unit choice, not luck.
 
+## Media
+
+All under `media/P0_bc_periodic/` — gitignored and regenerable:
+
+- `checks.png`
+- `fields_lineouts.png`
+- `fields_streak.png`
+- `gates.png`
+- `laser_history.png`
+- `laser_profile.png`
+- `phase_space.png`
+- `movie_fields.mp4`
+- `movie_phase.mp4`
+
+```bash
+python scripts/run_checks.py   runs/P0_bc_periodic
+python scripts/laser_report.py runs/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_periodic
+```
 ## Result
 
 Ran 24 000 steps (2.348 ps) in 6 min at 4 threads. `--verify` OK.

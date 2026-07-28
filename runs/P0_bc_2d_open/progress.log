@@ -4,3 +4,5 @@
 2026-07-28T15:26:35 | 158/8000 ( 2.0%) | 0h00m | 0.1899 s/step(wall) | 0.1761 s/step(warpx) | ETA ~0h24m | x1.08 | load 29.7 | laser 0.798 of peak, Eabs 0.02568 J
 2026-07-28T15:28:35 | 850/8000 (10.6%) | 0h02m | 0.1734 s/step(wall) | 0.1735 s/step(warpx) | ETA ~0h20m | x1.00 | load 33.9 | laser 0.742 of peak, Eabs 0.1364 J
 2026-07-28T15:31:05 | 1733/8000 (21.7%) | 0h05m | 0.1699 s/step(wall) | 0.1713 s/step(warpx) | ETA ~0h17m | x0.99 | load 33.2 | laser 0.464 of peak, Eabs 0.2703 J
+2026-07-28T15:33:05 | 2493/8000 (31.2%) | 0h07m | 0.1579 s/step(wall) | 0.1671 s/step(warpx) | ETA ~0h14m | x0.95 | load 32.5 | laser 0.407 of peak, Eabs 0.353 J
+2026-07-28T15:35:05 | 3281/8000 (41.0%) | 0h09m | 0.1523 s/step(wall) | 0.1634 s/step(warpx) | ETA ~0h11m | x0.93 | load 29.5 | laser 0.378 of peak, Eabs 0.4251 J

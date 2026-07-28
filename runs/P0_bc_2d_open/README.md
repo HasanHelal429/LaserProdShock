@@ -68,6 +68,19 @@ Comparable to `P0_bc_2d` (~22 min at 4 threads). See `progress.log`.
 | G5 ppc / Tlocalfrac | 16 target ppc — budget relaxed as in `P0_bc_2d` | PASS (relaxed) |
 | G6 energy closure | — must be read WITH the loss fraction (now large on four faces) | post-run |
 
+## Media
+
+All under `media/P0_bc_2d_open/` — gitignored and regenerable:
+
+- *(not generated yet)*
+
+```bash
+python scripts/run_checks.py   runs/P0_bc_2d_open
+python scripts/laser_report.py runs/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_2d_open
+```
 ## Result
 
 *(not yet run)*

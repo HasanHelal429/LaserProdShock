@@ -93,6 +93,28 @@ dimensionality test, and the 1D↔2D comparison is against a 1D run at 200 ppc, 
 means a systematic offset in `f_abs` of that order is expected and is not evidence of a
 2D effect. Phase 1's 2D runs raise ppc for the absorption numbers.
 
+## Media
+
+All under `media/P0_bc_2d/` — gitignored and regenerable:
+
+- `checks.png`
+- `fields_lineouts.png`
+- `fields_map2d.png`
+- `fields_streak.png`
+- `gates.png`
+- `laser_history.png`
+- `laser_profile.png`
+- `movie_fields.mp4`
+- `movie_map2d.mp4`
+- `movie_phase.mp4`
+
+```bash
+python scripts/run_checks.py   runs/P0_bc_2d
+python scripts/laser_report.py runs/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_2d
+```
 ## Result
 
 Ran 8000 steps (0.791 ps) in 22 min at 4 threads — by far the most expensive P0 run.
@@ -115,7 +137,14 @@ ambient runs (see `media/P0_boundary_decision/compare.png`, panels 3 and 4 — n
 are deliberately dimensionless, because `E_abs` is per m² in 1D and per m in 2D and the
 raw values must never share an axis).
 
-Transverse structure was not examined here: that needs a plotfile reader (Phase 1).
+**Transverse flatness — the other pass criterion — is confirmed quantitatively.** The
+transverse relative spread of `n_e` (std over x, per z, where there is meaningful plasma)
+is **0.00 % at t = 0, then median 5.0 % / max 14.9 % at 0.40 ps and median 5.3 % /
+max 13.2 % at 0.79 ps**. The per-cell shot-noise floor is `1/sqrt(32)` = **17.7 %**
+(16 ppc x 2 electron species), so the measured spread is *below* the noise floor: there is
+**no coherent x structure**, which is exactly what a uniform beam on a planar target with
+periodic transverse boundaries must give. `media/P0_bc_2d/movie_map2d.mp4` shows the
+stratification staying horizontal for the whole run.
 
 **Declared follow-up: `P0_bc_2d_open`** (transverse `open`), required before any
 finite-spot physics, and only meaningful now that the planar case is known to match 1D.
