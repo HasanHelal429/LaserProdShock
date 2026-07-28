@@ -1,0 +1,71 @@
+meta:
+  run_id: OVERRIDDEN
+  phase: 0
+  description: P0_bc_open_B truncated to 2 steps, run at several RNG seeds, to measure
+    the PIC noise floor on f_abs(0). The near-critical turning-point integral is extremely
+    sensitive to per-cell density noise, so this sets the bar any f_abs difference
+    must clear before it can be attributed to a geometry or boundary change.
+  reference: RESULTS 2026-07-28; gate G4 (ray_cfl non-asymptoticity at turning points)
+  deck: OVERRIDDEN
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 1
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 20
+    scale_length_de: 15
+    theta_e_init: 0.0001
+    theta_i_init: 1.0e-06
+    shape: planar
+    center_de: -50
+  ambient:
+    density_over_ncr: 0.06
+    theta_e: 0.005
+    theta_i: 5.0e-05
+field:
+  orientation: perpendicular
+  vA_over_c: 0.003
+geometry:
+  dims: 1
+  normal_axis: z
+  axis:
+    lo_de: -100
+    hi_de: 100
+  dz_over_de: 0.5
+  boundary:
+    axis:
+      lo: open
+      hi: open
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 2
+  ppc:
+    target: 200
+    ambient: 48
+  random_seed: 1
+diagnostics:
+  plotfile_intervals: 2
+  reduced_intervals: 1
+gates:
+  compression_factor: 2.0
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 200
+targets:
+  note: B_y/B0 must stay 1.000 in the far upstream; the ambient traverse must eat
+    <2% of the beam so the upstream is not pre-heated

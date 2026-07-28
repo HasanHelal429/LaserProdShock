@@ -339,6 +339,11 @@ def render(cfg: dict) -> str:
     a(f"boundary.particle_hi = {' '.join(phi_bc)}")
     a("")
     a(f"algo.particle_shape = {int(num.get('particle_shape', 2))}")
+    if num.get("random_seed") is not None:
+        # Fixing the seed makes a run bit-reproducible AND lets a seed sweep measure the
+        # PIC noise floor on any derived quantity -- necessary before attributing a small
+        # difference between two runs to physics.
+        a(f"warpx.random_seed  = {int(num['random_seed'])}")
     if num.get("filter_npass"):
         a("warpx.use_filter    = 1")
         a(f"warpx.filter_npass_each_dir = {num['filter_npass']}")
@@ -612,6 +617,8 @@ def key_params(path: str) -> dict:
     out["cfl"] = float(d["warpx.cfl"])
     out["dims"] = int(float(d.get("geometry.dims", "1")))
     out["particle_shape"] = int(float(d["algo.particle_shape"]))
+    if "warpx.random_seed" in d:
+        out["warpx.random_seed"] = int(float(d["warpx.random_seed"]))
     out["n_cell"] = " ".join(str(int(float(v))) for v in d["amr.n_cell"].split())
     for key in ("geometry.prob_lo", "geometry.prob_hi"):
         out[key] = " ".join(f"{_eval(v, ns):.10g}" for v in d[key].split())

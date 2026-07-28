@@ -484,3 +484,82 @@ just cannot have *open* transverse walls holding a hot ambient.
 Six runs, the boundary decision recorded, both transverse options characterised, the
 exit-overshoot measured, and every run carrying a generated geometry diagram, a figure set,
 movies and a gate table. `media/P0_2d_transverse/compare.png` is the controlled 2D pair.
+
+---
+
+## 2026-07-28 (later) — Can the region behind the target be removed? Yes, with `open`. Plus a RETRACTION.
+
+**The question.** The laser enters at +z and the ablation flows back toward +z, so the domain
+behind the target looks like wasted resolution. Two variants of `P0_bc_open_B`, each with the
+domain truncated at the target's initial rear face (`lo_de: −100 → −60`, **320 cells vs 400**)
+and everything else byte-identical: `P0_rear_open` (`open` rear) and `P0_rear_reflect`
+(`reflecting` rear). New `scripts/compare_frontside.py` compares only z > −40, because
+`compare_runs.py` overlays whole-domain totals, which *must* differ when one run holds less
+plasma.
+
+**Two facts established before running.** (1) The laser genuinely cannot see behind the
+target: peak `n_e/n_cr` *rises* 1.55 → 1.59 → 1.63 → **1.81** — the target **compresses**
+rather than rarefying — so the ray always turns at the critical surface inside the slab and
+never reaches the rear boundary; the exit-overshoot does not apply there either. (2) But the
+rear is **not** quiescent: by 2.35 ps **6.95 %** of target ion mass sits behind z = −60,
+reaching z = −87 at `u_z` = −8.7 C_s. So the question was empirical.
+
+### `P0_rear_open` is a valid truncation
+
+| front-side observable | vs `P0_bc_open_B` |
+|---|---|
+| target-ion count at z > −40 | **+0.1 %** |
+| `n_e(z)` at z > −40, final time | median 5.6 %, 90th pct 12.5 % (ppc level) |
+| `E_abs` integrated over the run | **−0.6 %** |
+| total target-ion `p_z` | **−3.4 %** |
+| plume front position | within **1.0 d_e** (2 cells) of 30 d_e travelled |
+| cost | **20 % fewer cells**, 3.5 min vs 4.7 min |
+
+### `P0_rear_reflect` is different physics, not a cheaper equivalent
+
+It **flips the sign of the target's net momentum**: total target-ion `p_z` = **+0.0067**
+against **−0.0315** (reference) and −0.0305 (`open`). In the full domain the rear blowoff
+dominates and the target recoils away from the laser; a tamped rear returns that momentum.
+Front-side density and count look fine (+0.3 %, median 4.8 %), so **had only the local plume
+been checked this would have passed** — the momentum balance is the discriminator. Keep it as
+the reference for a deliberately tamped target.
+
+### RETRACTION — `f_abs(0)` is not a usable discriminator
+
+Both truncated runs gave `f_abs(0)` = 0.3108 against 0.2827 for the reference, +9.9 %. Before
+attributing that to the truncation I measured the noise floor: `studies/fabs_noise/`, six runs
+of one identical config differing **only in `numerics.random_seed`** (a new schema field, so
+the sweep is config-driven):
+
+```
+0.2925  0.3140  0.2740  0.2938  0.2837  0.2279
+mean 0.2810   std 0.0292   relative std 10.39%   FULL SPREAD 30.64%
+```
+
+**`f_abs(0)` carries a ~10 % 1σ.** The step-0 profile dumps localise the mechanism precisely:
+essentially the entire difference between any two runs sits in the **single cell containing
+the critical surface** (P_abs there 1.176e24 → 1.511e24 W/m³ between runs whose densities
+agreed to 0.0004 n_cr), because `K ∝ 1/√(1 − n_e/n_cr)` diverges there and the operator
+integrates that layer over a *locally interpolated*, noisy density and gradient.
+
+**Therefore I retract the claim, made in the `P0_bc_2d_open` entry above, that the
+edge-column density deficit produces a measurable 5.2 % `f_abs(0)` offset.** That 5.2 % is
+well inside a 10.4 % σ. What survives — because it was measured, not inferred — is the
+deficit itself (outer two columns at **0.365×** and **0.861×** the interior density, interior
+median difference 0.000 %), the fact that it puts a 1.5 n_cr target at 0.55 n_cr in the
+outermost column, and the rule that follows. Only the absorption number is withdrawn.
+
+**New working rule: quote `E_abs`, never `f_abs(0)`, when comparing runs.** `E_abs` integrates
+hundreds of applications and agreed to 0.6 % between geometries whose `f_abs(0)` differed by
+10 %. This also sharpens gate G4 — the `ray_cfl` non-asymptoticity at turning points is a
+*noise-amplification* problem, not only a discretisation one — and it means Phase 3's
+intensity sweep must average over time or seeds rather than read single-shot absorption.
+
+*(Also: `compare_frontside.py`'s `p_z(front side)` column is a signed sum amounting to only
+32–44 % of the gross flux, so it carries heavy cancellation noise — the total-momentum
+comparison is the reliable one. A sign-formatting bug in that column was fixed.)*
+
+**Adopt for Phase 1 and 2: truncate at the target's rear face with an `open` boundary**, for
+free-standing-foil physics at 20 % lower cost. Verified for a 20 d_e / 1.5 n_cr target over
+2.35 ps (≈ the rear rarefaction's slab-crossing time); re-check for a much thinner target or a
+much longer run, where the two faces couple more strongly.

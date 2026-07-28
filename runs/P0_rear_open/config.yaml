@@ -1,0 +1,75 @@
+diagnostics:
+  field_intervals: 400
+  phase_intervals: 1200
+  plotfile_intervals: 2400
+  reduced_intervals: 200
+field:
+  orientation: perpendicular
+  vA_over_c: 0.003
+gates:
+  compression_factor: 2.0
+  dz_over_lambdaD_max: 8.0
+  omega_pe_dt_max: 1.2
+  ppc_target_min: 200
+geometry:
+  axis:
+    lo_de: -60
+    hi_de: 100
+  boundary:
+    axis:
+      lo: open
+      hi: open
+  dims: 1
+  dz_over_de: 0.5
+  normal_axis: z
+laser:
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  direction: z
+  incidence_angle_deg: 0.0
+  inject_side: hi
+  intensity: 1.0e18
+  intervals: 10
+  profile_intervals: 8000
+  ray_cfl: 0.25
+  temperature_mode: local
+  wavelength_um: 1.053
+meta:
+  deck: inputs_P0_rear_open
+  description: 'P0_bc_open_B with the domain truncated at the target''s initial REAR
+    face (z = -60) and a open boundary there -- rear material simply LEAVES: the rear
+    rarefaction drains through an absorbing wall. Tests whether the region behind
+    the target can be removed without changing the front-side ablation.'
+  phase: 0
+  reference: TEST_PLAN.md 5.0, 5.2; KinShock2020 deck._BC_MAP ('open')
+  run_id: P0_rear_open
+numerics:
+  cfl: 0.35
+  max_step: 24000
+  particle_shape: 2
+  ppc:
+    ambient: 48
+    target: 200
+plasma:
+  ambient:
+    density_over_ncr: 0.06
+    theta_e: 0.005
+    theta_i: 5.0e-05
+  target:
+    center_de: -50
+    density_over_ncr: 1.5
+    scale_length_de: 15
+    shape: planar
+    theta_e_init: 0.0001
+    theta_i_init: 1.0e-06
+    thickness_de: 20
+reference:
+  charge_state: 1
+  length_scale: critical
+  mass_ratio: 100.0
+targets:
+  note: front-side observables (f_abs(t), E_abs(t), n_e and phase space for z > -40,
+    plume front, target-ion +z momentum) must match P0_bc_open_B if the rear region
+    is truly removable
+controls:
+  full_domain_reference: P0_bc_open_B

@@ -104,8 +104,9 @@ periodic wrap: a quadratic shape spans three cells, so the outermost two are und
 **That edge artifact is not cosmetic for a near-critical target.** At 0.365× the interior
 value the target peak in the outermost column is 1.5 × 0.365 = **0.55 n_cr — underdense**,
 so the ray does *not* turn there: it transits instead of reflecting, and the edge columns do
-different ray physics from the rest of the beam. `f_abs(0)` is 0.2594 against 0.2466 for the
-planar run, a **5.2 %** offset from four columns of eighty. My falsification criterion above
+different ray physics from the rest of the beam. *(The 5.2 % `f_abs(0)` offset originally
+quoted here as the consequence has been **retracted** — see "Retracted" below. The
+density-deficit mechanism stands; the absorption number was noise.)* My falsification criterion above
 ("`f_abs` diverging from t = 0 means the boundary changed the drive") is therefore
 *technically triggered but wrongly framed* — the criterion did not anticipate that a
 transverse boundary changes the density *deposition* in edge columns and hence their
@@ -143,4 +144,15 @@ the transverse box size.
 
 ## Retracted
 
-Nothing.
+**The claim that the edge-column density deficit produces a measurable 5.2 % `f_abs(0)`
+offset.** `f_abs(0)` was 0.2594 here against 0.2466 for `P0_bc_2d`, and I attributed the
+difference to the four affected edge columns. `studies/fabs_noise/` subsequently measured
+`f_abs(0)` across six runs differing *only* in RNG seed and found a **10.4 % 1σ and a 30.6 %
+full spread** — so a 5.2 % offset is well inside the noise and is not evidence of anything.
+
+What survives, because it was measured directly rather than inferred: the outer two columns
+per side really do carry **0.365×** and **0.861×** the interior density (interior median
+difference 0.000 %), that really does put a 1.5 n_cr target at 0.55 n_cr — underdense — in
+the outermost column, and the rule that follows (use a beam profile negligible at the
+transverse walls; exclude the outer two cells) is unaffected. Only the absorption *number*
+is withdrawn.
