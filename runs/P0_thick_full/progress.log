@@ -1,0 +1,11 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P0_thick_full
+# logging_started 2026-07-28T16:29:30  total_steps=24000  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-07-28T16:30:00 | 3760/24000 (15.7%) | 0h00m | 0.0080 s/step(wall) | 0.0077 s/step(warpx) | ETA ~0h02m | x1.04 | load 28.2 | laser 0.205 of peak, Eabs 6.06e+04 J
+2026-07-28T16:30:30 | 7569/24000 (31.5%) | 0h01m | 0.0079 s/step(wall) | 0.0077 s/step(warpx) | ETA ~0h02m | x1.02 | load 29.7 | laser 0.114 of peak, Eabs 9.589e+04 J
+2026-07-28T16:31:00 | 11432/24000 (47.6%) | 0h01m | 0.0078 s/step(wall) | 0.0077 s/step(warpx) | ETA ~0h01m | x1.01 | load 29.9 | laser 0.076 of peak, Eabs 1.268e+05 J
+2026-07-28T16:31:30 | 15197/24000 (63.3%) | 0h02m | 0.0080 s/step(wall) | 0.0077 s/step(warpx) | ETA ~0h01m | x1.03 | load 30.7 | laser 0.045 of peak, Eabs 1.518e+05 J
+2026-07-28T16:32:00 | 18567/24000 (77.4%) | 0h02m | 0.0089 s/step(wall) | 0.0079 s/step(warpx) | ETA ~0h00m | x1.13 | load 30.6 | laser 0.101 of peak, Eabs 1.747e+05 J
+2026-07-28T16:32:30 | 21931/24000 (91.4%) | 0h03m | 0.0089 s/step(wall) | 0.0080 s/step(warpx) | ETA ~0h00m | x1.11 | load 30.7 | laser 0.048 of peak, Eabs 1.975e+05 J
+2026-07-28T16:33:00 | 24000/24000 (100.0%) | 0h03m | 0.0145 s/step(wall) | 0.0080 s/step(warpx) | ETA ~0h00m | x1.80 | load 30.9 | laser 0.416 of peak, Eabs 2.117e+05 J
+DONE 2026-07-28T16:33:00 | 24000/24000 (100.0%) | total wall 0h03m | mean 0.0088 s/step(wall) | reached max_step

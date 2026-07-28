@@ -116,14 +116,17 @@ def main() -> int:
         # interpolate the reference onto this run's times for a fair difference
         fr = np.interp(r["t"], ref["t"], ref["front"])
         d_front = np.nanmax(np.abs(r["front"] - fr))
+        # FINAL E_abs, not the max over time: E_abs starts near zero, so a relative
+        # difference taken early is dominated by the first application's noise (f_abs(0)
+        # carries a 10.4% 1-sigma -- studies/fabs_noise) and reads ~20% even for runs that
+        # agree to 1% once integrated.
         er = np.interp(r["hist"].t, ref["hist"].t, ref["hist"].Eabs)
-        d_E = np.nanmax(np.abs(np.asarray(r["hist"].Eabs) - er)
-                        / np.maximum(er, 1e-30)) * 100
+        d_E = (r["hist"].Eabs[-1] / er[-1] - 1) * 100 if er[-1] else float("nan")
         pr = (np.interp(r["ptime"], ref["ptime"], ref["pmom"])
               if r["pmom"].size and ref["pmom"].size else None)
         d_p = ((r["pmom"][-1] / pr[-1] - 1) * 100 if pr is not None and pr[-1] else
                float("nan"))
-        print(f"  {r['id']:18s} vs reference:  max |ΔE_abs|/E_abs = {d_E:6.2f}%   "
+        print(f"  {r['id']:18s} vs reference:  ΔE_abs(final) = {d_E:+6.2f}%   "
               f"max |Δfront| = {d_front:5.2f} d_e   Δp_z(front side) = {d_p:+6.2f}%")
 
     # --- figure -----------------------------------------------------------

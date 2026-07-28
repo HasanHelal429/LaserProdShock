@@ -563,3 +563,50 @@ comparison is the reliable one. A sign-formatting bug in that column was fixed.)
 free-standing-foil physics at 20 % lower cost. Verified for a 20 d_e / 1.5 n_cr target over
 2.35 ps (≈ the rear rarefaction's slab-crossing time); re-check for a much thinner target or a
 much longer run, where the two faces couple more strongly.
+
+---
+
+## 2026-07-28 (later) — Rear truncation re-tested at 4× thickness: it gets BETTER
+
+The 20 d_e verification carried an explicit caveat — valid for *that* thickness over *that*
+duration. `P0_thick_full` / `P0_thick_open` repeat it at **80 d_e,cr = 13.4 µm, 49 % of the
+upstream `run_laser_shock` target** (163 d_e,cr), which is the setup this project actually
+wants. Everything else is unchanged; the coronal scale length was deliberately left at 15 d_e
+so thickness is the only variable (matching the upstream `L_n/w_t` = 0.75 is a Phase-1 item).
+
+**The prediction, made before running.** The rear rarefaction crosses the slab in `w_t/c_s`:
+**2.3 ps at 20 d_e** against a 2.348 ps run (**103 % crossed — fully coupled**, which is why
+`P0_rear_reflect` flipped the momentum sign) but **9.1 ps at 80 d_e** (**26 % crossed**). So
+the faces should decouple and the truncation should improve.
+
+**Confirmed, by the mechanism rather than by luck.** Target-ion mass behind the initial rear
+face, in the full-domain references: **6.97 % → 2.24 %**, a 3.1× reduction closely tracking
+the predicted ~4× ratio of crossing fractions.
+
+| front-side observable | 20 d_e pair | **80 d_e pair** |
+|---|---|---|
+| total target-ion `p_z` | −3.39 % | **−0.54 %** (6× better) |
+| `E_abs` over the run | −0.67 % | **+0.88 %** |
+| target-ion count at z > face | +0.10 % | **+0.11 %** |
+| cost saved by truncating | 20 % of cells | 15 % of cells |
+
+`p_z(total)` is the decisive column — it is the observable that caught `P0_rear_reflect`
+flipping sign — and it improves **6-fold**. `E_abs` changes sign between the pairs but both
+are sub-1 %, i.e. scatter; `f_abs(0)` cannot refine it, carrying a 10.4 % 1σ.
+
+Both thick runs stay overdense (peak `n_e/n_cr` = 1.737 and 1.761), so the premise holds: the
+ray turns inside the slab and the rear boundary is invisible to the laser.
+
+`E_abs` is also nearly unchanged by quadrupling the thickness (2.117e5 vs 2.155e5 J/m², −2 %),
+which is a first, incidental data point for **H3** — thickness buys piston *momentum*, not
+coupled energy, because the drive shuts off on the corona's terms rather than the slab's.
+
+**ADOPTED for Phase 1 and 2: truncate at the target's rear face with an `open` boundary.**
+Verified at 20 d_e and 80 d_e, with fidelity improving toward the thicker, more realistic end.
+The remaining step to the desired setup is the coronal scale length, not the truncation.
+
+*(Tooling note: `yt` refuses a `covering_grid` flush against a non-periodic domain edge when
+the right edge rounds a float ULP outside it — it hit the new domain sizes. `plot_fields` and
+`make_movies` now call `ds.force_periodicity()` first, which only affects ghost-cell fetching
+that a full-domain covering grid never needs. Also worth recording: `diag1` carries only the
+total `rho`, not per-species — per-species densities are on `diag_fields`.)*

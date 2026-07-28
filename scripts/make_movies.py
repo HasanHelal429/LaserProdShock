@@ -203,6 +203,7 @@ def movie_map2d(cfg, sc, rid, rd, fps, keep=False):
     maps, extent, vlo, vhi = [], None, np.inf, 0.0
     for p in paths:
         ds = yt.load(p)
+        ds.force_periodicity()      # see plot_fields.load_series
         g = ds.covering_grid(0, left_edge=ds.domain_left_edge,
                              dims=ds.domain_dimensions)
         ne = sum(np.abs(np.asarray(g[("boxlib", f"rho_{s}")])[:, :, 0])

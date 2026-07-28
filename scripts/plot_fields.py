@@ -60,6 +60,10 @@ def load_series(run_dir, prefix, sc, species):
         except Exception:
             continue
         have = {f[1] for f in ds.field_list}
+        # yt refuses a covering_grid flush against a NON-periodic domain edge when the
+        # right edge rounds a float ULP outside it. force_periodicity only affects how yt
+        # would fetch ghost cells, which a full-domain covering_grid never needs.
+        ds.force_periodicity()
         g = ds.covering_grid(0, left_edge=ds.domain_left_edge,
                             dims=ds.domain_dimensions)
         if z is None:

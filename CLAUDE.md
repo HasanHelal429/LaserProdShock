@@ -126,6 +126,23 @@ not, and work while a run is still going.
   new, shorter movie). `--keep-frames` retains them, and a failed encode keeps them
   automatically. Never leave frame directories behind by hand -- they are several times the
   size of the movie they produced.
+- **Quote `E_abs`, never `f_abs(0)`, when comparing runs.** `f_abs(0)` carries a **10.4 %
+  1σ and a 30.6 % full spread** across runs differing only in RNG seed
+  (`studies/fabs_noise/`): `K ∝ 1/√(1−n_e/n_cr)` diverges at the critical surface and the
+  operator integrates that layer over a locally interpolated, noisy density and gradient, so
+  essentially the whole run-to-run difference sits in the single cell containing the critical
+  surface. `E_abs` integrates hundreds of applications and agreed to 0.6 % between geometries
+  whose `f_abs(0)` differed by 10 %. This also makes gate G4 a **noise-amplification** issue,
+  not only a discretisation one.
+- **Truncate the domain at the target's rear face, with an `open` boundary.** Verified at
+  both 20 d_e and 80 d_e thickness (front-side ion count within 0.11 %, `E_abs` within 0.9 %,
+  total target `p_z` within 0.54 % at 80 d_e), and the fidelity *improves* with thickness
+  because the rear rarefaction crosses less of a thicker slab. Saves 15-20 % of the cells.
+  A `reflecting` rear is **different physics** — it flips the sign of the target's net
+  momentum (a tamped target), and front-side density alone will not reveal that.
+- **`diag1` has only the total `rho`; per-species densities are on `diag_fields`.** And yt
+  refuses a `covering_grid` flush against a non-periodic domain edge on some domain sizes —
+  call `ds.force_periodicity()` first (the analysis scripts do).
 - **Analyse the step-0 deposition profile.** Later `profile_intervals` dumps drift as the
   kicks move electrons.
 - **`ray_cfl = 0.25` (default) is not asymptotic for turning-point problems** —
