@@ -1,0 +1,4 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P1/P1_vac_2d_off
+# logging_started 2026-07-29T01:11:55  total_steps=432000  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-07-29T01:12:25 | 1773/432000 ( 0.4%) | 0h00m | 0.0169 s/step(wall) | 0.0162 s/step(warpx) | ETA ~2h01m | x1.05 | load 18.1 | laser OFF (I0 = 0)

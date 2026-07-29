@@ -212,6 +212,33 @@ not, and work while a run is still going.
   never (which is all 10 ps could show). **H2 stays falsified**: `E_abs = ∫f_abs(t)·I₀ dt`
   with `f_abs` set by the target's hydrodynamic state (`TEST_PLAN.md` §2.4–2.5). Quote the
   **plateau level, the `n_cr`-crossing time and `dE/dt`** — never a half-peak shutoff time.
+- **Target thickness is a DRIVE-DURATION knob, and it trades against piston speed.** A 5×
+  thicker target keeps the peak above `n_cr` for the whole run (it even *compresses*, to 1.92
+  `n_cr`) where the 80 d_e target crossed at 28.8 ps and lost its plateau — so thickness extends
+  the drive past the ~38 ps formation needs. But it costs speed: `E_abs` rises only ~46 % for 5×
+  the mass (a colder target absorbs *better*, `K ∝ n_e²T_e^{−3/2}`, so the plateau is +23 % —
+  coupled energy is **not** thickness-independent), hence `v_p ∝ √(E_abs/w_t)` **falls** (0.63×
+  measured, 0.54× predicted). **H3's "thickness leaves `v_p` unchanged" is FALSIFIED**; α ≈ 1–2
+  survives. There is an optimum thickness, as consequential as the optimum `I₀` (`TEST_PLAN.md`
+  §2.6).
+- **Validate a rear truncation by CORE DECOUPLING, never by boundary-density invariance.** The
+  truncated boundary sits on a **free surface**, which must rarefy — asking it to stay put is an
+  ill-posed test (`P1_vac_1d_thick`'s rear density fell 37 % while the truncation was sound).
+  The right measure is the width of slab still at its initial density between the two
+  disturbance fronts: 269 of 400 d_e (67 %) undisturbed there. Also, **truncating costs the
+  energy budget** — 6.13 % weight loss at 30 ps vs 1.14 % at 100 ps untruncated — so **G6 cannot
+  be closed tightly on a truncated run**; take strict closure from untruncated ones.
+- **In 2D the laser operator is ~65 % of the step cost**, because it launches a ray per
+  transverse cell and reduces `T_e` per cell: the driven 2D run ran at 0.046 s/step against
+  0.016 for its laser-off control, a 2.9× ratio (in 1D the two differ by ~15 %). Budget 2D runs
+  from the *driven* rate, and expect a `_off` control to be much cheaper than its partner.
+- **ppc in 2D: 36 (6×6), not 400.** 400 is unaffordable once a transverse dimension multiplies
+  both grid and particles. G5's absorption-bias bound rises 0.31 % → 3.5 %, but `Tlocalfrac`
+  stayed at 0.90–0.99 (and 0.975–0.987 in the Phase-0 2D runs at only **16** ppc), so `T_e` is
+  still measured rather than floored. **Match the ppc in any 1D baseline** used for a 1D↔2D
+  comparison, or ppc bias confounds dimensionality.
+- **Matching a 1D run to a 2D run means matching `t_end`, not `max_step`.** `dt` is `cfl·dz/c`
+  in 1D but `cfl·dz/(c√2)` in 2D, so 2D needs √2 more steps for the same physical time.
 - **`c_s` must come from the MEASURED electron energy, not `laser_report`'s implied `T_e,ab`.**
   That number assumes all coupled energy is electron thermal, but **66 % of it is in ions** by
   100 ps, so it overstates `c_s` by 2.3× and understates α to 0.84. Use `<KE_e>` from the `EP`

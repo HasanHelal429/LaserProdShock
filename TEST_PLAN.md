@@ -293,6 +293,48 @@ KE rises 29.7 % → 65.8 % between 10 and 100 ps). That, and `t_drive` ≈ 40 ps
 `5 ω_ci0⁻¹` = 38 ps that formation needs, are the two numbers Phase 2 inherits — and they say
 the margin is **thin**.
 
+### 2.6 REFINED 2026-07-29 by `P1_vac_1d_thick` (400 d_e) — **H3's thickness clause is falsified, and the thin margin is fixable**
+
+A 5×-thicker target at otherwise identical parameters (30 ps, 36 ppc, rear-truncated) changes
+three things, and two of them were predicted wrong beforehand.
+
+**1. Thickness buys drive DURATION.** Peak `n_e` never falls below `n_cr` — it *rises* to
+**1.92 `n_cr`** under ablation-pressure compression — where the 80 d_e target crossed at 28.8 ps
+and lost its plateau. **So §2.5's "thin margin" against the 38 ps formation requirement is a
+thickness problem, and thickness fixes it.**
+
+**2. Coupled energy is NOT thickness-independent.** `E_abs` at 29.9 ps is **+46 %**
+(1.109×10⁷ vs 7.574×10⁶ J/m²) and the plateau **+23 %** (0.2597 vs 0.2117), because `K ∝ n_e²
+T_e^{−3/2}` and 5× the mass for the same drive keeps the target **colder**, which absorbs
+*better*. Drive-limited means no capacity ceiling — it does **not** mean the plateau level is a
+constant. (ppc confound ≤ 3.5 % against a 23 % shift.)
+
+**3. H3's thickness clause is FALSIFIED.** H3 argued `v_p` is thickness-independent because
+"thickness raises `E_abs` and the mass in step, so `v = √(2E/m)` is unchanged". **That assumed
+`E_abs ∝ w_t`, which §2.4 disproved.** `E_abs` rose 46 % for 5× the mass, so
+
+```
+v_p(400 d_e)/v_p(80 d_e) = sqrt(1.46/5) = 0.54   predicted
+                         = 0.63                  measured (0.00223 c vs 0.00353 c)
+```
+
+**α = `v_p`/`c_s` ≈ 1 survives** (0.92 here, 1.13 there) — that is the part of H3 that holds.
+Restate H3 as: *α ≈ 1–2 universally, but `v_p` itself falls as ≈ √(`E_abs`(w_t)/w_t).*
+
+**Consequence — a new sweep axis for Phase 3.** Thickness buys drive duration but costs piston
+speed as √(E/m), and formation needs **both** a supercritical `v_p` and ≳ 1 `ω_ci0⁻¹` of drive.
+**There is therefore an optimum target thickness**, and it is as consequential as the optimum
+`I₀` that H4 is about. §9.2's geometry sweep must scan `w_t`, not only spot size.
+
+**Methodological correction.** A truncated run's rear boundary sits on a **free surface**, which
+*must* rarefy — checking that boundary density is "unchanged" is an ill-posed test of the
+truncation. The correct criterion is **core decoupling**: the width of slab still at its initial
+density between the two disturbance fronts. Here 269 of 400 d_e (67 %) stayed undisturbed while
+the rear-boundary density fell 37 %, and the truncation was sound. Truncation also costs the
+energy budget: **6.13 % weight loss at 30 ps** against 1.14 % at 100 ps untruncated, so
+**G6 cannot be closed tightly on a truncated run** — strict closure claims must come from
+untruncated runs.
+
 ---
 
 ## 3. Architecture and working rules

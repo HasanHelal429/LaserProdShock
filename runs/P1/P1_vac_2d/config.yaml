@@ -114,5 +114,8 @@ targets:
     (slab plus Gaussian corona) -- 2.0 d_e/ps at 10 ps rising to 3.1 at 29.9 ps. Over the
     full run that is 92 d_e, i.e. 23 percent of the slab, which is the same crossing
     fraction at which P0_thick_open measured the truncation error at only -0.54 percent on
-    total target momentum. To be CHECKED post-run by confirming n_e and T_e at the rear
-    boundary are unchanged from their initial values.
+    total target momentum. CHECK IT POST-RUN BY CORE DECOUPLING -- the width of slab still
+    at its initial density between the two disturbance fronts -- NOT by asking whether the
+    rear-boundary density is unchanged. The rear face is a free surface and must rarefy
+    (P1_vac_1d_thick measured 1.441 -> 0.915 n_cr, while 269 of 400 d_e stayed undisturbed and the
+    truncation was sound). See runs/P1/P1_vac_1d_thick/README.md section 5.
