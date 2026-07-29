@@ -178,6 +178,16 @@ not, and work while a run is still going.
 - **Performance.** `OMP_NUM_THREADS=8 OMP_PROC_BIND=spread OMP_PLACES=cores` — near-linear
   to 8 cores (~1.8× vs 4), memory-bandwidth-bound beyond. `max_grid_size`, tiling and
   `sort_intervals` were benchmarked as neutral-to-negative in `KinShock2020` — don't bother.
+- **The GPU is worth 12.7× even in 1D — use it, and BENCHMARK rather than scale.** On the
+  `P1_vac_1d` deck (2000 cells, 420 k macroparticles): **7.9 min on one RTX 4070 vs 100.6 min
+  on 8 CPU threads**. Estimating that run by scaling from `P0_thick_open` (particles ×3.15 ×
+  steps ×4.27) predicted ~25 min on CPU and was **wrong by 4×** — cell count dominates far
+  more than a particle×step scaling allows for, so measure a 2000-step slice when the grid
+  changes size. CPU and GPU agree on `P_abs(0)` to 2×10⁻⁶ but on integrated `E_abs` only to
+  ~2.5 %, because the kicks use `ParallelForRNG` and the backends draw different random
+  streams: the two are different *realizations*, well inside the 10.4 % seed noise on
+  `f_abs(0)`. **Run a physics run and its `_off` control on the SAME backend**, or that
+  difference lands inside the G3 subtraction.
 - **GPU: `launch.sh --gpu [N]`, and the CUDA build is ONE TREE PER DIMENSIONALITY.**
   `WarpX_DIMS` is compile-time, so `build_cuda/` is **2D only** and 1D needs its own
   `build_cuda1d/`. Two RTX 4070s (12 GB, arch 8.9) — `-g 0` and `-g 1` carry two runs at
@@ -193,6 +203,29 @@ not, and work while a run is still going.
   cells (a rounding error next to the particle push in 1D). Rear-face truncation pays off
   when an *ambient* fills the cushion at 48 ppc; with no ambient, spend the cells on genuine
   free surfaces at both faces instead. It is also why a 10 ps vacuum run is affordable.
+- **Absorption FLOORS, it does not shut off — so `t_s` from a half-peak crossing is a lie.**
+  `P1_vac_1d`: `f_abs` 1.000 → a **plateau ≈ 0.23**, `E_abs` still rising at 10 ps
+  (late/early `dE/dt` = 0.41; 99 % of `E_abs` arrives by 9.90 ps of a 10.02 ps run). The
+  half-peak crossing reads 0.25 ps and means only "fell onto the plateau". **H2 is falsified**
+  — `E_abs ≈ f_abs·I₀·t`, so `E_abs ∝ I₀`, not intensity-independent (`TEST_PLAN.md` §2.4).
+  Quote the **plateau level and `dE/dt`**, never a shutoff time.
+- **The coronal scale length sets the absorption REGIME, not just the amount.** `L_n/w_t`
+  0.19 → 0.75 (`L_n` 15 → 60 d_e at `w_t` = 80) took τ-to-the-turning-point from 0.14 to 5.60,
+  i.e. optically thin → thick, and `f_abs(0)` from 0.248 to **1.000**. At `L_n` = 60 the ray is
+  extinguished ~15 d_e *before* the critical surface: **0.000 % of `P_abs` lands at or below
+  it**, so the turning point plays no role and G4's `ray_cfl` sensitivity should weaken. Predict
+  this before running by integrating τ to the turning point at the **group** `T_e` — it got
+  +53.8 d_e for the deposition peak against a +53.6 d_e prediction.
+- **Piston speed from a weight-weighted bulk, never a percentile front.** The laser-off
+  control's own ion front reaches 0.0091 c against the driven run's 0.0267 c — a percentile
+  front is ~1/3 undriven thermal expansion. By mass the split is clean (0.00089 vs 0.00144 c).
+  Also beware averaging in target mass the rarefaction has not reached yet: at 10 ps it had
+  crossed only ~70 % of an 80 d_e slab, which drags the bulk mean down and makes α a **lower
+  bound** (H3 is untested, not falsified).
+- **Quote the WEIGHT lost at the boundaries, not the macroparticle count** — they differ by
+  65×. `P1_vac_1d` lost 0.68 % of macroparticles but only **0.0104 % of the weight**, because
+  the escapers are the tenuous corona tail. That is why G6 finally closed (**−0.74 %**) where
+  Phase 0 could only report +218 %/+235 %.
 - **A `_off` control must differ ONLY in `laser.intensity`.** Grid heating accumulates with
   step count and depends on the grid, the ppc and the species, so any other difference makes
   the G3 subtraction meaningless. `tests/test_structures.py` renders both decks and diffs

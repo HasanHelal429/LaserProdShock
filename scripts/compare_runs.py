@@ -135,7 +135,11 @@ def main() -> int:
         #    so far. Normalising is not cosmetic: Eabs is per unit length in each absent
         #    dimension, so a 1D run reports J/m^2 and a 2D run J/m. Putting both on one
         #    axis in raw units would be two different units on the same scale.
-        if len(r["hist"]):
+        # A laser-off control (gate G3) has P_inc = 0, and this normalisation divides by
+        # it. The control is a MANDATORY companion to every headline run, so comparing a
+        # run against its own control must not crash -- skip the panel for that run
+        # instead (E_abs is identically 0, so there is nothing to draw).
+        if len(r["hist"]) and r["P_inc"]:
             t = [v * 1e12 for v in r["hist"].t]
             y = [(E / (r["P_inc"] * tt)) if tt > 0 else float("nan")
                  for E, tt in zip(r["hist"].Eabs, r["hist"].t)]

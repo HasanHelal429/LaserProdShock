@@ -37,11 +37,19 @@ from laserprod import plotting as lpp       # noqa: E402
 
 
 def _laser_curve(cfg, sc, rd):
-    """(t_ps, f_abs) for the tracking panel, or (None, None)."""
+    """(t_ps, f_abs) for the tracking panel, or (None, None).
+
+    A laser-off control (gate G3) has P_inc = 0, so every f_abs is nan and the tracking
+    panel's set_ylim() raises on a NaN limit. The control is a MANDATORY companion to
+    every headline run, so return (None, None) and let the caller drop the panel --
+    there is no absorbed fraction to track when the drive is off.
+    """
     hist = lpio.laserdep_history(rd)
     if not len(hist):
         return None, None
     P = lpio.incident_power(sc, cfg)
+    if not P:
+        return None, None
     return np.asarray(hist.t) * 1e12, np.asarray(hist.f_abs(P))
 
 
@@ -265,12 +273,25 @@ def main() -> int:
 
     keep = args.keep_frames
     want = {args.only} if args.only else {"fields", "phase", "map2d"}
-    if "fields" in want:
-        movie_fields(cfg, sc, rid, rd, args.fps, keep)
-    if "phase" in want:
-        movie_phase(cfg, sc, rid, rd, args.fps, keep)
-    if "map2d" in want and sc.dims == 2:
-        movie_map2d(cfg, sc, rid, rd, args.fps, keep)
+    # `encode` only deletes frames after a SUCCESSFUL ffmpeg run (deliberately -- on an
+    # ffmpeg failure the frames are the only evidence). But a crash while *building* the
+    # frames left them behind too, which broke the auto-removal rule: a laser-off control
+    # crashed in the tracking panel and stranded 81 PNGs. Sweep on the way out as well.
+    try:
+        if "fields" in want:
+            movie_fields(cfg, sc, rid, rd, args.fps, keep)
+        if "phase" in want:
+            movie_phase(cfg, sc, rid, rd, args.fps, keep)
+        if "map2d" in want and sc.dims == 2:
+            movie_map2d(cfg, sc, rid, rd, args.fps, keep)
+    except BaseException:
+        if not keep:
+            left = lpp.cleanup_frame_dirs(rid)
+            if left:
+                print(f"  cleaned up {len(left)} frame director"
+                      f"{'y' if len(left) == 1 else 'ies'} after the failure "
+                      f"(--keep-frames to retain them)")
+        raise
     return 0
 
 

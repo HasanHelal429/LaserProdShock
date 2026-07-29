@@ -205,6 +205,42 @@ enough that `E_abs ≈ f_abs I₀ t_s` is drive-limited rather than capacity-lim
 would also break H2. **Explaining that discrepancy is a named deliverable of Phase 3A**, not
 a footnote.
 
+### 2.4 RESOLVED 2026-07-28 — **H2 is falsified, and the tension above is explained**
+
+`P1_vac_1d` (10.018 ps, vacuum, `L_n/w_t` = 0.75) settles it, and the guess in the paragraph
+above was right: **coupling is drive-limited, not capacity-limited.**
+
+| measurement | value |
+|---|---|
+| `f_abs` | 1.000 → **plateau ≈ 0.23**, *not* → 0 |
+| late/early `dE/dt` | **0.41** — not 0, so `E_abs` never rolls over |
+| 90 % / 99 % of `E_abs` delivered by | 8.86 / 9.90 ps of a 10.02 ps run |
+| `E_abs` | 2.4626×10⁶ J/m² = **11.5×** the `L_n` = 15 run's |
+
+So `E_abs ≈ f_abs·I₀·t_drive` with `f_abs` quasi-steady, hence **`E_abs ∝ I₀`** — the direct
+negation of H2 ("coupled energy is intensity-independent, `t_s ∝ 1/I₀`"). Absorption does not
+switch off; it **floors**. A half-peak "shutoff time" is still reportable (0.2505 ps here) but
+is *not* a shutoff — it is the fall onto the plateau, and quoting it as `t_s` is misleading.
+
+**H1 is not directly tested by this**: it predicts `T_e,shutoff`, and there is no shutoff to
+evaluate it at. Restate H1 in terms of what sets the **plateau level** instead of a cutoff.
+
+**H4 loses its stated mechanism and must be re-derived.** H4 assumed H2 — that raising `I₀`
+shortens the drive rather than strengthening it. With `E_abs ∝ I₀` and a floor that never
+closes, raising `I₀` raises the coupled energy *and* keeps the drive running. An optimum `I₀`
+may still exist, because the geometric constraint is untouched and real: a too-fast piston
+crosses the box in a fraction of a gyroperiod (the upstream `3e19` run hit exactly that). But
+it is a **geometry-and-timing optimum, not the capacity-ceiling optimum §2.3 describes.**
+Phase 3A must therefore measure `E_abs(I₀)` and `v_p(I₀)` directly rather than test the H2
+form, and its named deliverable becomes **the plateau law** — what sets `f_abs,plateau` —
+rather than the `Z_eff·lnΛ` discrepancy, which the plateau picture already explains
+qualitatively (`E_abs ∝ f_abs·t`, so a longer near-unity phase multiplies both factors).
+
+**H3 is untested, not confirmed or falsified.** See `runs/P1_vac_1d/README.md`: a
+weight-weighted bulk gives α ≈ 0.46, but ~30 % of the slab is still cold at 10 ps and is being
+averaged in, so that is a **lower bound**. A fair test must restrict to the ablated population
+— which is what `plot_ablation.py` is for. **That is the next Phase-1 item.**
+
 ---
 
 ## 3. Architecture and working rules

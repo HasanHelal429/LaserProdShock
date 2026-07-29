@@ -147,9 +147,18 @@ the runaway tail leaves, which is exactly the population §7.1 wants measured.
 2000 cells (525 particle-bearing) × 400 ppc × 2 species = **420 000 macroparticles**,
 102 400 steps → 10.018 ps.
 
-Scaled from `P0_thick_open` (133 280 particles, 24 000 steps, 3.4 min at 4 threads):
-particles ×3.15, steps ×4.27 ⇒ ×13.4 ⇒ **~25 min at 8 CPU threads**. To be replaced by the
-measured number from `progress.log`.
+**Measured** on this deck (2000 steps, diagnostics off, so this times the push):
+
+| backend | 2000 steps | projected 102 400 steps |
+|---|---|---|
+| CPU, 8 threads (`build/`) | 117.9 s | **100.6 min** |
+| **GPU, 1× RTX 4070 (`build_cuda1d/`)** | **9.3 s** | **7.9 min** |
+
+**12.7× on the GPU**, which is what this run used. Note the *estimate* by scaling from
+`P0_thick_open` (particles ×3.15, steps ×4.27 ⇒ ×13.4 ⇒ ~25 min at 8 threads) was **wrong by
+4×** — the real CPU cost is 100.6 min. Cell count matters much more than that scaling
+allowed for (2000 cells vs 440), so **benchmark rather than scale** when the grid changes
+size. See `progress.log` for the run's own wall-clock record.
 
 ## Gates
 
@@ -167,11 +176,137 @@ measured number from `progress.log`.
 
 ## Media
 
-- `media/P1_vac_1d/checks.png` — pre-run: initial density from the deck's own `density_function`, predicted `K(z)` and `tau(z)` at the group `T_e`, and the gate table.
+- `media/P1_vac_1d/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
+- `media/P1_vac_1d/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1_vac_1d/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
+- `media/P1_vac_1d/gates.png` — the G1-G7 gate panel on its own
+- `media/P1_vac_1d/laser_history.png` — `f_abs(t)`, cumulative `E_abs(t)`, `Tlocalfrac(t)` - **the H2 verdict is in the middle panel's computed title**
+- `media/P1_vac_1d/laser_profile.png` — per-cell `n_e` and `P_abs` from the **step-0** dump - where the energy actually lands
+- `media/P1_vac_1d/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1_vac_1d/movie_phase.mp4` — target-ion phase space over the run
+- `media/P1_vac_1d/phase_space.png` — target-ion (z, u_z) - the arbiter
+- `media/P1_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_off`
 
 ## Result
 
-*(not run yet — awaiting approval)*
+Ran **102 400/102 400 steps = 10.018 ps in 8 min** on one RTX 4070 (GPU 0), zero errors,
+`--verify` OK, gates 4 pass / 0 warn / 0 fail.
+
+### The two headline results
+
+**1. `H2` IS FALSIFIED. Coupling is drive-limited, not capacity-limited.**
+This was the decisive measurement, and the answer is unambiguous: **`E_abs` never rolls
+over.** `f_abs` falls from 1.000 to a **plateau near 0.23** — not to zero — and the drive
+keeps delivering for the remaining 97 % of the run:
+
+| | value |
+|---|---|
+| `E_abs` final | **2.4626×10⁶ J/m²** — **11.5× `P0_thick_open`'s 2.135×10⁵** |
+| fraction of the incident energy absorbed | **24.6 %** (mean `f_abs` = 0.2458) |
+| late/early `dE/dt` | **0.41** (0.665 by first-vs-last quarter) — *not* 0 |
+| 50 % / 90 % / 99 % of `E_abs` delivered by | **3.98 / 8.86 / 9.90 ps** |
+
+Energy is still arriving at essentially a constant clip at the final step. So
+`E_abs ≈ f_abs·I₀·t` with `f_abs` quasi-steady, i.e. **`E_abs ∝ I₀`** — the opposite of H2's
+"coupled energy is intensity-independent". §2.3's "known tension" (H1–H2 predict a factor
+2.4 for the `Z_eff·lnΛ` change; 16× was measured) is now explained: the shutoff picture is
+simply the wrong model, because absorption floors instead of switching off.
+
+**Consequence for the campaign: H4 loses its stated mechanism.** H4 — "low intensity may
+drive shocks better", the plan's most consequential prediction — rests on H2, i.e. on
+raising `I₀` shortening the drive rather than strengthening it. With `E_abs ∝ I₀` and a
+plateau that does not close, raising `I₀` raises the coupled energy *and* keeps the drive on.
+**Phase 3A must be re-planned around a drive-limited law**; there may still be an optimum
+`I₀`, but not for the reason §2.3 gives. `TEST_PLAN.md` §2.3 and §9.1 updated.
+
+Note the reported "shutoff (½ peak) = 0.2505 ps" is a real crossing but **not a shutoff in
+any physical sense** — it is the fall onto the plateau. Quoting `t_s` from a half-peak
+crossing is misleading for this configuration; quote the plateau level and `dE/dt` instead.
+
+**2. The ablation is 99.93 % laser-driven — NOT grid heating (gate G3).**
+
+| | driven | laser-off control | control / driven |
+|---|---|---|---|
+| particle-KE gain | **+2.4212×10⁶ J** | **−1 696 J** | **−0.07 %** |
+| weight lost at the boundaries | 0.0104 % | 0.0000 % | — |
+
+The control's *net* particle energy change is **negative and four orders of magnitude
+smaller** than the driven gain, despite `dz/λ_D` = 61. Its internal shuffle is physical, not
+numerical: electrons **−51.4 kJ**, ions **+49.7 kJ** — ambipolar electron→ion transfer as a
+51 eV corona relaxes, summing to ≈ 0. **G2 is now bounded**, and this is the check the
+retracted upstream shock claim never had.
+
+### Gate G6 — the first clean energy closure in this project
+
+| | value |
+|---|---|
+| `E_abs` (tracer, grid-heating-immune) | 2.4626×10⁶ J |
+| particle-KE gain + field-energy gain | 2.4445×10⁶ J |
+| **raw gap** | **−0.74 %** |
+| gap after subtracting the control | −0.67 % |
+| **boundary weight loss (quote beside it)** | **0.0104 %** |
+
+Phase 0 could only report +218 % / +235 % at 5.8 % / 17 % particle loss. **The generous
+vacuum cushions are what bought this**: 0.68 % of *macroparticles* left the box but they
+carried only **0.0104 % of the weight** (the escaping population is the tenuous corona tail),
+so the closure is meaningful rather than swamped. The macroparticle-count and weight loss
+figures differ by 65×; quote the **weight**.
+
+### Predictions, scored
+
+| # | prediction | outcome |
+|---|---|---|
+| 1 | `f_abs(0)`: 0.248 → **1.000** (regime change to optically thick) | **CONFIRMED** — measured **1.0000** |
+| 2 | starts saturated, only falls (no initial rise) | **CONFIRMED** — peak 1.000 at 0.034 ps, then monotone decay to plateau |
+| 3 | does `E_abs` roll over in 10 ps? | **NO** — H2 falsified (above) |
+| 4 | deposition entirely coronal, **nothing** at the turning point | **CONFIRMED** — see below |
+| 5 | `v_p ≈ α c_s`, α ≈ 1–3 (H3) | **not confirmed; test is not yet fair** — see below |
+| 6 | G6 closes | **CONFIRMED** — −0.74 % |
+
+**Prediction 4, from the step-0 profile dump, is confirmed to the cell.** Predicted τ = 1 at
++53.6 d_e; measured peak deposition at **+53.8 d_e** (where `n_e` = 0.672 `n_cr`):
+
+- deposition extends **z = +38.2 → +182.3 d_e** — it stops *exactly* at the critical surface;
+- **0.000 % of `P_abs` at or below the critical surface** (+38.2 d_e);
+- the densest cell that absorbs anything is at `n_e` = **0.9990 `n_cr`** — right up to, never past;
+- 50 % / 90 % / 99 % of `P_abs` lands by z = +57.3 / +44.2 / +38.8 d_e marching from +z.
+
+So this configuration is a **pure coronal absorber**: the ray is extinguished ~15 d_e before
+the critical surface and the turning point plays no role in the drive. `media/P1_vac_1d/laser_profile.png`
+shows it directly. This also means **G4's `ray_cfl` sensitivity should be weaker here than in
+Phase 0**, since that is a turning-point effect — worth confirming, not yet measured.
+
+### The piston, and why H3 is not yet fairly tested
+
+| measure of target-ion `v_z` at 10 ps | driven | control |
+|---|---|---|
+| **weight-weighted mean over forward-moving ions** | **0.00144 c** | 0.00089 c |
+| unweighted 99.9th percentile ("the front") | **0.0267 c** | 0.0091 c |
+
+With `c_s` = 0.003149 c from the implied `T_e,ab` = 0.5068 keV (energy per target ion
+0.7602 keV), the bulk gives **α ≈ 0.46** — *below* H3's α ≈ 1–3. **But this is a lower bound,
+not a refutation**, for a concrete reason: at `c_s` = 5.6 d_e/ps the rarefaction has crossed
+only ~**70 %** of the 80 d_e slab in 10 ps, so ~30 % of the target mass is still cold and
+unmoved and is being averaged into the "piston". A fair H3 test has to restrict to the
+**ablated** population — which is exactly what `plot_ablation.py` (§3, not yet built) is for.
+**H3 is therefore open, not falsified**, and that tool is the next Phase-1 item.
+
+Note also the 19× spread between the bulk (0.00144 c) and the front (0.0267 c): the fast
+population is real but carries little mass. Energy partition at 10 ps is
+**77.4 % electrons / 22.6 % ions** (1.8729×10⁶ / 5.4828×10⁵ J), so only ~23 % of the coupled
+energy is in ion motion — the drive efficiency Phase 2 will care about.
+
+### Numerics
+
+`Tlocalfrac` rose **0.432 → 1.000** and saturates at 1.000 by ~1.5 ps: at 400 ppc every
+absorbing cell has a *measured* `T_e`, never the floor, so G5's bias bound (≤ 0.31 %) is real
+rather than nominal. Raw `E_z` rms is 1.2×10⁹ V/m at `dz/λ_D` = 61 — mostly grid noise, which
+is why the streak is boxcar-smoothed over 9 cells and the raw rms is quoted on the panel.
+
+**Domain sizing was well judged.** The streak shows the rear expansion reaching the `pec`
+wall at z = −300 at **t ≈ 7.5 ps** against a predicted ~8.3 ps, and the bulk plume never
+approaches z = +700. The bulk stayed in the box for the whole run, which is what made the
+G6 closure possible.
 
 ## Retracted
 

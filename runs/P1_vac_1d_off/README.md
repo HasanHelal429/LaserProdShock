@@ -70,7 +70,12 @@ respect the gates can see — with no beam, `ray_cfl` is moot.
 Same grid and particle count as `P1_vac_1d` — 2000 cells (525 particle-bearing) × 400 ppc
 × 2 species = 420 000 macroparticles, 102 400 steps → 10.018 ps. Slightly *cheaper* in
 practice, since the ray trace and the per-cell temperature reduction do not run.
-Estimate **~25 min at 8 CPU threads**; to be replaced from `progress.log`.
+
+Run on **GPU 1** (an RTX 4070) concurrently with `P1_vac_1d` on GPU 0 — the benchmark on
+that deck gave **7.9 min on GPU against 100.6 min on 8 CPU threads (12.7×)**. Both runs use
+the **same backend deliberately**: grid heating is what this control measures, and comparing
+a GPU physics run against a CPU control would fold a backend difference into the G3
+subtraction. See `progress.log`.
 
 ## Gates
 
@@ -88,11 +93,67 @@ Estimate **~25 min at 8 CPU threads**; to be replaced from `progress.log`.
 
 ## Media
 
-- `media/P1_vac_1d_off/checks.png` — pre-run: initial density from the deck's own `density_function`, predicted `K(z)` and `tau(z)` at the group `T_e`, and the gate table.
+- `media/P1_vac_1d_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
+- `media/P1_vac_1d_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1_vac_1d_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
+- `media/P1_vac_1d_off/gates.png` — the G1-G7 gate panel on its own
+- `media/P1_vac_1d_off/laser_history.png` — empty by construction: annotated "laser off (I₀ = 0)", and `Tlocalfrac` falling to 0.000
+- `media/P1_vac_1d_off/laser_profile.png` — the step-0 density profile with **zero** deposition — the visual null
+- `media/P1_vac_1d_off/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1_vac_1d_off/movie_phase.mp4` — target-ion phase space over the run
+- `media/P1_vac_1d_off/phase_space.png` — target-ion (z, u_z): the undriven thermal expansion a `v_p` measurement must be corrected for
 
 ## Result
 
-*(not run yet — awaiting approval)*
+Ran **102 400/102 400 steps = 10.018 ps in 8 min** on GPU 1, zero errors, `--verify` OK.
+
+**VERDICT: grid heating is negligible. `P1_vac_1d`'s ablation is 99.93 % laser-driven.**
+
+| | this control | `P1_vac_1d` | ratio |
+|---|---|---|---|
+| `E_abs` | **0 J** (all 10 240 `LASERDEP` lines report `Pabs = 0`) | 2.4626×10⁶ J | — |
+| **net particle-KE gain** | **−1 696 J** | +2.4212×10⁶ J | **−0.07 %** |
+| field-energy gain | 1 530 J | 23 310 J | 6.6 % |
+| weight lost at the boundaries | **0.0000 %** | 0.0104 % | — |
+
+The net particle energy change is **negative and four orders of magnitude smaller** than the
+driven run's gain, despite `dz/λ_D` = 61. **Gate G2 is now bounded**, and the expectation
+above holds: almost nothing happened.
+
+**The control is not inert, and its internal motion is physical rather than numerical.**
+Electrons **lost 51.4 kJ** while ions **gained 49.7 kJ** — the two nearly cancel (net
+−1.7 kJ). That is ambipolar electron→ion energy transfer as an initially 51 eV corona
+relaxes into vacuum, exactly the isothermal-rarefaction physics `P1_vac_1d` is driving
+harder; it is *not* a grid-heating signature, which would show up as a net **gain** shared
+by both species. Nothing left the box at all (0.0000 % weight loss).
+
+**This matters for how the ion front is read.** The control's ion front (unweighted 99.9th
+percentile) still runs out to **0.0091 c** by 10 ps, against the driven run's 0.0267 c — only
+a 2.9× ratio. A front-based `v_p` would therefore be **~1/3 contaminated** by undriven
+thermal expansion. By mass the separation is far cleaner: the weight-weighted forward-mean
+ion speed is 0.00089 c here against 0.00144 c driven. **Use weighted bulk measures, not
+percentile fronts, for piston speed** — and always against this control.
+
+`Tlocalfrac` runs 0.432 → **0.000**: with no absorption the operator has no cell in which to
+measure a temperature, which is the expected complement of the driven run's rise to 1.000.
+
+### Three tooling bugs this run exposed
+
+Every headline run in this project is *required* to have an `_off` companion, yet **no script
+had ever been given one** — all Phase-0 runs were driven. `P_inc = 0` makes `f_abs` NaN and
+`P_inc·t` zero, and three tools broke on it:
+
+| tool | failure | fix |
+|---|---|---|
+| `laser_report.py` | `set_ylim(0, max(f))` on all-NaN → `ValueError` | filter NaN; annotate the panel "laser off" |
+| `compare_runs.py` | `E/(P_inc·t)` → `ZeroDivisionError` comparing a run to its own control | skip that panel when `P_inc = 0` |
+| `make_movies.py` | NaN axis limit in the tracking panel | drop the panel; **and sweep frame dirs on failure**, since the crash had stranded 81 PNGs |
+
+The last one also violated the standing rule that frame directories clean themselves up —
+`encode` only deleted them after a *successful* ffmpeg run, so a crash while building frames
+leaked them. Now cleaned up on any exception. `laser_report.py`'s `f_abs` panel title was
+additionally hard-coded to assert "then shuts itself off", which `P1_vac_1d` disproves; it is
+now computed from the data like the `E_abs` panel already was.
 
 ## Retracted
 

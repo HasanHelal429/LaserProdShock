@@ -51,16 +51,39 @@ def history_figure(cfg, sc, hist, run_id, run_dir):
     ax.plot(t_ps, f, color=lpp.C_LASER)
     lpp.label_line(ax, t_ps[-1], f[-1], " f$_{abs}$", lpp.C_LASER)
     ax.set_ylabel("f$_{abs}$ = P$_{abs}$/P$_{inc}$")
-    ax.set_title("Absorbed fraction — absorption is SELF-LIMITING "
-                 "(K ∝ Z$_{eff}$lnΛ n$_e^2$ T$_e^{-3/2}$): the target absorbs "
-                 "strongly cold, then shuts itself off", loc="left",
-                 fontweight="bold")
+    # DESCRIPTIVE, computed from this run's own data -- the same rule the E_abs panel
+    # below already follows. The old fixed title asserted "then shuts itself off", which
+    # P1_vac_1d flatly contradicts: f_abs falls from 1.000 to a ~0.23 PLATEAU and keeps
+    # delivering for the remaining 97% of the run. A panel must not state a conclusion
+    # its own curve refutes.
+    if f_fin := [v for v in f if v == v]:
+        pk, fin = max(f_fin), f_fin[-1]
+        late = sum(f_fin[int(0.8 * len(f_fin)):]) / max(1, len(f_fin) - int(0.8 * len(f_fin)))
+        verdict = (f"decays to a PLATEAU at f$_{{abs}}$ ≈ {late:.2f}, not to zero — "
+                   f"the drive keeps delivering" if late > 0.05 * pk else
+                   f"SHUTS OFF (late f$_{{abs}}$ ≈ {late:.3f})")
+        title = (f"Absorbed fraction — K ∝ Z$_{{eff}}$lnΛ n$_e^2$ T$_e^{{-3/2}}$ is "
+                 f"self-limiting: peak {pk:.3f} → final {fin:.3f}, and it {verdict}")
+    else:
+        title = "Absorbed fraction — laser off (I₀ = 0), nothing to report"
+    ax.set_title(title, loc="left", fontweight="bold", fontsize=9.5)
     t_off = hist.shutoff_time()
     if t_off is not None:
         ax.axvline(t_off * 1e12, color=lpp.INK, ls=":", lw=1.2)
         ax.text(t_off * 1e12, 0.96, "  shutoff (½ peak)", va="top", fontsize=8,
                 transform=ax.get_xaxis_transform(), color=lpp.INK)
-    ax.set_ylim(0, max(1.02 * max(f), 0.05) if f else 1)
+    # A laser-off control (gate G3) has P_inc = 0, so every f_abs is nan and both max()
+    # and set_ylim() raise. The control is a MANDATORY run type here, so it has to be a
+    # first-class case rather than a crash: keep the panel and say why it is empty.
+    f_ok = [v for v in f if v == v]                      # drops nan
+    if f_ok:
+        ax.set_ylim(0, max(1.02 * max(f_ok), 0.05))
+    else:
+        ax.set_ylim(0, 1)
+        ax.text(0.5, 0.5, "laser off (I₀ = 0) — no absorbed fraction to report;\n"
+                          "this run exists to measure grid heating (gate G3)",
+                transform=ax.transAxes, ha="center", va="center", fontsize=9,
+                color=lpp.INK_2)
     lpp.style_axes(ax)
 
     # --- cumulative coupled energy (own panel; NOT a second y-axis) ---
