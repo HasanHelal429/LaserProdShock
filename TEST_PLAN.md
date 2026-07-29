@@ -13,8 +13,15 @@ be re-run before any 2D claim. Phase 1 in **1D** is complete and its findings (�
 thickness clause. **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
 done, and the boundary decision recorded (`open` on the propagation axis + periodic
 transverse; B₀ uniform to 1.000000 under pec).
+**Phase 1.5 (§7.5) is now on the plan**: the ray march is **65.6 %** of a driven 2D run by
+WarpX's own profiler, so before Phase 2's 2D runs and Phase 3B's ~30-point `beam_waist` sweep pay
+that cost ~30 more times, three changes are scoped — cache a redundant `sample()`, OMP over rays,
+and skip the provably-no-op march through vacuum (47 % of the path here, 89 % in `P1_vac_2d`). It
+is a **code** phase: no deck changes, no new physics runs, and its acceptance suite re-validates
+the existing P1 corpus **spatially** (per-column profiles), because §2.8 established that a
+conserved total is not a working operator.
 The config schema (§3), the deck renderer, gates G1–G7, the laser diagnostics and the
-cross-run comparison all work in 1D and 2D from one code path; 71 tests pass. The three
+cross-run comparison all work in 1D and 2D from one code path; 173 tests pass. The three
 source-code questions of §5.1 are resolved. Phases 1–3 remain as written.
 
 **The one-sentence question.** *Can a ray-traced laser drive a piston that produces a
@@ -586,6 +593,7 @@ parser), `metrics` (piston/shock kinematics, Schaeffer criteria — port from
 |---|---|---|---|
 | **0** | What boundary conditions and geometry are even admissible? | 5 short | hours |
 | **1** | Does the laser ablate a target correctly, in 1D and 2D? | 4 | ~1 day |
+| **1.5** | Can the ray march stop being 65 % of every driven 2D run? (a CODE phase — §7.5) | 0 new; re-validates P1 | ~1 day |
 | **2** | Does the piston shock an ambient — unmagnetized (control) and magnetized? | 4 | ~2–3 days |
 | **3** | How do `f_abs`, `E_abs`, `v_p`, `M_ms` depend on laser power and geometry? | ~30 short | ~3–4 days |
 
@@ -760,6 +768,219 @@ sub-cell ray sampling first matters.
 where WKB predicts; `f_abs(t)`, `t_s`, `T_e,shutoff` and `v_p` are measured with the
 laser-off control subtracted; H1 and H3 are either confirmed with fitted coefficients or
 falsified with a stated replacement.
+
+---
+
+## 7.5 Phase 1.5 — making the ray tracer affordable (a CODE phase, not a physics phase)
+
+**Numbered 7.5 deliberately**, so every `§7.2`/`§8.1` reference in `CLAUDE.md`, the run READMEs
+and `RESULTS.md` keeps its meaning. This phase changes **no physics and no deck**; it changes what
+Phases 2 and 3 cost, and it is the first phase whose deliverable is an upstream commit to
+`warpx-cda` rather than a run.
+
+### 7.5.0 Why now, and the measurement that justifies it
+
+The eikonal ray march is the dominant cost of every driven 2D run, measured three independent
+ways:
+
+| measurement | value | source |
+|---|---|---|
+| `LaserDeposition::applyDeposition` share of total wall time | **65.61 %** | WarpX TinyProfiler, `P1_vac_2d` (43 200 calls, 1.208×10⁴ s of 1.842×10⁴ s) |
+| next largest phase (`GatherAndPush`) | 11.39 % | same table |
+| cost per application, 320-ray spot deck | **771 ms** | per-step wall times, `P1_vac_2d_spot`: 64.6 ms without an application, 836.1 ms with one |
+| driven vs laser-off step, same grid | 0.140 vs **0.0702** s/step | `P1_vac_2d_spot` vs `P1_vac_2d_spot_off` |
+| serial RK4 steps per application | **1.47×10⁶** | 320 rays × ~4 600 steps (`path/(ray_cfl·dz)`) |
+| per RK4 step | **0.52 µs** ≈ 1 570 cycles at 3 GHz | derived from the two rows above |
+
+The last number is the tell: one RK4 step is ~120 flops, so this is running at ~1 % of scalar
+peak. It is **serial host code** — the march is a plain `for` loop, not inside a `ParallelFor`,
+and `LaserDeposition.cpp` contains no `#pragma omp` at all — so on a box with 32 cores and 5 888
+CUDA cores this phase uses exactly one scalar core. `nvidia-smi` shows the driven run oscillating
+**0 % → 61 % → 0 %** while the laser-off control holds a steady 82–90 %.
+
+**Why it pays now rather than after Phase 2.** Everything downstream is 2D and driven: `P2_mag_2d`
+quasi-1D and then finite-spot (§8.3), and Phase 3B's geometry sweep, which scans `beam_waist` over
+~30 points (§9.2). All of them pay this cost, and the march scales **linearly with transverse
+columns** — which is precisely what makes an H5-scale spot (`w₀` ≈ 0.8 `ρ_i0` = 214 `d_e,cr`,
+~3 400 columns) unaffordable today. A ~15× on this phase converts to ~1.9× on every driven 2D run
+and moves H5's real spot size from impossible to expensive.
+
+**Time box.** If the acceptance suite in §7.5.4 is not passing within a day of work, the phase is
+abandoned and Phase 2 proceeds at the current cost. A performance phase that eats the physics
+budget has failed even if the code is faster.
+
+### 7.5.1 O1 — OMP-parallelise over rays
+
+**Legality.** Rays are independent by construction: `n_host` is gathered once per application
+(`ParallelCopy` to a single full-domain box, then `dtoh_memcpy`) and is **not written** during the
+march, and `trace_ray` has no ray-to-ray coupling. The frozen field is what makes this safe.
+
+**The entire race surface is two lines, both in `deposit()`:**
+
+```cpp
+H_arr(idx[0], idx[1], idx[2]) += absorbed / (n_e * V_cell) * inv_me;
+absorbed_power_total += absorbed;
+```
+
+The second is a `reduction(+:)`. The first is the design decision:
+
+- **Atomics** (`#pragma omp atomic`) — two lines, low contention (nearest-cell deposition keeps a
+  normally-incident ray in its own column), but the summation order into a cell becomes run-to-run
+  variable. That is a real cost *here*: the pre-fix binary reproduced every committed
+  `laser_deposition` checksum to **≤4×10⁻¹⁶** (§2.8), and this campaign has just had to reset
+  those benchmarks once.
+- **Per-accumulator buffers, reduced in fixed order** — deterministic, and the memory is trivial in
+  2D (one full-domain FAB is 320×2200×8 B = 5.6 MB).
+
+**Take the buffers, and decouple the accumulator count from the thread count.** Use a fixed
+`N_ACC` (16) buffers with ray `i` → buffer `i % N_ACC`, reduced in buffer order. Then the result is
+**bit-identical for any `OMP_NUM_THREADS`**, which is a far stronger and more testable property
+than "reproducible at fixed thread count", and it is what §7.5.4's thread-invariance test checks.
+Schedule `static, 1` so that adjacent rays — which have similar cost — land on different threads:
+load balance matters because `trace_ray` exits early on `P > P_min` (`P_min = 10⁻⁸ P0`), so a core
+ray extinguished before its turning point costs a fraction of a wing ray that transits the domain.
+
+**Two machine-specific blockers, both to be fixed in this phase:**
+
+- `scripts/launch.sh --gpu` **forces `OMP_NUM_THREADS=1`**, on the then-correct reasoning that with
+  the CUDA backend the push is on the device and host threads only contend. Once the march is
+  threaded that inverts for *driven* runs: add a flag, and record the benchmark.
+- This box collapses above ~12 threads (14.5 / 41.5 / 58.5 / **64.9** steps/s at 1/4/8/12, then
+  **3.1** at 16) because it is shared and the OpenMP spin-wait barriers burn the timeslice. The
+  realistic factor is **6–8×**, not 32×. Do not quote a scaling curve measured on a loaded box.
+
+**3D caveat, stated now so it is not discovered later.** At 10⁸ cells a per-accumulator FAB is
+800 MB, so 3D needs tiled accumulators or atomics. 3D is out of scope (§1.3) but the operator is
+not, and the header should say which regime the buffers assume.
+
+### 7.5.2 O2 — skip the march through vacuum
+
+**This is not an approximation, it is a no-op removal.** Where `n_e` = 0, `sample()` returns
+`n_ref` = 1 and `g` = 0, so the RK4 integration of `dc/ds = T/n_ref`, `dT/ds = ∇n_ref` reduces
+**exactly** to a straight line (all four stages return the same derivative), and `ne_m` = 0 skips
+the `deposit()` branch entirely. The code spends 24 interpolations per step rediscovering that
+light travels straight through nothing.
+
+Measured waste: **47 % of the path** in `P1_vac_2d_spot` (launch face +700, corona from +182), and
+**89 %** in `P1_vac_2d` (launch face +1200). This is the cost side of the rule that the launch
+plane must sit outside the plasma — a forward vacuum gap is nearly free for particles and
+expensive for the ray trace.
+
+**Implementation — one reduction, one analytic jump.** Per application, reduce the
+already-gathered host field for the extreme `z` at which any cell exceeds `n_th`, then advance each
+ray analytically from the launch face to that plane before entering the loop.
+
+- The reduction is one pass over the gathered field (~0.5 ms against 771 ms).
+- Take the **global** max over all columns, not a per-column value: then no ray of *any* direction —
+  oblique, converging, or wandered — can have interacted above that plane. Conservative and exact,
+  and it keeps `beam_focus` and `incidence_angle` correct for free.
+- Run the exit test after the jump, so a ray that never meets plasma terminates immediately.
+- It degrades to a no-op in exactly the documented awkward case (a corona that has reached the
+  injection face), because then the entry plane *is* the face.
+- Bonus: it removes exposure to `max_steps = 6·L_sum/h + 100`, since skipped steps no longer count.
+
+**The error is computable, and that is the point.** With this deck's own coefficient
+(`K` = 2.1054×10⁷ m⁻¹ at 1.5 `n_cr`, `τ` = 1411 over the 400 `d_e` flat top) and `K ∝ n_e²`, at
+`n_th` = 10⁻⁴ `n_cr`: `K` = 0.094 m⁻¹, so over 500 `d_e` of skipped path
+**`τ_skipped` = 7.9×10⁻⁶** — 8×10⁻⁴ % of the beam, **four decades below the 10.4 % 1σ seed noise
+on `f_abs(0)`**. Refraction is equally safe (`n_ref` = 0.99995). Tightening the threshold is nearly
+free because the corona is steep: its 10⁻³ and 10⁻⁴ `n_cr` contours sit only 20 `d_e` apart.
+
+**Rejected alternative: adaptive `h` inside the march.** More general — it would also skip vacuum
+*inside* the domain once the plume goes non-monotonic — but it changes the integrator everywhere,
+and `ray_cfl` convergence is **non-monotonic for turning-point problems** with the 0.25 default
+sitting near a 2.5 % excursion (G4). That is a re-validation of the whole accuracy suite for a
+second-order win. Revisit only if O1+O2 miss the §7.5.5 target.
+
+### 7.5.3 O3 — the redundant sample (free, exact)
+
+Each march step calls `sample()` **six** times: four RK4 stages, one at the step midpoint for the
+absorption, and one at the new position `c`. That last one recomputes exactly what the *next*
+iteration's first RK4 stage computes at the same `c`. Cache it: 6 → 5 samples per step, **~17 %**,
+bit-identical results. Do this first — it is the cheapest possible confidence-builder in the
+harness.
+
+### 7.5.4 Acceptance suite — tested against the EXISTING P1 corpus, and spatially
+
+**The governing rule comes from §2.8: a conserved total is not a working operator.** The clamp bug
+passed all five CI tests throughout its life because each reduces the operator to one number, and
+the clamp *relocated* energy while conserving the total to 7 digits. So no acceptance test in this
+phase may be a total alone.
+
+**Tier 1 — upstream CI decks** (`Examples/Tests/laser_deposition/`), which are the analytic tests:
+
+| deck | criterion |
+|---|---|
+| 1D uniform slab (A), 1D ramp/turning point (B1) | **bit-identical** to pre-optimization output, profiles and `EP.txt` |
+| 2D oblique (B2) | per-column share stays **12.50 % (= 1/8) exactly**, per-column max/min **1.000**, `analysis_oblique.py` vs closed form ≤ 0.48 % |
+| 2D gaussian, 2D focus | step-0 per-column distribution byte-identical; checksums within the committed tolerance |
+
+The oblique deck is the decisive one and is sharper than any research deck: 30° tilt, rays drift
+2.9 transverse domain widths, density uniform in `x`, so the correct answer is *exactly* uniform —
+known analytically rather than to shot noise.
+
+**Tier 2 — spatial re-validation on the P1 decks already on disk.** Two steps each
+(`max_step = 2`), comparing the step-0 `laserdep_profile` dump cell by cell and column by column:
+
+| P1 deck | what it tests | criterion |
+|---|---|---|
+| `P1_vac_1d_thick` | 1D, 36 ppc, thick target, rear truncation | per-cell `P_abs` **bit-identical** (1D has no transverse dimension, so O1's accumulator order is the only thing that could move it) |
+| `P1_vac_2d_spot` | the Gaussian spot, 320 columns | per-column profile vs analytic `I₀exp(−(x/w₀)²)`: mean ratio **1.00010 ± 0.0002**, column-to-column scatter **2.54 % ± 0.1**, lag-1 autocorrelation **−0.51 ± 0.03**, 2 edge columns / peak column **2.33×10⁻⁷ ± 5 %** |
+| `P1_vac_2d_spot` | total, as a cross-check only | absorbed `5.940787×10¹²` W/m vs analytic `I₀w₀√π`, agreement **≤ 3×10⁻⁵** (it is 2.2×10⁻⁵ today) |
+| `P1_vac_2d` (invalid physics, valid cost) | the 89 %-vacuum geometry | O2's win must appear here as ~9×, and the step-0 column profile must stay flat to shot noise |
+
+`scripts/spot_report.py` already prints every Tier-2 number; the acceptance test is a diff of its
+output, not a new script.
+
+**Tier 3 — time-integrated agreement on a real slice.** Re-run 1–3 ps slices of
+`P1_vac_1d_thick` and `P1_vac_2d_spot` and compare against the runs on disk:
+
+- `E_abs(t)` within **0.5 %** — well inside the 10.4 % 1σ / 30.6 % full seed spread on `f_abs(0)`,
+  and comparable to the 0.6 % at which `E_abs` agreed across geometries.
+- the `spot_report` columns `f_ax`, `w_eff/w₀`, `leak>2.5w₀`, `wall/in` within their own
+  dump-to-dump scatter.
+- **`E_abs` is the comparison, never `f_abs(0)`** and never a median across dimensionalities.
+
+**Tier 4 — determinism and thread invariance** (this is what buys the buffer design over atomics):
+
+- same binary, same deck, run twice → **bit-identical**;
+- `OMP_NUM_THREADS` = 1, 2, 4, 8, 12 → **bit-identical to each other**, by the fixed-`N_ACC`
+  reduction of §7.5.1;
+- CUDA build vs OMP build → *not* expected identical (device reductions and RNG streams differ);
+  the criterion there is `E_abs` within the 2.5 % already measured between backends.
+
+**Revert rule.** Any acceptance test outside its stated tolerance means the optimization is
+reverted, not the tolerance widened. The tolerances above are written before the work, which is
+the point of writing them here.
+
+### 7.5.5 Cost target, and what it unlocks
+
+| quantity | now | target |
+|---|---|---|
+| `applyDeposition` share of a driven 2D step | 54 % (65.6 % of the planar run) | **≤ 10 %** |
+| driven 2D step, spot deck | 0.140 s | **≤ 0.080 s** (control is 0.0702) |
+| per application, 320 rays | 771 ms | **≤ 60 ms** |
+| `P1_vac_2d_spot` (9.96 ps) | 5.6 h | ~2.8 h |
+| a 40 ps 2D run to the formation time | ~22 h fixed-domain | ~11 h |
+| H5-scale spot, `w₀` = 214 `d_e,cr` (~3 400 columns) | unaffordable | expensive but reachable |
+
+Expected factors, to be replaced by measurements: O3 ~1.17×, O1 6–8×, O2 ~1.9× on this deck
+(~9× on `P1_vac_2d`'s geometry) — multiplicative on the same phase, so ~15× combined and the
+driven step lands within ~6 % of the laser-off control.
+
+### 7.5.6 Deliverables
+
+1. An upstream commit in `warpx-cda` touching only
+   `Source/Particles/LaserDeposition/LaserDeposition.{cpp,H}`, with the accumulator design and the
+   `n_th` threshold documented in the header where the next reader will find them.
+2. `studies/ray_march_perf/` — the benchmark ladder (threads × O1/O2/O3 on/off), reducing to a
+   table of s/step and profiler shares, plus the Tier-4 determinism check as a script.
+3. A `RESULTS.md` entry with the measured factors and any acceptance test that moved.
+4. `CLAUDE.md` performance bullets updated — including retiring "the eikonal ray march is a plain
+   host loop, so the GPU idles during it", which will no longer be true, and revising the
+   `--gpu` forces `OMP_NUM_THREADS=1` guidance.
+5. If `Examples/Tests/laser_deposition/` benchmarks move at all, the reason, per deck, in the
+   commit message — never a bulk reset.
 
 ---
 
@@ -946,6 +1167,18 @@ boundaries, is the project's headline output.
 - [ ] Self-similar rarefaction / Schaeffer Eq. 1 recovered
 - [ ] `P1_vac_2d` planar reproduces 1D on axis
 - [ ] `P1_vac_2d` finite spot: `w₀` scan, `rays_per_cell` convergence, H5
+
+**Phase 1.5 — the ray march (a CODE phase, §7.5)**
+- [ ] O3: cache the redundant end-of-step `sample()` (6 -> 5 per step, bit-identical)
+- [ ] O1: OMP over rays, fixed `N_ACC` accumulators so the result is thread-count invariant
+- [ ] O2: skip the vacuum by one reduction + an analytic jump to the entry plane
+- [ ] `launch.sh --gpu` no longer forces `OMP_NUM_THREADS=1` for driven runs; benchmarked
+- [ ] Tier 1: the five CI decks; 1D bit-identical, 2D oblique still 12.50 % / max-min 1.000
+- [ ] Tier 2: step-0 per-COLUMN profiles on `P1_vac_1d_thick` and `P1_vac_2d_spot`
+- [ ] Tier 3: `E_abs` within 0.5 % on 1-3 ps slices of the same two runs
+- [ ] Tier 4: bit-identical across repeats AND across `OMP_NUM_THREADS` 1/2/4/8/12
+- [ ] `studies/ray_march_perf/` benchmark ladder; measured factors in `RESULTS.md`
+- [ ] `CLAUDE.md` performance bullets updated (the "GPU idles during the march" note retires)
 
 **Phase 2 — ambient**
 - [ ] `scripts/tune_shock.py`, `make_figures.py`, `phase_space.py`, `make_movies.py`
