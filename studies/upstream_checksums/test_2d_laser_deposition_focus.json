@@ -1,0 +1,21 @@
+{
+  "electrons": {
+    "particle_momentum_x": 2.4680797240914807e-21,
+    "particle_momentum_y": 2.485377019176741e-21,
+    "particle_momentum_z": 2.476732042892177e-21,
+    "particle_position_x": 26.214415796810986,
+    "particle_position_y": 65.53598514142698,
+    "particle_weight": 2.0000000000000003e+20
+  },
+  "lev=0": {
+    "Bx": 0.0,
+    "By": 0.0,
+    "Bz": 0.0,
+    "Ex": 0.0,
+    "Ey": 0.0,
+    "Ez": 0.0,
+    "jx": 279128822734622.56,
+    "jy": 186977150679085.25,
+    "jz": 319546522943663.5
+  }
+}

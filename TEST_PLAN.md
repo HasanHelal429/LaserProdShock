@@ -6,9 +6,10 @@
 `ParticleHeater` + `TargetInjector` piston surrogate that `KinShock2020` used to replicate
 Schaeffer et al. 2020.
 
-**Status.** **Phase 1's 2D path is BLOCKED** (2026-07-29) — the planar validation fails on a located
-**operator bug** — rays that drift past the periodic transverse boundary are clamped into the edge
-column, so 98.8 % of absorption ends up in 2 of 64 columns; see §2.7. Phase 1 in **1D** is complete and its findings (§2.4–2.6) already overturn H2 and H3's
+**Status.** The 2D operator bug of §2.7 is **FIXED upstream** (2026-07-29, `warpx-cda` c817b63)
+and verified on the shipped CI decks — see §2.8. **Phase 1's 2D path is unblocked, but its two 2D
+runs remain invalid**: `P1_vac_2d` / `P1_vac_2d_off` were produced by the buggy operator and must
+be re-run before any 2D claim. Phase 1 in **1D** is complete and its findings (§2.4–2.6) already overturn H2 and H3's
 thickness clause. **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
 done, and the boundary decision recorded (`open` on the propagation axis + periodic
 transverse; B₀ uniform to 1.000000 under pec).
@@ -407,6 +408,60 @@ dimensionalities, never the median.**
 is precisely why this comparison isolates the effect. Also recorded: at 36 ppc the G3 control's
 excursion is **−3.09 %** of the driven gain against **−0.066 %** at 400 ppc — 47× larger, the
 honest price of 2D-affordable ppc, and the same poor statistics that seed the artifact.
+
+### 2.8 RESOLVED 2026-07-29 — the §2.7 bug is fixed upstream and verified
+
+`warpx-cda` **c817b63**, `Source/Particles/LaserDeposition/LaserDeposition.cpp`. Both the
+interpolation/deposition index mapping and the ray-march exit test are now keyed off **one**
+`wrap[]` flag, so a face can never be periodic for interpolation and open for termination at once:
+
+| face | index mapping | ray march |
+|---|---|---|
+| periodic **transverse** | wrap (modulo) | keeps going |
+| non-periodic transverse | clamp (one step only) | terminates |
+| propagation **axis**, either end | clamp | terminates **always** |
+
+The axis terminates even when nominally periodic — a beam leaving the front or back of the target
+is gone. That choice is what keeps the 1D tests, which *are* periodic along z, bit-for-bit
+unchanged; wrapping there would have silently changed 1D physics while fixing 2D.
+
+**Verified on the shipped CI decks** (`Examples/Tests/laser_deposition/`), A/B against a binary
+built from the pre-fix commit, at the CI configuration (2 MPI ranks). The 2D **oblique** deck is
+the decisive case and is sharper than `P1_vac_2d`: 30° tilt across a 0.2 mm periodic transverse
+box, so rays drift **2.9 domain widths**, while the density is uniform in x — hence the correct
+answer is *exactly* uniform deposition, known analytically rather than to shot noise.
+
+| | before | after |
+|---|---|---|
+| share of absorption in 1 of 8 columns | **99.53 %** | 12.50 % (= 1/8, exact) |
+| per-column max/min | 9.1×10⁵ | **1.000** |
+| step-0 total `P_abs` | 6.945009×10¹⁹ | **6.945009×10¹⁹** (unchanged, 7 digits) |
+| `analysis_oblique.py` vs closed form | 1.29 % | **0.48 %** error |
+
+The unchanged total is the point: the bug **moved** energy without creating or destroying it —
+exactly the "misplaces energy in space while conserving the total" class `ACCURACY.md` warned all
+five CI tests would miss, because every one of them reduces the operator to a total. All five pass
+both before and after. 1D decks are **bit-identical** (profiles and `EP.txt`).
+
+**CI benchmarks need resetting** — `Regression/Checksum/benchmarks_json/` for
+`test_2d_laser_deposition_{oblique,gaussian,focus}`. Legitimate to reset here because the pre-fix
+binary reproduces every committed benchmark to ≤4×10⁻¹⁶ (machine precision) at 2 ranks, i.e. this
+build *is* the CI reference. Magnitudes: oblique +164 %, focus +4.7 %, gaussian +2.2×10⁻⁵; 1D
+unchanged. `particle_momentum_*` and `j*` rise because the same absorbed energy now spreads over
+8× more electrons and |u| ∝ √E is **concave** (predicted √8 = 2.83×, measured 2.46×). Gaussian and
+focus move at all only because near-critical reflection off a noisy `grad n_ref` gives rays a small
+transverse kick; their step-0 column distributions are byte-identical.
+
+**Still required before any 2D physics claim:**
+1. **Re-run `P1_vac_2d` and `P1_vac_2d_off`.** Their 5h07m / 1h57m of output is invalid — produced
+   by the buggy operator. `build_cuda/bin/warpx.2d` has been rebuilt with the fix and is ready.
+   Pass criterion unchanged from §2.7: the 2 edge columns must carry ~3.1 % of absorption (2/64),
+   not 98.8 %, and `E_abs` must match `P1_vac_1d_thick` rather than exceed it by 12 %.
+2. Then the finite-spot run (H5).
+
+Note the §2.7 artifact only switched on **after** structure developed (3.2 % at t = 0 → 98.8 % at
+26.9 ps), so a short slice of `P1_vac_2d` cannot serve as the regression test — which is why the
+oblique CI deck, wrong from its first application, was used instead.
 
 ---
 

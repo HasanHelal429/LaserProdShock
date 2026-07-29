@@ -151,7 +151,15 @@ makes the comparison valid.
 Ran **432 000/432 000 steps = 29.88 ps in 5 h 07 m** on GPU 0, zero errors, `--verify` OK,
 gates 4 pass / 0 warn / 0 fail. Control: 1 h 57 m.
 
-> ## VERDICT: the planar validation **FAILS**, and it is an **operator BUG**, located.
+> ## ⚠️ SUPERSEDED 2026-07-29 — **the bug diagnosed below is FIXED, so this run's output is invalid.**
+> The fix is `warpx-cda` **c817b63** (`TEST_PLAN.md` §2.8): periodic transverse faces now wrap and
+> every other face terminates, verified on the CI oblique deck (one column's share of absorption
+> **99.53 % → 12.50 %**, the exact 1/8, with the step-0 total unchanged to 7 digits). **Everything
+> below is retained as the diagnosis, not as a result** — `diags/` here was produced by the buggy
+> operator. `build_cuda/bin/warpx.2d` is rebuilt with the fix; re-run this run and `P1_vac_2d_off`
+> against the §7 pass criterion before quoting any 2D number.
+
+> ## VERDICT (pre-fix): the planar validation **FAILS**, and it is an **operator BUG**, located.
 > Rays whose *transverse* coordinate drifts past the periodic transverse boundary are neither
 > wrapped nor terminated. `deposit()` **clamps** the cell index in every dimension, and the
 > domain-exit test checks **only the propagation axis** — so such a ray keeps marching outside

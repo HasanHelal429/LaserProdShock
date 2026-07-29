@@ -212,20 +212,23 @@ not, and work while a run is still going.
   never (which is all 10 ps could show). **H2 stays falsified**: `E_abs = ∫f_abs(t)·I₀ dt`
   with `f_abs` set by the target's hydrodynamic state (`TEST_PLAN.md` §2.4–2.5). Quote the
   **plateau level, the `n_cr`-crossing time and `dE/dt`** — never a half-peak shutoff time.
-- **⚠️ 2D IS BLOCKED by an operator BUG: rays that drift past a periodic transverse boundary are
-  clamped into the edge column.** In `LaserDeposition.cpp`, `deposit()` (~line 739) does
-  `idx[d] = min(max(ii, lo3[d]), hi3[d])` — clamping in *every* dimension — while the ray march's
-  exit test (line 893) checks **only the propagation axis**. So a transversely-deflected ray is
-  neither wrapped nor terminated; it marches on outside the domain and dumps its remaining power
-  into column 0 or N−1. In `P1_vac_2d` (exactly planar: uniform beam, periodic transverse) the two
-  edge columns' share of all absorption went **3.2 % at t = 0 (= 2/64, correct) → 73 % at 3 ps →
-  98.8 % at 26.9 ps**, and net absorption ran **+12 %** above matched 1D. Not a plumbing error
-  otherwise: 1D and 2D agree on absorbed power at t = 0 to **2×10⁻⁵** and on weight loss to 0.2 %.
-  The deflection itself is benign — the G3 control shows the same ~5 % transverse density ripple
-  with **no beam** (PIC shot noise; the start is quiet, 0.06 %). **It will not converge away** —
-  ppc, `rays_per_cell` and smoothing are irrelevant to a deterministic clamp. Fix upstream: wrap
-  periodic dimensions via `geom.periodicity()`, terminate on non-periodic transverse faces.
-  **1D is unaffected** (no transverse dimension to drift into). `TEST_PLAN.md` §2.7.
+- **The transverse-boundary clamp is FIXED** (`warpx-cda` c817b63, 2026-07-29) — but **the two 2D
+  runs on disk predate it and are invalid.** `P1_vac_2d` / `P1_vac_2d_off` must be re-run before any
+  2D claim; `build_cuda/bin/warpx.2d` is already rebuilt with the fix. What the bug was: rays
+  drifting past a periodic transverse face were neither wrapped nor terminated (`deposit()` clamped
+  the index in *every* dimension, the exit test checked *only* the axis), so each dumped its
+  remaining power into column 0 or N−1 — the 2 edge columns' share went **3.2 % at t = 0 (= 2/64,
+  correct) → 98.8 % at 26.9 ps** and absorption ran **+12 %** above matched 1D. Now index mapping
+  and termination are keyed off one `wrap[]` flag: periodic transverse faces wrap, everything else
+  terminates, and **the axis always terminates even if periodic** — which is what keeps the 1D
+  tests (periodic in z!) bit-identical. Verified on the CI oblique deck: one column's share
+  **99.53 % → 12.50 %** (= 1/8 exactly) with the step-0 total unchanged to 7 digits.
+  `TEST_PLAN.md` §2.7–2.8.
+- **A conserved total is not a working operator.** All five `laser_deposition` CI tests passed
+  *throughout* the bug above, because each reduces the operator to one number (a `dKE/dt` slope) and
+  the clamp **relocated** energy without creating or destroying it — step-0 total `P_abs` agreed to
+  7 digits before and after the fix. `ACCURACY.md` predicted exactly this class. When touching the
+  operator, **check a spatial field, not just an energy budget.**
 - **Diagnose non-uniformity from the PATTERN, not the variance.** rms/mean = 4.17 was equally
   consistent with smooth refractive channelling and with an edge pile-up, and I first asserted the
   former — which would have wasted GPU time on a convergence study of a deterministic bug. Printing
