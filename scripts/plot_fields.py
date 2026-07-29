@@ -268,10 +268,23 @@ def main() -> int:
             a.set_title(f"n$_e$/n$_{{cr}}$ at t = {float(ds.current_time)*1e12:.3f} ps",
                         loc="left", fontweight="bold")
             lpp.colorbar(fig3, im, a, "n$_e$ / n$_{cr}$")
-        fig3.text(0.005, 0.995, "Transverse structure: a uniform beam on a planar target "
-                  "with periodic transverse boundaries should show NONE — any x "
-                  "dependence here is numerical.", ha="left", va="top", fontsize=8,
-                  color=lpp.INK_2)
+        # The caption has to follow the BEAM, not the geometry. For a uniform beam any x
+        # dependence is numerical and the reader should distrust it; for a finite spot the
+        # x dependence IS the physics and the same words would be actively misleading --
+        # which is how a figure caption turns into a retraction.
+        beam = (cfg["laser"].get("beam") or {})
+        prof = str(beam.get("profile", "uniform"))
+        if prof == "uniform":
+            cap = ("Transverse structure: a uniform beam on a planar target with periodic "
+                   "transverse boundaries should show NONE — any x dependence here is "
+                   "numerical.")
+        else:
+            w0 = float(beam.get("waist_de", 0.0))
+            cap = (f"Transverse structure is EXPECTED here: {prof} beam, w$_0$ = {w0:g} "
+                   f"d$_e$. The x dependence is the physics — see spot_report.py for the "
+                   f"quantitative version, and note the drive is periodic in x with pitch "
+                   f"{float(cfg['geometry']['transverse']['hi_de']) - float(cfg['geometry']['transverse']['lo_de']):g} d$_e$.")
+        fig3.text(0.005, 0.995, cap, ha="left", va="top", fontsize=8, color=lpp.INK_2)
         lpp.savefig(fig3, "fields_map2d.png", run_id=rid)
     return 0
 
