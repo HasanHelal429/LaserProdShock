@@ -228,10 +228,22 @@ not, and work while a run is still going.
   disturbance fronts: 269 of 400 d_e (67 %) undisturbed there. Also, **truncating costs the
   energy budget** — 6.13 % weight loss at 30 ps vs 1.14 % at 100 ps untruncated — so **G6 cannot
   be closed tightly on a truncated run**; take strict closure from untruncated ones.
-- **In 2D the laser operator is ~65 % of the step cost**, because it launches a ray per
-  transverse cell and reduces `T_e` per cell: the driven 2D run ran at 0.046 s/step against
-  0.016 for its laser-off control, a 2.9× ratio (in 1D the two differ by ~15 %). Budget 2D runs
-  from the *driven* rate, and expect a `_off` control to be much cheaper than its partner.
+- **In 2D the laser operator is ~65 % of the step cost, and it is SERIAL HOST CODE.** The
+  driven 2D run ran at 0.046 s/step against 0.016 for its laser-off control (2.9×; in 1D the two
+  differ by ~15 %). The cause is visible in `nvidia-smi`: the driven run's GPU oscillates
+  **0 % → 61 % → 0 %** while the control holds a steady **82 %**. The eikonal RK4 ray march
+  (`LaserDeposition.cpp` ~747–816) is a plain host loop — **not** in a `ParallelFor`, and the
+  file contains **no `#pragma omp` at all** — so the GPU idles during it and neither a faster
+  GPU nor more host threads helps. **Budget driven 2D runs from the driven rate; single-thread
+  host speed is the bottleneck.**
+- **A forward vacuum gap is free for particles but EXPENSIVE for the ray trace.** The march costs
+  `path/(ray_cfl·dz)` RK4 steps *per ray*, and rays = transverse cells × `rays_per_cell`. In
+  `P1_vac_2d` that is 9 168 steps × 64 rays = **5.9×10⁵ serial RK4 steps per application**, of
+  which **89 % is through empty vacuum** between the domain edge (+1200) and the plasma (+182).
+  So the "extra cells are nearly free in vacuum" rule holds for the *particle* push only — in a
+  **driven** run, size the forward gap to what the plume actually needs. (Upstream improvement
+  worth proposing: skip or coarsen the march where `n_e ≈ 0`, and/or OMP-parallelise over rays,
+  which are independent.)
 - **ppc in 2D: 36 (6×6), not 400.** 400 is unaffordable once a transverse dimension multiplies
   both grid and particles. G5's absorption-bias bound rises 0.31 % → 3.5 %, but `Tlocalfrac`
   stayed at 0.90–0.99 (and 0.975–0.987 in the Phase-0 2D runs at only **16** ppc), so `T_e` is

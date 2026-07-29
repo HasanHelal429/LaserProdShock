@@ -2,3 +2,5 @@
 # logging_started 2026-07-29T00:49:55  total_steps=432000  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
 2026-07-29T00:50:25 | 730/432000 ( 0.2%) | 0h00m | 0.0411 s/step(wall) | 0.0390 s/step(warpx) | ETA ~4h55m | x1.05 | load 17.2 | laser 0.873 of peak, Eabs 0.2577 J
+2026-07-29T01:24:57 | 43650/432000 (10.1%) | 0h35m | 0.0483 s/step(wall) | 0.0481 s/step(warpx) | ETA ~5h12m | x1.00 | load 18.1 | laser 0.369 of peak, Eabs 7.24 J
+2026-07-29T01:59:03 | 86942/432000 (20.1%) | 1h09m | 0.0472 s/step(wall) | 0.0477 s/step(warpx) | ETA ~4h31m | x0.99 | load 18.0 | laser 0.296 of peak, Eabs 12.22 J
