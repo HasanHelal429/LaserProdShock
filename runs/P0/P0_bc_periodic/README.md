@@ -70,7 +70,7 @@ That is a deliberate consequence of the length-unit choice, not luck.
 
 ## Media
 
-All under `media/P0_bc_periodic/` — gitignored and regenerable:
+All under `media/P0/P0_bc_periodic/` — gitignored and regenerable:
 
 - `checks.png`
 - `fields_lineouts.png`
@@ -83,11 +83,11 @@ All under `media/P0_bc_periodic/` — gitignored and regenerable:
 - `movie_phase.mp4`
 
 ```bash
-python scripts/run_checks.py   runs/P0_bc_periodic
-python scripts/laser_report.py runs/P0_bc_periodic
-/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_periodic
-/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_periodic
-/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_periodic
+python scripts/run_checks.py   runs/P0/P0_bc_periodic
+python scripts/laser_report.py runs/P0/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0/P0_bc_periodic
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0/P0_bc_periodic
 ```
 ## Result
 

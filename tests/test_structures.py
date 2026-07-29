@@ -19,8 +19,14 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from laserprod import config as lpconfig   # noqa: E402
 from laserprod import deck as lpdeck       # noqa: E402
 
-RUN_DIRS = sorted(d for d in glob.glob(os.path.join(ROOT, "runs", "*"))
-                  if os.path.isfile(os.path.join(d, "config.yaml")))
+# Runs live in runs/<phase>/<run_id>/ (see runs/README.md). Glob both that and the old
+# flat runs/<run_id>/ layout, so a stray un-migrated run dir is still checked rather than
+# silently skipped -- these tests are the repo's only guarantee that every run has a
+# README and a deck matching its config.
+RUN_DIRS = sorted(
+    d for pat in (("runs", "*"), ("runs", "*", "*"))
+    for d in glob.glob(os.path.join(ROOT, *pat))
+    if os.path.isfile(os.path.join(d, "config.yaml")))
 RUN_IDS = [os.path.basename(d) for d in RUN_DIRS]
 
 

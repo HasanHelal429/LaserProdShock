@@ -176,16 +176,16 @@ size. See `progress.log` for the run's own wall-clock record.
 
 ## Media
 
-- `media/P1_vac_1d/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
-- `media/P1_vac_1d/fields_lineouts.png` — `n_e(z)` profiles at selected times
-- `media/P1_vac_1d/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
-- `media/P1_vac_1d/gates.png` — the G1-G7 gate panel on its own
-- `media/P1_vac_1d/laser_history.png` — `f_abs(t)`, cumulative `E_abs(t)`, `Tlocalfrac(t)` - **the H2 verdict is in the middle panel's computed title**
-- `media/P1_vac_1d/laser_profile.png` — per-cell `n_e` and `P_abs` from the **step-0** dump - where the energy actually lands
-- `media/P1_vac_1d/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
-- `media/P1_vac_1d/movie_phase.mp4` — target-ion phase space over the run
-- `media/P1_vac_1d/phase_space.png` — target-ion (z, u_z) - the arbiter
-- `media/P1_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_off`
+- `media/P1/P1_vac_1d/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
+- `media/P1/P1_vac_1d/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1/P1_vac_1d/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
+- `media/P1/P1_vac_1d/gates.png` — the G1-G7 gate panel on its own
+- `media/P1/P1_vac_1d/laser_history.png` — `f_abs(t)`, cumulative `E_abs(t)`, `Tlocalfrac(t)` - **the H2 verdict is in the middle panel's computed title**
+- `media/P1/P1_vac_1d/laser_profile.png` — per-cell `n_e` and `P_abs` from the **step-0** dump - where the energy actually lands
+- `media/P1/P1_vac_1d/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1/P1_vac_1d/movie_phase.mp4` — target-ion phase space over the run
+- `media/P1/P1_vac_1d/phase_space.png` — target-ion (z, u_z) - the arbiter
+- `media/P1/P1_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_off`
 
 ## Result
 
@@ -272,7 +272,7 @@ figures differ by 65×; quote the **weight**.
 - 50 % / 90 % / 99 % of `P_abs` lands by z = +57.3 / +44.2 / +38.8 d_e marching from +z.
 
 So this configuration is a **pure coronal absorber**: the ray is extinguished ~15 d_e before
-the critical surface and the turning point plays no role in the drive. `media/P1_vac_1d/laser_profile.png`
+the critical surface and the turning point plays no role in the drive. `media/P1/P1_vac_1d/laser_profile.png`
 shows it directly. This also means **G4's `ray_cfl` sensitivity should be weaker here than in
 Phase 0**, since that is a turning-point effect — worth confirming, not yet measured.
 

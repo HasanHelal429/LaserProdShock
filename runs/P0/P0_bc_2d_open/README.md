@@ -70,7 +70,7 @@ Comparable to `P0_bc_2d` (~22 min at 4 threads). See `progress.log`.
 
 ## Media
 
-All under `media/P0_bc_2d_open/` — gitignored and regenerable:
+All under `media/P0/P0_bc_2d_open/` — gitignored and regenerable:
 
 - `checks.png`
 - `fields_lineouts.png`
@@ -85,11 +85,11 @@ All under `media/P0_bc_2d_open/` — gitignored and regenerable:
 - `movie_phase.mp4`
 
 ```bash
-python scripts/run_checks.py   runs/P0_bc_2d_open
-python scripts/laser_report.py runs/P0_bc_2d_open
-/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_2d_open
-/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_2d_open
-/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_2d_open
+python scripts/run_checks.py   runs/P0/P0_bc_2d_open
+python scripts/laser_report.py runs/P0/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0/P0_bc_2d_open
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0/P0_bc_2d_open
 ```
 ## Result
 

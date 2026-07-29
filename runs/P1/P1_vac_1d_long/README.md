@@ -143,16 +143,16 @@ sub-linear against the particle push. Both runs went on their own GPU concurrent
 
 ## Media
 
-- `media/P1_vac_1d_long/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
-- `media/P1_vac_1d_long/fields_lineouts.png` — `n_e(z)` profiles at selected times
-- `media/P1_vac_1d_long/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps — the plume filling the domain from ~55 ps is visible here
-- `media/P1_vac_1d_long/gates.png` — the G1-G7 gate panel on its own
-- `media/P1_vac_1d_long/laser_history.png` — **the headline figure**: `f_abs(t)` with a running median showing the plateau ending abruptly at ~30 ps, cumulative `E_abs(t)`, and `Tlocalfrac(t)`
-- `media/P1_vac_1d_long/laser_profile.png` — per-cell `n_e` and `P_abs` from the step-0 dump — deposition entirely coronal
-- `media/P1_vac_1d_long/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
-- `media/P1_vac_1d_long/movie_phase.mp4` — target-ion phase space over the full 100 ps
-- `media/P1_vac_1d_long/phase_space.png` — target-ion (z, u_z) — note the percentile front is boundary-truncated late; use the weighted bulk
-- `media/P1_long_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_long_off`
+- `media/P1/P1_vac_1d_long/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
+- `media/P1/P1_vac_1d_long/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1/P1_vac_1d_long/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps — the plume filling the domain from ~55 ps is visible here
+- `media/P1/P1_vac_1d_long/gates.png` — the G1-G7 gate panel on its own
+- `media/P1/P1_vac_1d_long/laser_history.png` — **the headline figure**: `f_abs(t)` with a running median showing the plateau ending abruptly at ~30 ps, cumulative `E_abs(t)`, and `Tlocalfrac(t)`
+- `media/P1/P1_vac_1d_long/laser_profile.png` — per-cell `n_e` and `P_abs` from the step-0 dump — deposition entirely coronal
+- `media/P1/P1_vac_1d_long/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1/P1_vac_1d_long/movie_phase.mp4` — target-ion phase space over the full 100 ps
+- `media/P1/P1_vac_1d_long/phase_space.png` — target-ion (z, u_z) — note the percentile front is boundary-truncated late; use the weighted bulk
+- `media/P1/P1_long_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_long_off`
 
 ## Result
 
@@ -178,7 +178,7 @@ decays when the peak density falls through `n_cr` and the turning point disappea
 
 **Peak `n_e` crosses `n_cr` at t = 28.8 ps, and that is exactly where the plateau breaks.**
 The smoothed `f_abs` is at 0.90× its plateau by 20 ps, 0.75× by 34 ps, **half by 41.6 ps** and
-a quarter by 68.9 ps. `media/P1_vac_1d_long/laser_history.png` shows the plateau ending
+a quarter by 68.9 ps. `media/P1/P1_vac_1d_long/laser_history.png` shows the plateau ending
 abruptly at ~30 ps — the running-median overlay makes it unmistakable.
 
 **So there is a real drive-decay timescale, ~40 ps, and it is set by hydrodynamics (the

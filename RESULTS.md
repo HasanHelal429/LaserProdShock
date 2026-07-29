@@ -150,7 +150,7 @@ boundaries the macroparticle count is **exactly** constant, 52418 → 52418
 (0.000 % lost): nothing can leave, so the runaway ablation front has nowhere to go but
 around. With `open` (pec fields + absorbing particles) the count is flat until
 **t ≈ 0.9 ps** and then falls at an accelerating rate, reaching 0.23 % lost by 2.35 ps —
-the front arriving and being absorbed. `media/P0_boundary_decision/compare.png`.
+the front arriving and being absorbed. `media/P0/P0_boundary_decision/compare.png`.
 
 **The boundary change did not perturb the drive.** `f_abs(t)` overlays between the two
 runs for the whole run, and `E_abs` agrees to 1.5 % (3.774e5 vs 3.719e5 J/m²). So the
@@ -395,7 +395,7 @@ now parsed positionally from the front and the columns are returned under names 
 `n_e`, `H`, `P_abs`, `theta_e`, `A`). This affected `laser_report.py`'s profile figure for
 every run made before this entry; those figures have been regenerated.
 
-`runs/P0_bc_2d_open` (transverse `open`, the declared follow-up) is running.
+`runs/P0/P0_bc_2d_open` (transverse `open`, the declared follow-up) is running.
 
 ### Movies added, and the 2D planar flatness criterion is met quantitatively
 
@@ -483,7 +483,7 @@ just cannot have *open* transverse walls holding a hot ambient.
 
 Six runs, the boundary decision recorded, both transverse options characterised, the
 exit-overshoot measured, and every run carrying a generated geometry diagram, a figure set,
-movies and a gate table. `media/P0_2d_transverse/compare.png` is the controlled 2D pair.
+movies and a gate table. `media/P0/P0_2d_transverse/compare.png` is the controlled 2D pair.
 
 ---
 
@@ -737,9 +737,9 @@ cell has a measured `T_e`, so G5's ≤ 0.31 % bound is real. Raw `E_z` rms 1.2×
 well judged**: rear expansion reached the `pec` wall at **t ≈ 7.5 ps** vs a predicted ~8.3 ps,
 and the bulk never approached z = +700.
 
-**Media.** `media/P1_vac_1d{,_off}/`: `checks`, `gates`, `laser_history`, `laser_profile`,
+**Media.** `media/P1/P1_vac_1d{,_off}/`: `checks`, `gates`, `laser_history`, `laser_profile`,
 `fields_streak`, `fields_lineouts`, `phase_space`, `movie_fields.mp4`, `movie_phase.mp4`;
-plus `media/P1_g3/compare.png` for the G3 subtraction.
+plus `media/P1/P1_g3/compare.png` for the G3 subtraction.
 
 ---
 
@@ -850,6 +850,6 @@ now derive from one plateau/late pair and report three regimes (holds / decays N
 The `f_abs` panel also gained a **running-median overlay**: across 102 400 applications the raw
 trace is a solid block, and the median is what makes the plateau's abrupt end at ~30 ps visible.
 
-**Media.** `media/P1_vac_1d_long{,_off}/` — `checks`, `gates`, `laser_history` (the headline),
+**Media.** `media/P1/P1_vac_1d_long{,_off}/` — `checks`, `gates`, `laser_history` (the headline),
 `laser_profile`, `fields_streak`, `fields_lineouts`, `phase_space`, `movie_fields.mp4`,
-`movie_phase.mp4`; plus `media/P1_long_g3/compare.png`.
+`movie_phase.mp4`; plus `media/P1/P1_long_g3/compare.png`.

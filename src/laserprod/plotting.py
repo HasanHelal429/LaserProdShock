@@ -24,6 +24,7 @@ Two rules these figures never break:
 from __future__ import annotations
 
 import os
+import re
 
 import matplotlib
 matplotlib.use("Agg")
@@ -80,9 +81,23 @@ plt.rcParams.update({
 
 
 def media_dir(run_id=None, testing=False):
-    """Path under media/: ``media/testing`` (bring-up) or ``media/<run_id>``."""
-    d = os.path.join(MEDIA, "testing") if testing else \
-        (os.path.join(MEDIA, run_id) if run_id else MEDIA)
+    """Path under media/: ``media/testing`` (bring-up) or ``media/<phase>/<run_id>``.
+
+    Media is grouped by phase to mirror ``runs/<phase>/<run_id>/``, because a flat
+    directory becomes unreadable once a campaign has a few dozen runs. The phase comes
+    from the run-ID prefix (``P0_``/``P1_``/... -- see ``runs/README.md``), so nothing has
+    to pass it in; cross-run comparison names like ``P1_long_g3`` land under their phase
+    too. A name with no recognisable prefix stays at the media/ root rather than being
+    forced into a wrong bucket.
+    """
+    if testing:
+        d = os.path.join(MEDIA, "testing")
+    elif run_id:
+        m = re.match(r"(P\d+[A-Za-z]?)_", str(run_id))
+        d = (os.path.join(MEDIA, m.group(1), run_id) if m
+             else os.path.join(MEDIA, run_id))
+    else:
+        d = MEDIA
     os.makedirs(d, exist_ok=True)
     return d
 

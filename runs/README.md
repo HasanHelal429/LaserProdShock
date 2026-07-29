@@ -1,4 +1,14 @@
-# `runs/` — one directory per simulation
+# `runs/` — one directory per simulation, grouped by phase
+
+**Layout is `runs/<phase>/<run_id>/`** — `runs/P0/P0_bc_open/`, `runs/P1/P1_vac_1d/`, and so
+on. A flat directory stopped being readable at ~10 runs; the phase prefix already encoded the
+grouping, so this just makes it a directory. `media/` mirrors it: `media/<phase>/<run_id>/`,
+derived automatically from the run-ID prefix by `laserprod.plotting.media_dir`, so no script
+has to be told the phase.
+
+Nothing else changes: every script still takes a path to a run directory, `launch.sh` still
+cd's into it, and `config.yaml` still carries `meta.run_id` (the directory name is not the
+source of truth for the ID).
 
 Each run directory holds:
 
@@ -35,7 +45,7 @@ Write the top half **before** launching (it is the hypothesis), the bottom half 
 ## Geometry
 <paste the GENERATED diagram -- never hand-draw it:
 
-    python scripts/make_inputs.py runs/<ID> --diagram
+    python scripts/make_inputs.py runs/<phase>/<ID> --diagram
 
 It is built from config.yaml (target slab, coronal ramp, ambient fill, boundary condition
 per face, which face the laser enters, transverse extent in 2D, B0 axis, grid and
@@ -86,7 +96,7 @@ Suffix conventions:
 - `_fine` — a higher-resolution or higher-ppc variant of the same physics.
 
 Systematic sweeps live in `studies/`, not here — only sweep points worth keeping as
-standalone references get promoted to a `runs/P3_*` directory.
+standalone references get promoted to a `runs/P3/P3_*` directory.
 
 ### `_long` — an extended-duration variant
 

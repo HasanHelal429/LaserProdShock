@@ -95,7 +95,7 @@ means a systematic offset in `f_abs` of that order is expected and is not eviden
 
 ## Media
 
-All under `media/P0_bc_2d/` — gitignored and regenerable:
+All under `media/P0/P0_bc_2d/` — gitignored and regenerable:
 
 - `checks.png`
 - `fields_lineouts.png`
@@ -109,11 +109,11 @@ All under `media/P0_bc_2d/` — gitignored and regenerable:
 - `movie_phase.mp4`
 
 ```bash
-python scripts/run_checks.py   runs/P0_bc_2d
-python scripts/laser_report.py runs/P0_bc_2d
-/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_2d
-/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_2d
-/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_2d
+python scripts/run_checks.py   runs/P0/P0_bc_2d
+python scripts/laser_report.py runs/P0/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0/P0_bc_2d
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0/P0_bc_2d
 ```
 ## Result
 
@@ -133,7 +133,7 @@ to within the noise it was set up to have. **No 2D-specific absorption effect is
 detected.** A cleaner test wants matched ppc, which Phase 1's 2D runs will use.
 
 Time-averaged absorbed fraction and the normalised KE history both overlay the 1D
-ambient runs (see `media/P0_boundary_decision/compare.png`, panels 3 and 4 — note those
+ambient runs (see `media/P0/P0_boundary_decision/compare.png`, panels 3 and 4 — note those
 are deliberately dimensionless, because `E_abs` is per m² in 1D and per m in 2D and the
 raw values must never share an axis).
 
@@ -143,7 +143,7 @@ is **0.00 % at t = 0, then median 5.0 % / max 14.9 % at 0.40 ps and median 5.3 %
 max 13.2 % at 0.79 ps**. The per-cell shot-noise floor is `1/sqrt(32)` = **17.7 %**
 (16 ppc x 2 electron species), so the measured spread is *below* the noise floor: there is
 **no coherent x structure**, which is exactly what a uniform beam on a planar target with
-periodic transverse boundaries must give. `media/P0_bc_2d/movie_map2d.mp4` shows the
+periodic transverse boundaries must give. `media/P0/P0_bc_2d/movie_map2d.mp4` shows the
 stratification staying horizontal for the whole run.
 
 **Declared follow-up: `P0_bc_2d_open`** (transverse `open`), required before any

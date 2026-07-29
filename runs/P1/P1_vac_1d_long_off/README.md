@@ -95,15 +95,15 @@ would fold that into the G3 subtraction.
 
 ## Media
 
-- `media/P1_vac_1d_long_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
-- `media/P1_vac_1d_long_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
-- `media/P1_vac_1d_long_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps
-- `media/P1_vac_1d_long_off/gates.png` — the G1-G7 gate panel on its own
-- `media/P1_vac_1d_long_off/laser_history.png` — empty by construction — annotated "laser off"; `Tlocalfrac` falls to 0.001
-- `media/P1_vac_1d_long_off/laser_profile.png` — the step-0 density profile with zero deposition — the visual null
-- `media/P1_vac_1d_long_off/movie_fields.mp4` — evolving `n_e(z)` lineouts
-- `media/P1_vac_1d_long_off/movie_phase.mp4` — target-ion phase space over the full 100 ps
-- `media/P1_vac_1d_long_off/phase_space.png` — target-ion (z, u_z): the undriven expansion that must be subtracted
+- `media/P1/P1_vac_1d_long_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
+- `media/P1/P1_vac_1d_long_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1/P1_vac_1d_long_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps
+- `media/P1/P1_vac_1d_long_off/gates.png` — the G1-G7 gate panel on its own
+- `media/P1/P1_vac_1d_long_off/laser_history.png` — empty by construction — annotated "laser off"; `Tlocalfrac` falls to 0.001
+- `media/P1/P1_vac_1d_long_off/laser_profile.png` — the step-0 density profile with zero deposition — the visual null
+- `media/P1/P1_vac_1d_long_off/movie_fields.mp4` — evolving `n_e(z)` lineouts
+- `media/P1/P1_vac_1d_long_off/movie_phase.mp4` — target-ion phase space over the full 100 ps
+- `media/P1/P1_vac_1d_long_off/phase_space.png` — target-ion (z, u_z): the undriven expansion that must be subtracted
 
 ## Result
 

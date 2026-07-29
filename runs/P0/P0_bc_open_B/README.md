@@ -82,7 +82,7 @@ Predicted: the ambient traverse eats **0.047%** of the beam, so the upstream sta
 
 ## Media
 
-All under `media/P0_bc_open_B/` — gitignored and regenerable:
+All under `media/P0/P0_bc_open_B/` — gitignored and regenerable:
 
 - `checks.png`
 - `fields_lineouts.png`
@@ -94,11 +94,11 @@ All under `media/P0_bc_open_B/` — gitignored and regenerable:
 - `movie_phase.mp4`
 
 ```bash
-python scripts/run_checks.py   runs/P0_bc_open_B
-python scripts/laser_report.py runs/P0_bc_open_B
-/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0_bc_open_B
-/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0_bc_open_B
-/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0_bc_open_B
+python scripts/run_checks.py   runs/P0/P0_bc_open_B
+python scripts/laser_report.py runs/P0/P0_bc_open_B
+/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/P0/P0_bc_open_B
+/opt/anaconda3/envs/physics/bin/python scripts/phase_space.py runs/P0/P0_bc_open_B
+/opt/anaconda3/envs/physics/bin/python scripts/make_movies.py runs/P0/P0_bc_open_B
 ```
 ## Result
 

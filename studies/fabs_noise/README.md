@@ -1,7 +1,7 @@
 # `fabs_noise` — the PIC noise floor on `f_abs(0)`
 
 **What it varies.** Only `numerics.random_seed`, over one otherwise identical config
-(`runs/P0_bc_open_B` truncated to `max_step = 2`, since `f_abs(0)` needs only the step-0
+(`runs/P0/P0_bc_open_B` truncated to `max_step = 2`, since `f_abs(0)` needs only the step-0
 application). Six seeds, seconds each.
 
 **Hypothesis it tests.** That `f_abs(0)` is reproducible enough for a small difference

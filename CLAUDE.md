@@ -20,13 +20,13 @@ ambient plasma (unmagnetized, magnetized) → sweeps of laser power and geometry
   characterisation, the three known findings).
 
 ## The one rule: `config.yaml` is the single source of truth
-`runs/<ID>/config.yaml` holds the intuitive primaries (densities in `n_cr`, θ = kT/mₑc²,
+`runs/<phase>/<ID>/config.yaml` holds the intuitive primaries (densities in `n_cr`, θ = kT/mₑc²,
 lengths in `d_e,ref`, speeds/c, intensity in W/m²). `scripts/make_inputs.py` renders the
 WarpX deck from it. **Never hand-edit a deck** (`inputs_*`) — edit `config.yaml` and
 regenerate; `--verify` checks `warpx_used_inputs` against the config after a run.
 
 ## The second rule: every run has a `README.md`
-`runs/<ID>/README.md` describes what the run is, the question it answers, what was expected,
+`runs/<phase>/<ID>/README.md` describes what the run is, the question it answers, what was expected,
 and — after it finishes — what happened, including **what is retracted**. `launch.sh`
 **refuses to start a run that has no README.md.** This is not bureaucracy: a laser-driven
 "marginally supercritical shock" was reported upstream and later retracted, and an
@@ -44,22 +44,22 @@ ion reflection, and is the piston *faster* than the compression it launched?
 - `scripts/` — analysis/driver CLIs (see `scripts/README.md`). All take a `run_dir`.
 - `studies/` — heavier experiments that *launch* WarpX (the Phase-3 sweeps).
 - `tests/` — fast pytest checks.
-- `runs/<ID>/` — `config.yaml` + `README.md` + deck + `warpx_used_inputs` (tracked);
+- `runs/<phase>/<ID>/` — `config.yaml` + `README.md` + deck + `warpx_used_inputs` (tracked);
   `diags/`, `*.log` gitignored.
-- `media/<ID>/` — figures/movies (gitignored, regenerable).
+- `media/<phase>/<ID>/` — figures/movies (gitignored, regenerable).
 
 ## Typical workflow
 ```bash
-python scripts/make_inputs.py runs/<ID>                 # config.yaml -> deck
-scripts/launch.sh -b -L runs/<ID>                       # launch WarpX (+ progress logger)
-python scripts/make_inputs.py runs/<ID> --verify        # deck == config?
-python scripts/run_checks.py   runs/<ID>                # derived scales + gates G1-G7
-python scripts/laser_report.py runs/<ID>                # f_abs(t), E_abs, t_s, Tlocalfrac
-python scripts/plot_fields.py  runs/<ID>                # streaks + lineouts (needs yt: physics env)
-python scripts/phase_space.py  runs/<ID>                # THE ARBITER -- before any shock claim
-python scripts/make_movies.py  runs/<ID>                # movies (needs yt + ffmpeg)
-python scripts/tune_shock.py   runs/<ID>                # fit v_sh + front BY EYE -> shock_fit.yaml
-python scripts/make_figures.py runs/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
+python scripts/make_inputs.py runs/<phase>/<ID>                 # config.yaml -> deck
+scripts/launch.sh -b -L runs/<phase>/<ID>                       # launch WarpX (+ progress logger)
+python scripts/make_inputs.py runs/<phase>/<ID> --verify        # deck == config?
+python scripts/run_checks.py   runs/<phase>/<ID>                # derived scales + gates G1-G7
+python scripts/laser_report.py runs/<phase>/<ID>                # f_abs(t), E_abs, t_s, Tlocalfrac
+python scripts/plot_fields.py  runs/<phase>/<ID>                # streaks + lineouts (needs yt: physics env)
+python scripts/phase_space.py  runs/<phase>/<ID>                # THE ARBITER -- before any shock claim
+python scripts/make_movies.py  runs/<phase>/<ID>                # movies (needs yt + ffmpeg)
+python scripts/tune_shock.py   runs/<phase>/<ID>                # fit v_sh + front BY EYE -> shock_fit.yaml
+python scripts/make_figures.py runs/<phase>/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
 ```
 Built: `launch.sh`, `run_progress_logger.py`, `make_inputs.py`, `run_checks.py`,
 `laser_report.py`, `compare_runs.py`, `plot_fields.py`, `phase_space.py`, `make_movies.py`,
@@ -67,7 +67,7 @@ and `src/laserprod/{units,config,deck,io,plotting}`. Still to build: `tune_shock
 `make_figures.py`, `plot_ablation.py`, `sweep.py` and `laserprod.metrics` (Phase 1-3).
 
 **The plotfile tools need the `physics` env** (yt is not in base anaconda):
-`/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/<ID>`. The
+`/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/<phase>/<ID>`. The
 config/log-based tools (`make_inputs`, `run_checks`, `laser_report`, `compare_runs`) do
 not, and work while a run is still going.
 
@@ -100,10 +100,11 @@ not, and work while a run is still going.
   is set. Also: **there is no vacuum gap behind the target** in an ambient run — the ambient
   fills both sides. This is Phase 0's subject; the finding lands here when it exists.
 - **Absorption is self-limiting, and that is real physics.** `K ∝ Z_eff lnΛ n_e² T_e^{−3/2}`,
-  so a cold target absorbs ~90 % and shuts off within ~0.05 gyroperiods as its corona heats
-  and rarefies. Coupled energy is set by the target electrons' heat capacity at shutoff and
-  is nearly **independent of intensity** — only captured because
-  `temperature_mode = local` (the default) measures `T_e` per cell.
+  so a cold target absorbs strongly and weakens as its corona heats and rarefies — captured
+  only because `temperature_mode = local` (the default) measures `T_e` per cell.
+  **But the "shuts off at a heat-capacity ceiling, coupled energy independent of intensity"
+  story is FALSIFIED — see the next bullet.** It is the inherited H2 picture and it does not
+  describe what the operator does.
 - **`Z_eff·lnΛ` is a very strong knob — change it in small steps.** 5/5 → 13/7 coupled
   **16×** more energy (92 keV per slab ion), giving a 0.06 c piston that crossed the domain
   in a fraction of a gyroperiod. `lnΛ` here is an honest mid-Z stand-in, and is a fixed
@@ -121,7 +122,7 @@ not, and work while a run is still going.
   the target far enough from the injection face that the transition is observable rather than
   present from t = 0. `make_inputs.py` warns when a corona exceeds 1e-3 n_cr at the face.
 - **Movie frames clean themselves up.** `make_movies.py` writes PNGs to
-  `media/<ID>/_frames_<name>/` and deletes the directory once ffmpeg succeeds; leftovers
+  `media/<phase>/<ID>/_frames_<name>/` and deletes the directory once ffmpeg succeeds; leftovers
   from an interrupted encode are swept at startup (so stale frames cannot be globbed into a
   new, shorter movie). `--keep-frames` retains them, and a failed encode keeps them
   automatically. Never leave frame directories behind by hand -- they are several times the
@@ -160,7 +161,7 @@ not, and work while a run is still going.
 - **`local` temperature mode needs ppc.** `T^{−3/2}` is convex, so per-cell noise biases
   absorption **high**: ~3 % at 25 ppc, < 0.1 % at 800. High ppc in the target, not the
   ambient. Watch `Tlocalfrac`.
-- **Launch with `scripts/launch.sh runs/<ID>`, never by hand.** The generated deck sets no
+- **Launch with `scripts/launch.sh runs/<phase>/<ID>`, never by hand.** The generated deck sets no
   `diag*.file_prefix`, so WarpX writes plotfiles to `diags/` *relative to the launch CWD* —
   two runs launched from the repo root share `./diags/` and clobber each other (`.old.NNNN`
   rename files are the tell; cost a rerun in `KinShock2020`). `launch.sh` cd's into the run
@@ -169,7 +170,7 @@ not, and work while a run is still going.
   (`--force` to override). `-b` detaches, `-L` also starts the progress logger, `-n`
   dry-runs, and anything after `--` becomes ParmParse overrides (smoke tests only — they
   will trip `--verify`).
-- **Shock kinematics come from `runs/<ID>/shock_fit.yaml`, fit BY EYE** — the convention
+- **Shock kinematics come from `runs/<phase>/<ID>/shock_fit.yaml`, fit BY EYE** — the convention
   `KinShock2020` arrived at after automatic `v_sh` drifted between scripts. One speed and
   front per run, shared by every diagnostic.
 - **No mesh refinement.** The operator asserts `finestLevel() == 0`. One uniform grid must

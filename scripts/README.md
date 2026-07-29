@@ -60,11 +60,11 @@ It additionally:
   finished run's plotfiles in place.
 
 ```bash
-scripts/launch.sh runs/P1_vac_1d              # foreground, logs to the run dir
-scripts/launch.sh -b -L runs/P1_vac_1d        # detach + start the progress logger
-scripts/launch.sh -n runs/P1_vac_1d           # dry run: print the command, change nothing
-scripts/launch.sh -f runs/P1_vac_1d           # overwrite a populated diags/ (mean it)
-scripts/launch.sh runs/P1_vac_1d -- max_step=20   # ParmParse overrides: smoke tests only
+scripts/launch.sh runs/P1/P1_vac_1d              # foreground, logs to the run dir
+scripts/launch.sh -b -L runs/P1/P1_vac_1d        # detach + start the progress logger
+scripts/launch.sh -n runs/P1/P1_vac_1d           # dry run: print the command, change nothing
+scripts/launch.sh -f runs/P1/P1_vac_1d           # overwrite a populated diags/ (mean it)
+scripts/launch.sh runs/P1/P1_vac_1d -- max_step=20   # ParmParse overrides: smoke tests only
 ```
 
 Overrides after `--` are not reflected in `config.yaml`, so `make_inputs.py --verify` will
@@ -92,7 +92,7 @@ longer being driven, however many steps remain — useful for killing a run earl
 Normally started by `launch.sh -L`; standalone:
 
 ```bash
-python scripts/run_progress_logger.py runs/P1_vac_1d --every-pct 5 --poll 20
+python scripts/run_progress_logger.py runs/P1/P1_vac_1d --every-pct 5 --poll 20
 ```
 
 

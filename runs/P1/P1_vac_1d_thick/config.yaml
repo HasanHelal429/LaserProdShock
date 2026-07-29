@@ -1,0 +1,95 @@
+meta:
+  run_id: P1_vac_1d_thick
+  phase: 1
+  deck: inputs_P1_vac_1d_thick
+  description: The 1D baseline that makes P1_vac_2d interpretable. Identical target, laser,
+    coronal scale length, resolution, cfl, PPC (36, not the 400 the other 1D runs use),
+    domain, rear truncation and duration -- the ONLY difference is dims = 1. Without it a
+    "2D reproduces 1D" claim would confound dimensionality with the thickness change made
+    for the truncation, since the 80 d_e P1_vac_1d target has 5x less mass for the same
+    drive and therefore runs much hotter.
+  reference: TEST_PLAN.md 7.2; parent P1_vac_1d; truncation from P0_thick_open
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 30560
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 400
+    scale_length_de: 60
+    center_de: -200
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -400
+    hi_de: 1200
+  boundary:
+    axis:
+      lo: open
+      hi: open
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 305600
+  ppc:
+    target: 36
+    ambient: 36
+
+diagnostics:
+  plotfile_intervals: 30560
+  field_intervals: 3820
+  phase_intervals: 15280
+  reduced_intervals: 764
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+
+controls:
+  two_d_run: P1_vac_2d
+  parent_geometry: P1_vac_1d
+  ray_cfl_ladder: studies/exit_overshoot (ray_cfl 0.05-1.0; total absorbed low by 0.1-2.0%,
+    no net energy creation; per-cell aliasing rms 0.73% -> 20%)
+
+
+targets:
+  note: max_step is 305600 not 432000 because dt is dz*cfl/c in 1D but dz*cfl/(c*sqrt(2)) in
+    2D, so the same physical 29.9 ps needs fewer 1D steps. Matching t_end, not step count,
+    is what makes the comparison valid.
+  expect: on-axis f_abs(t), E_abs(t), n_e(z) and the weight-weighted bulk ion speed should
+    agree with P1_vac_2d to within noise, because a uniform beam with periodic transverse
+    boundaries is exactly planar. Disagreement is a 2D bug or a boundary artifact, not
+    physics -- TEST_PLAN 7.2 makes this the gate on every later 2D claim.

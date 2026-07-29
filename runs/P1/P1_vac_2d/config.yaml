@@ -1,0 +1,118 @@
+meta:
+  run_id: P1_vac_2d
+  phase: 1
+  deck: inputs_P1_vac_2d
+  description: Phase-1 2D planar validation. The same laser and coronal scale length as
+    P1_vac_1d, in 2D XZ with a UNIFORM beam and PERIODIC transverse boundaries, so the
+    configuration is exactly planar and must reproduce the 1D run on axis. TEST_PLAN 7.2
+    makes this the gate on every later 2D physics claim. Two deliberate changes for cost
+    and for the truncation -- the region behind the target is NOT simulated (domain cut at
+    the rear face, `open`), and the target is 400 d_e thick -- 5x the 1D reference and
+    2.45x the upstream run_laser_shock target -- so the front-face disturbance cannot
+    reach the truncated rear boundary within the run.
+  reference: TEST_PLAN.md 7.2; parent P1_vac_1d; truncation from P0_thick_open
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 43200
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 400
+    scale_length_de: 60
+    center_de: -200
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 2
+  normal_axis: z
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  axis:
+    lo_de: -400
+    hi_de: 1200
+  transverse:
+    lo_de: -16
+    hi_de: 16
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: periodic
+      hi: periodic
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 432000
+  ppc:
+    target: 36
+    ambient: 36
+
+diagnostics:
+  plotfile_intervals: 43200
+  field_intervals: 5400
+  phase_intervals: 21600
+  reduced_intervals: 1080
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+
+controls:
+  laser_off: P1_vac_2d_off
+  planar_1d_baseline: P1_vac_1d_thick
+  ray_cfl_ladder: studies/exit_overshoot (ray_cfl 0.05-1.0; total absorbed low by
+    0.1-2.0%, no net energy creation; per-cell aliasing rms 0.73% -> 20%)
+  parent_geometry: P1_vac_1d
+
+targets:
+  note: PERIODIC transverse plus a uniform beam makes this exactly planar, so on-axis
+    f_abs(t), E_abs(t) and n_e(z) must match the 1D baseline to within noise. That
+    baseline is P1_vac_1d_thick, NOT P1_vac_1d -- the target thickness was changed for
+    the truncation, and a thicker target has more mass for the same drive, so it heats
+    less and rarefies more slowly. Comparing against the 80 d_e 1D run would confound
+    dimensionality with thickness.
+  transverse_structure: none expected. A planar run that develops transverse structure
+    is showing either an instability (a finding) or a bug, and either way it must be
+    explained before any finite-spot 2D result is trusted.
+  ppc_caveat: 36 ppc (6x6) not 400 -- 400 in 2D is unaffordable. G5's bias bound rises
+    from 0.31% to 3.5%, but Tlocalfrac stayed at 0.975-0.987 in the P0 2D runs at only
+    16 ppc, so the local temperature is still measured rather than floored. The 1D
+    baseline uses the SAME 36 ppc, so dimensionality is the only difference between them.
+  thickness_criterion: w_t = 400 d_e is set by the truncation, not by taste. The rear
+    disturbance travels at c_s inward from the laser-facing face, and c_s follows from the
+    drive-limited E_abs(t) spread over this target's true areal mass of 1.145e23 m^-2
+    (slab plus Gaussian corona) -- 2.0 d_e/ps at 10 ps rising to 3.1 at 29.9 ps. Over the
+    full run that is 92 d_e, i.e. 23 percent of the slab, which is the same crossing
+    fraction at which P0_thick_open measured the truncation error at only -0.54 percent on
+    total target momentum. To be CHECKED post-run by confirming n_e and T_e at the rear
+    boundary are unchanged from their initial values.

@@ -93,15 +93,15 @@ subtraction. See `progress.log`.
 
 ## Media
 
-- `media/P1_vac_1d_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
-- `media/P1_vac_1d_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
-- `media/P1_vac_1d_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
-- `media/P1_vac_1d_off/gates.png` — the G1-G7 gate panel on its own
-- `media/P1_vac_1d_off/laser_history.png` — empty by construction: annotated "laser off (I₀ = 0)", and `Tlocalfrac` falling to 0.000
-- `media/P1_vac_1d_off/laser_profile.png` — the step-0 density profile with **zero** deposition — the visual null
-- `media/P1_vac_1d_off/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
-- `media/P1_vac_1d_off/movie_phase.mp4` — target-ion phase space over the run
-- `media/P1_vac_1d_off/phase_space.png` — target-ion (z, u_z): the undriven thermal expansion a `v_p` measurement must be corrected for
+- `media/P1/P1_vac_1d_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)` at the group `T_e`, and the gate table
+- `media/P1/P1_vac_1d_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1/P1_vac_1d_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps, with the laser history on the same time axis
+- `media/P1/P1_vac_1d_off/gates.png` — the G1-G7 gate panel on its own
+- `media/P1/P1_vac_1d_off/laser_history.png` — empty by construction: annotated "laser off (I₀ = 0)", and `Tlocalfrac` falling to 0.000
+- `media/P1/P1_vac_1d_off/laser_profile.png` — the step-0 density profile with **zero** deposition — the visual null
+- `media/P1/P1_vac_1d_off/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1/P1_vac_1d_off/movie_phase.mp4` — target-ion phase space over the run
+- `media/P1/P1_vac_1d_off/phase_space.png` — target-ion (z, u_z): the undriven thermal expansion a `v_p` measurement must be corrected for
 
 ## Result
 

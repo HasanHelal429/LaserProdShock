@@ -71,10 +71,15 @@ open questions**:
    free expansion has a runaway ion front (measured at 0.20 c) that then *wraps* and
    pollutes the upstream. No vacuum gap is large enough. This is Phase 0.
 4. **Absorption is self-limiting**, because `K ∝ Z_eff lnΛ n_e² T_e^{-3/2}`: a cold target
-   absorbs ~90 % and shuts itself off within ~0.05 gyroperiods as its corona heats and
-   rarefies. Coupled energy is therefore set by the target electrons' heat capacity at
-   shutoff and is nearly *independent of intensity*. `Z_eff·lnΛ` is a very strong knob
-   (25 → 91 gave **16×** the coupled energy).
+   absorbs strongly and weakens as its corona heats and rarefies. `Z_eff·lnΛ` is a very
+   strong knob (25 → 91 gave **16×** the coupled energy).
+   ⚠️ **The inherited form of this hazard — "shuts off within ~0.05 gyroperiods, coupled
+   energy set by heat capacity and nearly independent of intensity" — was FALSIFIED by
+   `P1_vac_1d` and `P1_vac_1d_long`; see §2.4 and §2.5.** Absorption falls onto a *plateau*
+   (`f_abs` ≈ 0.24), and the plateau ends only when the rarefaction takes the peak density
+   below `n_cr` (28.8 ps), so `E_abs = ∫f_abs(t)·I₀ dt` and is **not** intensity-independent.
+   The rest of the hazard (that the drive is self-limiting at all, and that `Z_eff·lnΛ` is
+   dangerous) stands.
 5. **Phase space is the only arbiter of a shock claim.** The B and density streaks of the
    `run_laser_shock` pulse looked shock-like on their own. What disproved the shock was the
    phase space: 0.00 % ion reflection, upstream/downstream `f(u_z)` differing only by a
@@ -236,7 +241,7 @@ form, and its named deliverable becomes **the plateau law** — what sets `f_abs
 rather than the `Z_eff·lnΛ` discrepancy, which the plateau picture already explains
 qualitatively (`E_abs ∝ f_abs·t`, so a longer near-unity phase multiplies both factors).
 
-**H3 is untested, not confirmed or falsified.** See `runs/P1_vac_1d/README.md`: a
+**H3 is untested, not confirmed or falsified.** See `runs/P1/P1_vac_1d/README.md`: a
 weight-weighted bulk gives α ≈ 0.46, but ~30 % of the slab is still cold at 10 ps and is being
 averaged in, so that is a **lower bound**. A fair test must restrict to the ablated population
 — which is what `plot_ablation.py` is for. **That is the next Phase-1 item.**
