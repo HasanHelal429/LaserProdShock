@@ -116,6 +116,20 @@ targets:
     spot edge reaches the transverse wall at (80-20)/4.3 = 14 ps > t_end, so the periodic
     images do not interact within the run -- CHECK THAT POST-RUN, it is the run's main
     validity condition.
+  revision_2026_07_29: PRE-REGISTERED REVISION, written before this run's output was
+    examined, and NOT a rewrite of `expect` above -- read both. studies/spot_leak_ppc
+    measured the absorbed-power profile to be ~1.5x WIDER than the intensity profile
+    (w_eff/w0 = 1.000 at t = 0, rising to 1.52-1.62 by 1 ps at both 36 and 144 ppc), because
+    inverse bremsstrahlung goes as T_e^-3/2 and the spot suppresses its own coupling on the
+    hot axis. The heated radius is therefore ~1.5 w0 = 30 d_e, not 20 d_e, and two numbers in
+    `expect` follow from the wrong radius. Revised -- (1) the rarefaction must cross ~1.5 w0,
+    so t_cross ~ 6.9 ps rather than 4.6 ps and this 9.96 ps run covers only ~1.4 crossing
+    times, not 2.2, so a clean post-crossing asymptote should NOT be expected; (2) lateral
+    flow starts from the edge of the HEATED region, so it reaches the transverse wall at
+    (80-30)/4.3 = 11.6 ps rather than 14 ps -- still beyond t_end = 9.96 ps, so the validity
+    condition holds, but with 1.2x margin instead of 1.4x. Caveat on transfer -- the 1.5x was
+    measured at 1 ps in a 100 d_e target, and the mechanism should strengthen as T_e rises, so
+    treat 1.5 as a lower bound on the broadening and re-measure w_eff/w0 here directly.
   degradation_measure: compare the ENERGY-INTEGRATED E_abs and the on-axis (|x| < 0.25 w0)
     quantities against P1_vac_1d_thick at matched PHYSICAL time (dumps at 43200-step
     multiples coincide with the 1D run's 30560-step dumps to 0.1%), never the median f_abs
