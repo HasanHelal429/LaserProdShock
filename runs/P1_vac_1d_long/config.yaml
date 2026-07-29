@@ -1,0 +1,99 @@
+meta:
+  run_id: P1_vac_1d_long
+  phase: 1
+  deck: inputs_P1_vac_1d_long
+  description: P1_vac_1d run 10x LONGER (100.18 ps) on a 2.7x larger domain. The 10 ps
+    run falsified H2 by showing f_abs floors at a ~0.23 plateau with E_abs still rising
+    linearly at the final step -- so 10 ps could establish that the drive does not shut
+    off on that timescale, but not whether it EVER does. 100 ps is 13 gyroperiods at
+    the Phase-2 reference 1/w_ci0 = 7.61 ps and ~7 rear-rarefaction slab crossings, so
+    the whole target is processed and the ablated population dominates the bulk, which
+    is what makes H3 testable. Domain grown from the MEASURED expansion rates, not
+    guessed, so 99.9% of the ion weight stays in the box.
+  reference: TEST_PLAN.md 7.1 and 2.4; parent P1_vac_1d (RESULTS 2026-07-28)
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 102400
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 80
+    scale_length_de: 60
+    center_de: -40
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -3000
+    hi_de: 2400
+  boundary:
+    axis:
+      lo: open
+      hi: open
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 1024000
+  ppc:
+    target: 400
+    ambient: 48
+
+diagnostics:
+  plotfile_intervals: 102400
+  field_intervals: 12800
+  phase_intervals: 51200
+  reduced_intervals: 2560
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 400
+  compression_factor: 2.0
+
+controls:
+  laser_off: P1_vac_1d_long_off
+  ray_cfl_ladder: studies/exit_overshoot (ray_cfl 0.05-1.0; total absorbed low by
+    0.1-2.0%, no net energy creation; per-cell aliasing rms 0.73% -> 20%)
+  short_run: P1_vac_1d
+  parent_geometry: P1_vac_1d
+
+targets:
+  note: laser.intervals stays at 10 because it is the DEPOSITION CADENCE (physics),
+    not a diagnostic -- only the diagnostics were scaled by 10x, so the figures keep
+    the same number of dumps rather than 10x the data. Domain from measured ion-weight
+    quantile drift in P1_vac_1d -- the 1-99% weight band spreads at 10-14 d_e/ps and the
+    0.1%/99.9% tails at 13-20 d_e/ps, so +-2400/3000 d_e holds 99.9% of the weight for
+    100 ps with margin. The 0.01% extreme tail will still leave; that is expected and
+    the weight-loss fraction is the number to quote beside gate G6.
+  question: does f_abs EVER close, or does the plateau persist for 13 gyroperiods?
+  watch: the target must rarefy below n_cr eventually, at which point the beam punches
+    through, there is no turning point at all, and absorption should collapse. Whether
+    that happens inside 100 ps is the single most informative thing this run can say
+    about how long a laser can drive a piston.

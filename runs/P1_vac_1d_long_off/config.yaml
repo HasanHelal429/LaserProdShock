@@ -1,0 +1,92 @@
+meta:
+  run_id: P1_vac_1d_long_off
+  phase: 1
+  deck: inputs_P1_vac_1d_long_off
+  description: Gate-G3 laser-off control for P1_vac_1d_long. Byte-for-byte the same
+    deck except laser.intensity = 0, run for the same 100.18 ps. Grid heating accumulates
+    with step count, so a 10x longer physics run needs its OWN 10x longer control -- the
+    10 ps control (P1_vac_1d_off) cannot bound a 100 ps run. That run measured a net
+    particle-KE change of -1696 J, i.e. -0.07% of the driven gain; the question here is
+    whether that stays negligible over 1.024 million steps.
+  reference: TEST_PLAN.md 7.1 and 2.4; parent P1_vac_1d (RESULTS 2026-07-28)
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 0.0
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 102400
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 80
+    scale_length_de: 60
+    center_de: -40
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -3000
+    hi_de: 2400
+  boundary:
+    axis:
+      lo: open
+      hi: open
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 1024000
+  ppc:
+    target: 400
+    ambient: 48
+
+diagnostics:
+  plotfile_intervals: 102400
+  field_intervals: 12800
+  phase_intervals: 51200
+  reduced_intervals: 2560
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 400
+  compression_factor: 2.0
+
+controls:
+  physics_run: P1_vac_1d_long
+  short_run: P1_vac_1d_off
+  parent_geometry: P1_vac_1d
+  ray_cfl_ladder: studies/exit_overshoot (moot at intensity 0; declared so this deck
+    stays identical to P1_vac_1d_long in every respect the gates can see)
+
+
+targets:
+  note: With no drive the target should merely relax. Over 100 ps that is 10x longer for
+    grid heating to accumulate at dz/lambda_D = 61, so this is a much sharper test of G2
+    than the 10 ps control was. Watch for a NET energy gain shared by both species -- the
+    grid-heating signature -- as opposed to the electron-to-ion ambipolar transfer that
+    cancelled to ~0 in P1_vac_1d_off (electrons -51.4 kJ, ions +49.7 kJ).
+  expect_no_piston: true

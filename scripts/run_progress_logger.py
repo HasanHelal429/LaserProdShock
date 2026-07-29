@@ -173,8 +173,14 @@ def main():
             )
             if laser is not None:
                 pabs, pmax, eabs = laser
-                frac = pabs / pmax if pmax > 0 else float("nan")
-                line += f" | laser {frac:.3f} of peak, Eabs {eabs:.4g} J"
+                # A laser-off control (gate G3) has Pabs == Pmax == 0 for the whole run, and
+                # "laser nan of peak, Eabs 0 J" on every line is noise the reader has to
+                # decode. Say what it is instead -- these controls are mandatory companions
+                # to every headline run, so this line gets read as often as the driven one.
+                if pmax > 0:
+                    line += f" | laser {pabs / pmax:.3f} of peak, Eabs {eabs:.4g} J"
+                else:
+                    line += " | laser OFF (I0 = 0)"
             emit(line)
             last_pct_bucket = bucket
             prev_wall, prev_step = now, step

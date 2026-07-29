@@ -43,7 +43,28 @@ def load(path: str) -> dict:
     if os.path.isdir(path):
         path = os.path.join(path, "config.yaml")
     with open(path, "r") as fh:
-        cfg = yaml.safe_load(fh)
+        try:
+            cfg = yaml.safe_load(fh)
+        except yaml.YAMLError as exc:
+            # These configs carry long prose `description:` / `note:` fields, and the
+            # commonest way to break one is a bare ": " inside an unquoted multi-line
+            # scalar ("see P1_vac_1d: the band spreads..."), which YAML reads as a new
+            # mapping key. The raw traceback is 30 frames of yaml internals and never
+            # says that, so name the actual cause here.
+            mark = getattr(exc, "problem_mark", None)
+            where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+            hint = ""
+            if mark is not None:
+                try:
+                    with open(path) as f2:
+                        line = f2.read().splitlines()[mark.line]
+                    hint = (f"\n  offending line: {line.strip()!r}"
+                            "\n  A bare ': ' inside an unquoted multi-line string starts a "
+                            "new YAML key. Use ' -- ' instead, or quote the whole value.")
+                except Exception:
+                    pass
+            raise ValueError(f"{path} is not valid YAML{where}: "
+                             f"{getattr(exc, 'problem', exc)}{hint}") from exc
     cfg["_path"] = os.path.abspath(path)
     cfg["_run_dir"] = os.path.dirname(cfg["_path"])
     missing = [k for k in REQUIRED_SECTIONS if k not in cfg]

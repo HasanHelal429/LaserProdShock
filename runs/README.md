@@ -87,3 +87,20 @@ Suffix conventions:
 
 Systematic sweeps live in `studies/`, not here — only sweep points worth keeping as
 standalone references get promoted to a `runs/P3_*` directory.
+
+### `_long` — an extended-duration variant
+
+`P1_vac_1d_long` is `P1_vac_1d` run 10× longer. Two rules learned the hard way when making
+one:
+
+- **The domain must grow with the duration.** `P1_vac_1d`'s rear expansion reached its wall at
+  t ≈ 7.5 ps of a 10 ps run, so simply raising `max_step` would have bled the plume into the
+  boundary for 90 % of a 100 ps run and voided gate G6. Size the new domain from the
+  **measured** ion-weight quantile drift of the short run, not from a guess.
+- **Scale the `diagnostics:` intervals by the same factor**, so you get the same number of
+  dumps rather than 10× the data. But **`laser.intervals` is NOT a diagnostic** — it is the
+  deposition cadence, and the kick amplitude goes as `√(H·Δt)` with `Δt = intervals·dt`, so
+  changing it changes the physics. Leave it alone.
+
+A `_long` run needs its **own** `_long_off` control: grid heating accumulates with step count,
+so a shorter control cannot bound a longer run.
