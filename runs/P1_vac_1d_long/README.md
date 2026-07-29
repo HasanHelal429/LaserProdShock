@@ -106,11 +106,25 @@ parsing cost.
 
 10 800 cells, 420 000 macroparticles (unchanged), 1 024 000 steps → 100.18 ps.
 
-**Measured** on this deck: 4 000 steps in 28.7 s on one RTX 4070 ⇒ **~123 min projected**.
-Per step that is 7.19 ms against 4.70 ms at 2 000 cells, so the 5.4× cell increase costs only
-**1.53×** — field work in 1D is real but sub-linear against the particle push. Run concurrently
-with the control on the second GPU, so ~2 h wall for the pair. (Benchmarked rather than scaled,
-per the rule the 10 ps run's 4× estimate error established.)
+**Measured** on this deck: 4 000 steps in 28.7 s on one RTX 4070 ⇒ ~123 min projected.
+**Actual: 3 h 45 m** (control 3 h 10 m) — 1.8× the projection, because the host was
+CPU-saturated by unrelated jobs (16 `flash4` processes plus an 8-thread CPU WarpX = 2882 %
+demand on 32 cores). A CUDA run is latency-bound on a single host thread issuing kernel
+launches, so when that thread is preempted the GPU idles: utilisation fell 71 % → 53 % and
+power sat at 47–56 W of a 200 W cap. **Benchmark numbers here assume an otherwise idle host.**
+
+There is also a genuine, physical component: the plume spread from 526 to 10 800 occupied
+cells (20×) while the particle count stayed flat, so particle→grid deposition scatters over
+20× the memory footprint and locality degrades. `warpx_rate` rose 0.0070 → 0.0132 s/step in
+the driven run and 0.0062 → 0.0111 in the control — **it slows even with no laser**, which is
+how the two causes were separated. Roughly 1.5× physics × 1.3× contention.
+**`warpx.sort_intervals` is the fix worth benchmarking** for future GPU runs with expanding
+plumes: `CLAUDE.md`'s "sorting is neutral-to-negative" note is an inherited *CPU* result and
+should not be assumed to hold on the device.
+
+For the record on grid scaling: at t = 0 the step cost was 7.19 ms at 10 800 cells against
+4.70 ms at 2 000, so the 5.4× cell increase cost only **1.53×** — field work in 1D is real but
+sub-linear against the particle push. Both runs went on their own GPU concurrently.
 
 ## Gates
 
@@ -129,11 +143,165 @@ per the rule the 10 ps run's 4× estimate error established.)
 
 ## Media
 
-*(not generated yet)*
+- `media/P1_vac_1d_long/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
+- `media/P1_vac_1d_long/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1_vac_1d_long/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps — the plume filling the domain from ~55 ps is visible here
+- `media/P1_vac_1d_long/gates.png` — the G1-G7 gate panel on its own
+- `media/P1_vac_1d_long/laser_history.png` — **the headline figure**: `f_abs(t)` with a running median showing the plateau ending abruptly at ~30 ps, cumulative `E_abs(t)`, and `Tlocalfrac(t)`
+- `media/P1_vac_1d_long/laser_profile.png` — per-cell `n_e` and `P_abs` from the step-0 dump — deposition entirely coronal
+- `media/P1_vac_1d_long/movie_fields.mp4` — evolving `n_e(z)` lineouts with the laser history tracking below
+- `media/P1_vac_1d_long/movie_phase.mp4` — target-ion phase space over the full 100 ps
+- `media/P1_vac_1d_long/phase_space.png` — target-ion (z, u_z) — note the percentile front is boundary-truncated late; use the weighted bulk
+- `media/P1_long_g3/compare.png` — the **G3 subtraction**: this run against `P1_vac_1d_long_off`
 
 ## Result
 
-*(running)*
+Ran **1 024 000/1 024 000 steps = 100.18 ps in 3 h 45 m** on GPU 0 (slower than the 123 min
+benchmark because the host was CPU-saturated by unrelated jobs — see Cost). Zero errors,
+`--verify` OK, gates 4 pass / 0 warn / 0 fail.
+
+### The headline: the plateau DOES close, and the target going underdense is why
+
+**All four expectations were confirmed, including the mechanism.** The drive is not
+capacity-limited (H2's picture) and it is not an indefinite plateau either — it holds, then
+decays when the peak density falls through `n_cr` and the turning point disappears:
+
+| t [ps] | mean `f_abs` | `dE/dt` [J/m²/ps] | peak `n_e`/`n_cr` |
+|---|---|---|---|
+| 0–10 | 0.256 | 2.27×10⁵ | 1.54 |
+| 10–20 | 0.230 | 2.32×10⁵ | 1.33 |
+| 20–30 | **0.274** | 2.70×10⁵ | 0.93 ← **crosses `n_cr` at 28.8 ps** |
+| 30–40 | 0.189 | 1.81×10⁵ | 0.40 |
+| 40–50 | 0.107 | 1.06×10⁵ | 0.25 |
+| 60–70 | 0.065 | 6.44×10⁴ | 0.15 |
+| 90–100 | **0.044** | **4.39×10⁴** | 0.090 |
+
+**Peak `n_e` crosses `n_cr` at t = 28.8 ps, and that is exactly where the plateau breaks.**
+The smoothed `f_abs` is at 0.90× its plateau by 20 ps, 0.75× by 34 ps, **half by 41.6 ps** and
+a quarter by 68.9 ps. `media/P1_vac_1d_long/laser_history.png` shows the plateau ending
+abruptly at ~30 ps — the running-median overlay makes it unmistakable.
+
+**So there is a real drive-decay timescale, ~40 ps, and it is set by hydrodynamics (the
+rarefaction thinning the target below critical), not by a shutoff temperature.** This is the
+number Phase 2 needs, and it is *right at the edge* of what Schaeffer requires: formation
+wants drive at `t*` ≈ 5 `ω_ci0⁻¹` = 38 ps, and `f_abs` is down to ~0.19 → 0.11 there.
+
+| | value |
+|---|---|
+| `E_abs` final | **1.3486×10⁷ J/m²** (5.48× the 10 ps run's, for 10× the time) |
+| if the 0.234 plateau had held to 100 ps | 2.348×10⁷ J/m² — so it delivered **57 %** of that |
+| overall absorbed fraction of incident energy | **13.5 %** (was 24.6 % over 10 ps) |
+| `f_abs` peak → final | 1.0000 → **0.0421** |
+| late/early `dE/dt` | **0.23** — decaying, but not extinguished |
+
+**H2 remains falsified, and the refinement is important**: `E_abs` is neither
+intensity-independent (H2) nor unbounded (the 10 ps reading in isolation). It is
+`f_abs(t)·I₀·t` with `f_abs` set by the target's *hydrodynamic* state. `TEST_PLAN.md` §2.4
+stands; the drive-duration law it asks Phase 3A to find now has a candidate mechanism.
+
+### H3 is CONFIRMED — α ≈ 1.5–2.4
+
+This is what the run was built for, and the 7 slab crossings delivered it. The bulk has
+**saturated**, so α is a measurement rather than a lower bound:
+
+| t [ps] | bulk (fwd, weight-weighted) | rms (weighted) |
+|---|---|---|
+| 25.0 | 0.00353 c | 0.00431 c |
+| 50.1 | 0.00540 c | 0.00651 c |
+| 75.1 | 0.00597 c | 0.00741 c |
+| **100.2** | **0.00622 c** | **0.00774 c** |
+
+`c_s` must come from the **measured** electron energy, not the implied `T_e,ab`: 66 % of the
+coupled energy is in ions by 100 ps, so `laser_report`'s implied `T_e,ab` = 2.775 keV (which
+assumes it is all electron thermal) is an upper bound and gives a spuriously low α. From
+`<KE_e>` = 822 eV ⇒ **`T_e` = 548 eV ⇒ `c_s` = 0.00327 c**:
+
+| measure | α = `v_p`/`c_s` |
+|---|---|
+| control-subtracted bulk | **1.52** |
+| bulk forward, weighted | **1.90** |
+| rms, weighted | **2.36** |
+| *(against the implied `T_e,ab` — a lower bound)* | *0.84 – 1.05* |
+
+**α ≈ 1.5–2.4, squarely inside H3's predicted 1–3.** The 10 ps run's α ≥ 0.46 was a lower
+bound exactly as diagnosed, and the extra crossings closed the gap. Since `<KE_e>` includes
+directed electron motion, `T_e` = 548 eV is itself an upper bound, so these α are still mild
+*lower* bounds.
+
+### Drive efficiency: the ion share triples
+
+| t [ps] | `E_e` [J] | `E_i` [J] | ion share | `T_e` [eV] |
+|---|---|---|---|---|
+| 10.0 | 2.37×10⁶ | 1.00×10⁶ | 29.7 % | 293 |
+| 50.1 | 5.06×10⁶ | 6.15×10⁶ | 54.9 % | 625 |
+| **100.2** | 4.38×10⁶ | **8.42×10⁶** | **65.8 %** | 548 |
+
+**62 % of the coupled energy ends up in ions** (8.42×10⁶ of 1.349×10⁷ `E_abs`) against 22.6 %
+at 10 ps — the ablation converting absorbed electron heat into directed ion motion, which is
+the quantity Phase 2 actually spends. `T_e` peaks near 625 eV at ~50 ps then *falls* as
+expansion cools it and energy transfers to ions.
+
+### Gate G3 holds at 10× the steps — grid heating does not accumulate
+
+| | driven | laser-off control | ratio |
+|---|---|---|---|
+| net particle-KE gain | **+1.1975×10⁷ J** | **−7 962 J** | **−0.066 %** |
+| weight lost | 1.1405 % | **0.0014 %** | — |
+
+Essentially identical to the 10 ps run's −0.07 %, over **ten times the step count**. That
+settles the worry that finite-grid heating would creep in over 1.024 M steps: it does not.
+The control's internal split is the same ambipolar signature, 4× larger but still cancelling
+(electrons −221.8 kJ, ions +213.9 kJ → net −8.0 kJ), not the shared net *gain* that grid
+heating would produce.
+
+### Gate G6: −9.56 % raw, and the deficit is fully accounted for
+
+| | value |
+|---|---|
+| `E_abs` (tracer) | 1.3486×10⁷ J |
+| particle-KE + field gain | 1.2196×10⁷ J |
+| **raw gap** | **−9.56 %** |
+| **boundary weight loss** | **1.1405 %** |
+
+Worse than the 10 ps run's −0.74 % at 0.0104 %, **as flagged in advance** — and it is
+boundary loss, not a violation. The arithmetic is self-consistent: the missing
+1.29×10⁶ J is 9.6 % of `E_abs`, carried out by 1.14 % of the mass, i.e. the escaping
+population has ~8.4× the mean specific energy — precisely a fast runaway tail. The sign is
+right too (particles+field hold *less* than `E_abs`, because WarpX does not report energy
+carried out by absorbed particles).
+
+**The loss is entirely late**, so there is a clean window for strict budgeting:
+
+| t [ps] | 25.0 | 50.1 | 75.1 | 100.2 |
+|---|---|---|---|---|
+| weight lost | **0.0000 %** | 0.0127 % | 0.2211 % | 1.1405 % |
+
+**Use t ≲ 50 ps for any strict energy-closure claim from this run.**
+
+### The domain was undersized for 100 ps — my extrapolation was too conservative
+
+Stated plainly because it bounds the result. The domain was sized from the 10 ps run's drift
+rates, but the real expansion is **faster**, because the target kept heating (`T_e` 293 → 625 eV):
+
+| t [ps] | occupied cells | span [d_e] (domain is [−3000, +2400]) |
+|---|---|---|
+| 0 | 526 | −81 … +181 |
+| 30.1 | 4 508 | −1 586 … +1 240 |
+| 50.1 | 8 059 | −2 942 … +2 388 |
+| **60.1 →** | 9 592 → **10 800** | **pinned at the walls** |
+
+From ~55 ps the tenuous plume edge is against both walls. It costs 1.14 % of the weight and
+the −9.56 % G6 gap, and it **truncates the percentile ion front**, which is why that measure is
+non-monotonic (0.0536 c at 30 ps → 0.0245 c at 100 ps: the fast particles are being absorbed,
+not slowing down). **The weight-weighted bulk is unaffected and is what the H3 numbers use.**
+A future 100 ps run should use ≥ ±5000 d_e; the scaling rule is that the plume edge advances
+at ~50 d_e/ps once `T_e` reaches ~600 eV, not the ~20 d_e/ps the 10 ps run showed.
+
+### Numerics
+
+`Tlocalfrac` 0.430 → **1.000**, saturated within ~2 ps and held for the whole run, so G5's
+≤ 0.31 % bias bound is real throughout. No errors, no instability, `ω_pe dt` never a concern
+(the target only ever *rarefies* from 1.5 `n_cr`).
 
 ## Retracted
 

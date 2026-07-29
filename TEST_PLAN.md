@@ -241,6 +241,53 @@ weight-weighted bulk gives α ≈ 0.46, but ~30 % of the slab is still cold at 1
 averaged in, so that is a **lower bound**. A fair test must restrict to the ablated population
 — which is what `plot_ablation.py` is for. **That is the next Phase-1 item.**
 
+### 2.5 REFINED 2026-07-29 by `P1_vac_1d_long` (100 ps) — the drive DOES decay, and H3 holds
+
+The 10 ps run could not see the end of the drive. The 100 ps run can, and it changes the
+conclusion in one important way while leaving H2 falsified.
+
+**There IS a drive-decay timescale: ~40 ps, and it is HYDRODYNAMIC.** `f_abs` holds its ≈ 0.24
+plateau to ~30 ps, then decays to 0.042 by 100 ps. The cause is unambiguous:
+
+| | t [ps] |
+|---|---|
+| peak `n_e` falls below `n_cr` (the turning point disappears) | **28.8** |
+| smoothed `f_abs` below 0.90 / 0.75 / 0.50 / 0.25 × plateau | 20 / 34 / **41.6** / 68.9 |
+
+So the drive ends because **the rarefaction thins the target below critical and the beam punches
+through** — not because a shutoff temperature is reached (H1's mechanism), and not never (the
+10 ps reading in isolation). `E_abs` = 1.349×10⁷ J/m², i.e. **57 %** of what a persistent 0.234
+plateau would have delivered; late/early `dE/dt` = 0.23.
+
+**H2 stays falsified**: `E_abs` is neither intensity-independent nor capacity-limited. The
+correct form is `E_abs = ∫f_abs(t)·I₀ dt` with `f_abs` set by the target's **hydrodynamic
+state**. This gives Phase 3A a concrete mechanism to test: `I₀` should set how *fast* the target
+rarefies (higher `I₀` → hotter → faster `c_s` → earlier `n_cr` crossing → shorter drive), so a
+**drive-duration law `t_drive(I₀)`** replaces H2's `t_s ∝ 1/I₀`. **H4's optimum may therefore
+survive after all, by a different route** than §2.3's capacity argument — this is now the
+sharpest thing Phase 3A can measure.
+
+**H1 should be restated.** There is no shutoff temperature to predict. The analogous quantity is
+what sets the **plateau level** (≈ 0.24 here) and the **`n_cr`-crossing time**.
+
+**H3 is CONFIRMED: α = 1.5–2.4, inside the predicted 1–3.** The bulk saturates
+(0.73 → 0.81 → 0.84 `c_s` over 50–100 ps), so it is a measurement, not a bound. Two cautions
+that the 10 ps run's α ≈ 0.46 shows are easy to get wrong:
+
+- **Use the measured electron energy for `c_s`, not `laser_report`'s implied `T_e,ab`.** By
+  100 ps **66 %** of the coupled energy is in *ions*, so an implied `T_e,ab` that assumes all of
+  it is electron thermal (2.775 keV) overestimates `c_s` by 2.3× and understates α to 0.84. From
+  `<KE_e>` = 822 eV ⇒ `T_e` = 548 eV ⇒ `c_s` = 0.00327 c ⇒ **α = 1.90** (1.52 control-subtracted,
+  2.36 by rms).
+- **Never use a percentile front.** It is contaminated by undriven expansion (the laser-off
+  control's own front reaches 0.0178 c) and, at late times, *truncated* by the boundary — the
+  driven front reads 0.0536 c at 30 ps but 0.0245 c at 100 ps because the fast ions have left.
+
+**Drive efficiency for Phase 2: 62 % of `E_abs` ends up in ion energy** (ion share of particle
+KE rises 29.7 % → 65.8 % between 10 and 100 ps). That, and `t_drive` ≈ 40 ps against the
+`5 ω_ci0⁻¹` = 38 ps that formation needs, are the two numbers Phase 2 inherits — and they say
+the margin is **thin**.
+
 ---
 
 ## 3. Architecture and working rules

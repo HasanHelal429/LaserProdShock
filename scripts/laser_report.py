@@ -48,22 +48,51 @@ def history_figure(cfg, sc, hist, run_id, run_dir):
 
     # --- absorbed fraction: the self-limiting shutoff ---
     ax = axes[0]
-    ax.plot(t_ps, f, color=lpp.C_LASER)
+    # Raw f_abs is violently spiky -- the corona is structured, so individual applications
+    # swing between ~0.1 and 1.0 -- and over 102 400 applications the raw trace reads as a
+    # solid block that hides both the plateau and the decay. Draw the raw series faint and
+    # a running median on top; the median is what the title's numbers are computed from.
+    ax.plot(t_ps, f, color=lpp.C_LASER, lw=0.5, alpha=0.25)
+    if (k := max(1, len(f) // 200)) > 1 and len(f) > 4 * k:
+        import numpy as _np
+        fa = _np.asarray(f, float)
+        if _np.isfinite(fa).any():
+            trim = (len(fa) // k) * k
+            med = _np.nanmedian(fa[:trim].reshape(-1, k), axis=1)
+            tm = _np.asarray(t_ps[:trim], float).reshape(-1, k).mean(axis=1)
+            ax.plot(tm, med, color=lpp.C_LASER, lw=1.8,
+                    label=f"running median ({k} applications)")
+            ax.legend(loc="upper right", fontsize=7.5)
     lpp.label_line(ax, t_ps[-1], f[-1], " f$_{abs}$", lpp.C_LASER)
     ax.set_ylabel("f$_{abs}$ = P$_{abs}$/P$_{inc}$")
-    # DESCRIPTIVE, computed from this run's own data -- the same rule the E_abs panel
-    # below already follows. The old fixed title asserted "then shuts itself off", which
-    # P1_vac_1d flatly contradicts: f_abs falls from 1.000 to a ~0.23 PLATEAU and keeps
-    # delivering for the remaining 97% of the run. A panel must not state a conclusion
-    # its own curve refutes.
+    # DESCRIPTIVE, computed from this run's own data -- a panel must never state a
+    # conclusion its own curve refutes (the original fixed title asserted "then shuts
+    # itself off", which P1_vac_1d disproved).
+    #
+    # Compare the late level to the PLATEAU, not to the peak. The peak is a sub-ps
+    # cold-target transient (f_abs = 1.000 here), so "late/peak" called P1_vac_1d_long a
+    # shutoff while the E_abs panel below simultaneously called it "still delivering" --
+    # two contradictory verdicts on one figure. The plateau is the physically meaningful
+    # reference, and both titles now derive from the same numbers so they cannot disagree.
+    plateau = late_fabs = None
     if f_fin := [v for v in f if v == v]:
         pk, fin = max(f_fin), f_fin[-1]
-        late = sum(f_fin[int(0.8 * len(f_fin)):]) / max(1, len(f_fin) - int(0.8 * len(f_fin)))
-        verdict = (f"decays to a PLATEAU at f$_{{abs}}$ ≈ {late:.2f}, not to zero — "
-                   f"the drive keeps delivering" if late > 0.05 * pk else
-                   f"SHUTS OFF (late f$_{{abs}}$ ≈ {late:.3f})")
+        n_f = len(f_fin)
+        mid = sorted(f_fin[int(0.05 * n_f):int(0.35 * n_f)])       # robust to spikes
+        plateau = mid[len(mid) // 2] if mid else pk
+        tail = sorted(f_fin[int(0.9 * n_f):])
+        late_fabs = tail[len(tail) // 2] if tail else fin
+        r = late_fabs / plateau if plateau else float("nan")
+        if r > 0.5:
+            verdict = (f"HOLDS a plateau at f$_{{abs}}$ ≈ {plateau:.2f} — "
+                       f"the drive is still at {r:.0%} of it")
+        elif r > 0.02:
+            verdict = (f"DECAYS {1/r:.0f}× from its {plateau:.2f} plateau to ≈ {late_fabs:.3f}, "
+                       f"but does not extinguish")
+        else:
+            verdict = f"SHUTS OFF (plateau {plateau:.2f} → {late_fabs:.4f})"
         title = (f"Absorbed fraction — K ∝ Z$_{{eff}}$lnΛ n$_e^2$ T$_e^{{-3/2}}$ is "
-                 f"self-limiting: peak {pk:.3f} → final {fin:.3f}, and it {verdict}")
+                 f"self-limiting: peak {pk:.3f}, and it {verdict}")
     else:
         title = "Absorbed fraction — laser off (I₀ = 0), nothing to report"
     ax.set_title(title, loc="left", fontweight="bold", fontsize=9.5)
@@ -107,10 +136,19 @@ def history_figure(cfg, sc, hist, run_id, run_dir):
                 if hist.t[-1] > hist.t[i2] else float("nan"))
         if early and early == early:
             r = late / early
-            verdict = (f" — late/early dE/dt = {r:.2f}: "
-                       + ("SATURATED (H2 holds here)" if r < 0.15 else
-                          f"NOT saturated; f$_{{abs}}$ floors near {min(f[n//2:]):.2f} "
-                          "rather than 0, so the drive keeps delivering"))
+            # Phrased from the SAME plateau/late numbers the f_abs panel above uses, so
+            # the two titles cannot give contradictory verdicts on one figure.
+            if r < 0.05:
+                how = "SATURATED — the drive has stopped (H2's shape)"
+            elif r < 0.5:
+                how = (f"DECAYING, not saturated: still {r:.0%} of the early rate"
+                       + (f" at f$_{{abs}}$ ≈ {late_fabs:.3f}"
+                          if late_fabs is not None else ""))
+            else:
+                how = (f"still delivering at {r:.0%} of the early rate — NOT saturated"
+                       + (f", f$_{{abs}}$ floored at ≈ {late_fabs:.2f}"
+                          if late_fabs is not None else ""))
+            verdict = f" — late/early dE/dt = {r:.2f}: {how}"
     ax.set_title("Cumulative coupled energy" + verdict, loc="left", fontweight="bold")
     lpp.style_axes(ax)
 

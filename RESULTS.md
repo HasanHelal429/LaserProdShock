@@ -740,3 +740,116 @@ and the bulk never approached z = +700.
 **Media.** `media/P1_vac_1d{,_off}/`: `checks`, `gates`, `laser_history`, `laser_profile`,
 `fields_streak`, `fields_lineouts`, `phase_space`, `movie_fields.mp4`, `movie_phase.mp4`;
 plus `media/P1_g3/compare.png` for the G3 subtraction.
+
+---
+
+## 2026-07-29 — `P1_vac_1d_long` (100 ps): **the drive DOES decay, hydrodynamically, at ~40 ps** — and **H3 is confirmed**
+
+`P1_vac_1d` + control re-run **10× longer** (1 024 000 steps = 100.18 ps) on a 2.7× larger
+domain ([−3000, +2400] d_e, 10 800 cells). 3 h 45 m / 3 h 10 m on the two RTX 4070s, zero
+errors, `--verify` OK, gates 4 pass / 0 warn / 0 fail. All four pre-run expectations confirmed,
+**including the mechanism**.
+
+### 1. The plateau closes, and the cause is the target going underdense
+
+| t [ps] | mean `f_abs` | `dE/dt` [J/m²/ps] | peak `n_e`/`n_cr` |
+|---|---|---|---|
+| 0–10 | 0.256 | 2.27×10⁵ | 1.54 |
+| 20–30 | 0.274 | 2.70×10⁵ | 0.93 ← crosses `n_cr` at **28.8 ps** |
+| 30–40 | 0.189 | 1.81×10⁵ | 0.40 |
+| 40–50 | 0.107 | 1.06×10⁵ | 0.25 |
+| 90–100 | **0.044** | 4.39×10⁴ | 0.090 |
+
+`f_abs` holds ≈ 0.24 to ~30 ps, then decays 5× to 0.042. **Peak `n_e` crosses `n_cr` at 28.8 ps
+— exactly where the plateau breaks.** Smoothed `f_abs` is at half the plateau by **41.6 ps**,
+a quarter by 68.9 ps. So the drive ends because the rarefaction thins the target below critical
+and the beam punches through with no turning point — **not** because a shutoff temperature is
+reached, and **not** never.
+
+`E_abs` = **1.349×10⁷ J/m²** = 57 % of what a persistent 0.234 plateau would have given;
+overall absorbed fraction 13.5 % (was 24.6 % over 10 ps); late/early `dE/dt` = 0.23.
+**H2 stays falsified**, with the correct form `E_abs = ∫f_abs(t)·I₀ dt`, `f_abs` set by the
+target's hydrodynamic state. `TEST_PLAN.md` §2.5 (new) re-scopes Phase 3A around a
+**drive-duration law `t_drive(I₀)`** — and notes H4's optimum may survive by that route.
+
+**For Phase 2 the margin is thin:** `t_drive` ≈ 40 ps against the `5 ω_ci0⁻¹` = 38 ps that
+formation needs.
+
+### 2. H3 CONFIRMED — α = 1.5–2.4
+
+The bulk saturates (0.73 → 0.81 → 0.84 `c_s` over 50–100 ps), so this is a measurement, not the
+lower bound the 10 ps run could offer. **Two ways to get it wrong, both now documented:**
+
+- **`c_s` must come from the measured electron energy.** 66 % of the coupled energy is in *ions*
+  by 100 ps, so `laser_report`'s implied `T_e,ab` = 2.775 keV (which assumes it is all electron
+  thermal) overstates `c_s` by 2.3× and gives a spurious α = 0.84. From `<KE_e>` = 822 eV ⇒
+  `T_e` = **548 eV** ⇒ `c_s` = **0.00327 c**:
+
+| measure | v_p | α |
+|---|---|---|
+| control-subtracted bulk | 0.00498 c | **1.52** |
+| bulk forward, weight-weighted | 0.00622 c | **1.90** |
+| rms, weight-weighted | 0.00774 c | **2.36** |
+
+- **Never a percentile front.** The control's own front reaches 0.0178 c, and the driven front is
+  *boundary-truncated* late — 0.0536 c at 30 ps but 0.0245 c at 100 ps, because the fast ions
+  left. Non-monotonic front ≠ deceleration.
+
+### 3. Drive efficiency triples: 62 % of `E_abs` ends up in ions
+
+| t [ps] | `E_e` [J] | `E_i` [J] | ion share | `T_e` [eV] |
+|---|---|---|---|---|
+| 10.0 | 2.37×10⁶ | 1.00×10⁶ | 29.7 % | 293 |
+| 50.1 | 5.06×10⁶ | 6.15×10⁶ | 54.9 % | 625 |
+| 100.2 | 4.38×10⁶ | **8.42×10⁶** | **65.8 %** | 548 |
+
+`T_e` **peaks near 625 eV at ~50 ps then falls** as expansion cools it and energy transfers to
+ions. Ion energy is 62 % of `E_abs` — the quantity Phase 2 spends.
+
+### 4. G3 holds at 10× the steps — grid heating does NOT accumulate
+
+Control net particle-KE gain **−7 962 J = −0.066 %** of the driven +1.1975×10⁷ J, statistically
+identical to the 10 ps control's −0.07 %. Absolute grew 4.7× while the driven gain grew 4.9×, so
+the **ratio is flat**. Still the ambipolar signature, not heating: electrons −221.8 kJ, ions
++213.9 kJ, net −8.0 kJ. **G2 (`dz/λ_D` = 61) is bounded for 1.024 M steps.**
+
+### 5. G6 = −9.56 %, and the deficit is accounted for — but the domain was undersized
+
+`E_abs` 1.3486×10⁷ J vs particle-KE + field gain 1.2196×10⁷ J at **1.1405 %** weight loss (10 ps
+run: −0.74 % at 0.0104 %). The arithmetic is self-consistent: the missing 1.29×10⁶ J is 9.6 % of
+`E_abs`, carried by 1.14 % of the mass ⇒ the escapers have ~8.4× mean specific energy, i.e. a
+fast runaway tail; and the sign is right (WarpX does not report energy leaving with absorbed
+particles). Loss is **entirely late** — 0.0000 % at 25 ps, 0.0127 % at 50, 0.2211 % at 75,
+1.1405 % at 100 — so **use t ≲ 50 ps for any strict closure claim from this run.**
+
+**My domain extrapolation was too conservative and this bounds the result.** Occupied cells went
+526 → 4 508 (30 ps) → 8 059 (50 ps) → **pinned at 10 800 from ~60 ps**: the plume edge sits
+against both walls for the last 45 % of the run. The 10 ps drift rates (~20 d_e/ps) understated
+it because the target kept heating (`T_e` 293 → 625 eV); the edge actually advances at
+**~50 d_e/ps** once `T_e` ≈ 600 eV. **A future 100 ps run needs ≥ ±5000 d_e.** The control, with
+no drive, lost only 0.0014 % — so **the domain requirement is set by the drive, not the geometry.**
+
+### 6. Why the runs took 1.8× their benchmark — two causes, separated
+
+Benchmarked 123 min, took 3 h 45 m. **(a) Host CPU starvation**: 2882 % demand on 32 cores (16
+`flash4` + an 8-thread CPU WarpX). A CUDA run is latency-bound on one host thread issuing kernel
+launches, so preemption idles the GPU — utilisation 71 % → 53 %, power 47–56 W of a 200 W cap.
+**Benchmarks assume an idle host.** **(b) Genuine plume spreading**: occupied cells 526 → 10 800
+(20×) at *flat* particle count, so deposition scatters over 20× the memory footprint.
+`warpx_rate` 0.0070 → 0.0132 driven and 0.0062 → 0.0111 in the control — **it slows with no
+laser at all**, which is how the two were separated. Roughly 1.5× physics × 1.3× contention.
+**`warpx.sort_intervals` is worth benchmarking on GPU** — `CLAUDE.md`'s "sorting is
+neutral-to-negative" is an inherited *CPU* result.
+
+### 7. Tooling
+
+`laser_report`'s two computed titles **contradicted each other** on this run — panel 1 said
+"SHUTS OFF", panel 2 said "the drive keeps delivering" — because panel 1 compared the late level
+to the *peak* (a sub-ps cold-target transient at 1.000) rather than to the plateau. Both titles
+now derive from one plateau/late pair and report three regimes (holds / decays N× / shuts off).
+The `f_abs` panel also gained a **running-median overlay**: across 102 400 applications the raw
+trace is a solid block, and the median is what makes the plateau's abrupt end at ~30 ps visible.
+
+**Media.** `media/P1_vac_1d_long{,_off}/` — `checks`, `gates`, `laser_history` (the headline),
+`laser_profile`, `fields_streak`, `fields_lineouts`, `phase_space`, `movie_fields.mp4`,
+`movie_phase.mp4`; plus `media/P1_long_g3/compare.png`.

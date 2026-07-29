@@ -67,8 +67,13 @@ indistinguishable to the gates; with no beam, `ray_cfl` is moot.
 
 Same grid and particle count as `P1_vac_1d_long` — 10 800 cells, 420 000 macroparticles,
 1 024 000 steps → 100.18 ps. Slightly cheaper in practice, since the ray trace and the per-cell
-temperature reduction never run. **~123 min**, on GPU 1 concurrently with the physics run on
-GPU 0.
+temperature reduction never run. Benchmarked at ~123 min; **actual 3 h 10 m** on GPU 1,
+concurrently with the physics run on GPU 0 (3 h 45 m). Both overran the benchmark because the
+host was CPU-saturated by unrelated jobs — a CUDA run is latency-bound on one host thread, so
+GPU utilisation fell to ~53 %. See `P1_vac_1d_long`'s Cost section for the full breakdown; this
+run was the cleaner measurement of the *other* cause, since **it slows down too with no laser
+at all** (`warpx_rate` 0.0062 → 0.0111 s/step), which is how plume-spreading was separated from
+host contention.
 
 Both use the **same backend deliberately**: CPU and GPU agree on integrated `E_abs` only to
 ~2.5 % (different `ParallelForRNG` streams), and comparing a GPU physics run to a CPU control
@@ -90,11 +95,58 @@ would fold that into the G3 subtraction.
 
 ## Media
 
-*(not generated yet)*
+- `media/P1_vac_1d_long_off/checks.png` — initial density from the deck's own `density_function`, predicted `K(z)`/`tau(z)`, and the gate table
+- `media/P1_vac_1d_long_off/fields_lineouts.png` — `n_e(z)` profiles at selected times
+- `media/P1_vac_1d_long_off/fields_streak.png` — `n_e` and `E_z` as (z,t) maps over 100 ps
+- `media/P1_vac_1d_long_off/gates.png` — the G1-G7 gate panel on its own
+- `media/P1_vac_1d_long_off/laser_history.png` — empty by construction — annotated "laser off"; `Tlocalfrac` falls to 0.001
+- `media/P1_vac_1d_long_off/laser_profile.png` — the step-0 density profile with zero deposition — the visual null
+- `media/P1_vac_1d_long_off/movie_fields.mp4` — evolving `n_e(z)` lineouts
+- `media/P1_vac_1d_long_off/movie_phase.mp4` — target-ion phase space over the full 100 ps
+- `media/P1_vac_1d_long_off/phase_space.png` — target-ion (z, u_z): the undriven expansion that must be subtracted
 
 ## Result
 
-*(running)*
+Ran **1 024 000/1 024 000 steps = 100.18 ps in 3 h 10 m** on GPU 1, zero errors, `--verify` OK.
+
+**VERDICT: grid heating does NOT accumulate. It is −0.066 % of the driven gain over 1.024
+million steps — statistically the same as the −0.07 % the 10 ps control measured.**
+
+| | this control | 10 ps control | `P1_vac_1d_long` |
+|---|---|---|---|
+| steps | 1 024 000 | 102 400 | 1 024 000 |
+| net particle-KE gain | **−7 962 J** | −1 696 J | **+1.1975×10⁷ J** |
+| as a share of the driven gain | **−0.066 %** | −0.07 % | — |
+| electrons / ions | −221.8 kJ / +213.9 kJ | −51.4 / +49.7 kJ | +3.97×10⁶ / +8.42×10⁶ J |
+| field-energy gain | 6 129 J | 1 530 J | 2.21×10⁵ J |
+| weight lost | **0.0014 %** | 0.0000 % | 1.1405 % |
+
+**This was the run's whole point and it answers cleanly.** The concern was that finite-grid
+heating at `dz/λ_D` = 61 might creep in over ten times the step count. It does not: the
+absolute number grew ~4.7× (−1.7 → −8.0 kJ) while the *driven* gain grew ~4.9× (2.42×10⁶ →
+1.20×10⁷ J), so the **ratio is unchanged**. Gate G2 is bounded for the 100 ps run exactly as
+well as for the 10 ps one.
+
+**And the sign is the discriminator, not the magnitude.** The change is still **negative**, and
+still the ambipolar electron→ion split: electrons lost 221.8 kJ while ions gained 213.9 kJ,
+cancelling to −8.0 kJ. Grid heating would appear as a net **gain shared by both species**. What
+this run shows is a 51 eV corona relaxing into vacuum for 100 ps — real physics, no drive.
+
+**The undriven expansion is not negligible and must be subtracted.** Weight-weighted forward
+bulk ion speed reaches 0.00124 c (0.17 `c_s`) against the driven run's 0.00622 c, so the
+control accounts for **20 %** of the driven bulk velocity. That is why the H3 numbers in
+`P1_vac_1d_long` quote a control-subtracted α (1.52) alongside the raw one (1.90). By the
+percentile front the contamination is far worse — the control's front reaches 0.0178 c at
+30 ps — which is the second confirmation of the rule that **piston speed comes from a
+weight-weighted bulk, never a percentile front**.
+
+`Tlocalfrac` runs 0.430 → **0.001**: with no absorption the operator has essentially no cell
+in which to measure a temperature, the complement of the driven run's saturation at 1.000.
+
+Boundary loss stayed at **0.0014 %** — a factor 800 below the driven run's 1.14 %. The
+driven plume is what reaches the walls; the undriven one barely moves. So the domain was
+oversized for *this* run and undersized for its partner, which is itself a useful calibration:
+**the domain requirement is set by the drive, not by the geometry.**
 
 ## Retracted
 

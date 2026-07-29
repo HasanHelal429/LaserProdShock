@@ -203,12 +203,36 @@ not, and work while a run is still going.
   cells (a rounding error next to the particle push in 1D). Rear-face truncation pays off
   when an *ambient* fills the cushion at 48 ppc; with no ambient, spend the cells on genuine
   free surfaces at both faces instead. It is also why a 10 ps vacuum run is affordable.
-- **Absorption FLOORS, it does not shut off — so `t_s` from a half-peak crossing is a lie.**
-  `P1_vac_1d`: `f_abs` 1.000 → a **plateau ≈ 0.23**, `E_abs` still rising at 10 ps
-  (late/early `dE/dt` = 0.41; 99 % of `E_abs` arrives by 9.90 ps of a 10.02 ps run). The
-  half-peak crossing reads 0.25 ps and means only "fell onto the plateau". **H2 is falsified**
-  — `E_abs ≈ f_abs·I₀·t`, so `E_abs ∝ I₀`, not intensity-independent (`TEST_PLAN.md` §2.4).
-  Quote the **plateau level and `dE/dt`**, never a shutoff time.
+- **Absorption FLOORS onto a plateau, then decays HYDRODYNAMICALLY when the target goes
+  underdense. A half-peak `t_s` is meaningless here.** `f_abs` 1.000 → plateau ≈ 0.24 → 0.042
+  at 100 ps (`P1_vac_1d_long`). The decay is caused by the rarefaction taking peak `n_e` below
+  `n_cr` — measured at **28.8 ps**, with `f_abs` at half its plateau by **41.6 ps** — so the
+  beam punches through with no turning point. **Not** H1's shutoff temperature, and **not**
+  never (which is all 10 ps could show). **H2 stays falsified**: `E_abs = ∫f_abs(t)·I₀ dt`
+  with `f_abs` set by the target's hydrodynamic state (`TEST_PLAN.md` §2.4–2.5). Quote the
+  **plateau level, the `n_cr`-crossing time and `dE/dt`** — never a half-peak shutoff time.
+- **`c_s` must come from the MEASURED electron energy, not `laser_report`'s implied `T_e,ab`.**
+  That number assumes all coupled energy is electron thermal, but **66 % of it is in ions** by
+  100 ps, so it overstates `c_s` by 2.3× and understates α to 0.84. Use `<KE_e>` from the `EP`
+  reduced diag: `T_e = (2/3)<KE_e>` ⇒ 548 eV ⇒ `c_s` = 0.00327 c ⇒ **α = 1.5–2.4, so H3 is
+  CONFIRMED** (predicted 1–3). Ion energy is 62 % of `E_abs` — the drive efficiency Phase 2 spends.
+- **A non-monotonic ion front means particles LEFT, not that the piston decelerated.** The
+  driven percentile front read 0.0536 c at 30 ps but 0.0245 c at 100 ps purely because the fast
+  tail was absorbed at the wall. Another reason fronts are the wrong `v_p` measure.
+- **In a driven vacuum run the plume edge advances at ~50 d_e/ps once `T_e` ≈ 600 eV** — far
+  faster than the ~20 d_e/ps a 10 ps run extrapolates, because the target keeps heating. Sizing
+  `P1_vac_1d_long`'s domain from 10 ps drift rates left the plume pinned against both walls for
+  the last 45 % of the run (1.14 % weight loss, G6 −9.56 %). **A 100 ps vacuum run needs
+  ≥ ±5000 d_e**, and the requirement is set by the **drive**, not the geometry — the laser-off
+  control on the same domain lost only 0.0014 %.
+- **GPU benchmarks assume an IDLE host.** A CUDA run is latency-bound on one host thread issuing
+  kernel launches, so a loaded box starves it: at 2882 % CPU demand on 32 cores the 100 ps runs
+  took 1.8× their benchmark, GPU utilisation fell 71 % → 53 % and power sat at 47–56 W of 200 W.
+  Separately, cost grows *during* a vacuum run as the plume spreads (occupied cells 526 → 10 800
+  at flat particle count ⇒ deposition scatters over 20× the memory footprint); the laser-off
+  control slows too, which is how to tell the two apart. **`warpx.sort_intervals` is worth
+  benchmarking on GPU** — the "sorting is neutral-to-negative" note below is an inherited *CPU*
+  result and should not be assumed to hold on the device.
 - **The coronal scale length sets the absorption REGIME, not just the amount.** `L_n/w_t`
   0.19 → 0.75 (`L_n` 15 → 60 d_e at `w_t` = 80) took τ-to-the-turning-point from 0.14 to 5.60,
   i.e. optically thin → thick, and `f_abs(0)` from 0.248 to **1.000**. At `L_n` = 60 the ray is
