@@ -1,0 +1,140 @@
+meta:
+  run_id: P1_vac_2d_spot
+  phase: 1
+  deck: inputs_P1_vac_2d_spot
+  description: Phase-1 finite-spot 2D run -- the first test of a LOCALIZED laser spot
+    (TEST_PLAN 7.2, hypothesis H5). Identical target, laser wavelength, PEAK intensity,
+    Z_eff*lnLambda, coronal scale length, resolution, cfl and ppc as the planar 2D run
+    P1_vac_2d and the 1D baseline P1_vac_1d_thick; the beam is a Gaussian of 1/e intensity
+    radius 20 d_e instead of a uniform plane wave, and the transverse box is +-80 d_e (4x
+    the waist) instead of +-16, so the beam is negligible at the transverse walls as the
+    Phase-0 finite-spot rule requires. The question is how fast LATERAL rarefaction --
+    which no 1D or planar run can have -- degrades the on-axis drive.
+  reference: TEST_PLAN.md 7.2 and H5 (2.3); parent P1_vac_2d; 1D baseline P1_vac_1d_thick;
+    transverse-wall rule from P0_bc_2d_open; runs with the FIXED operator (warpx-cda c817b63)
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 14400
+  beam:
+    profile: gaussian
+    waist_de: 20
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 400
+    scale_length_de: 60
+    center_de: -200
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 2
+  normal_axis: z
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  axis:
+    lo_de: -400
+    hi_de: 700
+  transverse:
+    lo_de: -80
+    hi_de: 80
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: periodic
+      hi: periodic
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 144000
+  ppc:
+    target: 36
+    ambient: 36
+
+diagnostics:
+  plotfile_intervals: 14400
+  field_intervals: 1800
+  phase_intervals: 7200
+  reduced_intervals: 360
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+
+controls:
+  laser_off: P1_vac_2d_spot_off
+  planar_2d: P1_vac_2d
+  planar_1d_baseline: P1_vac_1d_thick
+  parent_geometry: P1_vac_2d
+  transverse_wall_rule: P0_bc_2d_open (a transverse boundary alters the density deposited in
+    the outer two columns, which for a near-critical target changes their ray physics at
+    t = 0; the rule is to use a beam that is negligible at the walls and to exclude the
+    outer two columns from analysis)
+  ray_cfl_ladder: studies/exit_overshoot (ray_cfl 0.05-1.0; total absorbed low by
+    0.1-2.0%, no net energy creation; per-cell aliasing rms 0.73% -> 20%)
+
+targets:
+  waist_convention: laser_deposition.beam_waist is the 1/e radius of the INTENSITY, not the
+    field -- LaserDeposition.cpp applies I = I0*exp(-(r^2/w^2)^order) with order = 1 for
+    profile = gaussian. So w0 = 20 d_e = 3.35 um, FWHM = 2*sqrt(ln2)*w0 = 33.3 d_e, and the
+    total power per unit length is I0*w0*sqrt(pi) = 5.94e12 W/m, i.e. the same as a uniform
+    beam 35.4 d_e wide. `intensity` is the PEAK, matching P1_vac_2d on axis at t = 0, which
+    is what makes any later on-axis difference a 2D effect rather than a power difference.
+  expect: on-axis f_abs(t) and n_e(z) should track P1_vac_1d_thick while the lateral
+    rarefaction has not yet crossed the spot, and fall below it afterwards. The crossing
+    time is w0/c_s with c_s from the MEASURED electron energy (not laser_report's implied
+    T_e,ab) -- T_e ~ 300 eV at these times gives c_s = 0.0024 c = 4.3 d_e/ps, so t_cross =
+    w0/c_s ~ 4.6 ps and the 9.96 ps run covers ~2.2 crossing times. Lateral flow from the
+    spot edge reaches the transverse wall at (80-20)/4.3 = 14 ps > t_end, so the periodic
+    images do not interact within the run -- CHECK THAT POST-RUN, it is the run's main
+    validity condition.
+  degradation_measure: compare the ENERGY-INTEGRATED E_abs and the on-axis (|x| < 0.25 w0)
+    quantities against P1_vac_1d_thick at matched PHYSICAL time (dumps at 43200-step
+    multiples coincide with the 1D run's 30560-step dumps to 0.1%), never the median f_abs
+    across dimensionalities -- that estimator differs by 48% where the energy-integrated
+    figure differs by 12% (RESULTS 2026-07-29).
+  transverse_structure: expected and physical this time -- a Gaussian spot must produce a
+    transverse deposition profile. The falsifiable statement is that the deposition profile
+    at t = 0 matches I0*exp(-x^2/w0^2) to shot noise, and that the two EDGE columns carry
+    exp(-16) = 1.1e-7 of the peak, i.e. nothing. Edge columns carrying a percent-level share
+    would mean the transverse-wrap fix (warpx-cda c817b63) is incomplete.
+  ppc_caveat: 36 ppc (6x6) as in P1_vac_2d -- G5's absorption-bias bound is 3.5% and the
+    laser-off control's excursion was -3.09% of the driven gain at this ppc (vs -0.066% at
+    400), so quote P1_vac_2d_spot_off beside any few-percent number from this run.
+  domain_note: the axial hi face is +700 d_e, not P1_vac_2d's +1200, and this is justified by
+    MEASUREMENT rather than by taste -- in P1_vac_1d_thick the 1e-4 n_cr plume front sits at
+    384 d_e at 8.97 ps and 541 d_e at 11.96 ps, and 99% of P_abs is below 160 d_e at 8.97 ps,
+    so nothing dense reaches +700 within 9.96 ps. It matters because the eikonal ray march is
+    SERIAL HOST CODE costing path/(ray_cfl*dz) RK4 steps per ray -- cutting 500 d_e of vacuum
+    off the front of every one of the 320 rays is a ~30% saving on the dominant cost, and
+    with 5x the columns of P1_vac_2d this run cannot afford the vacuum P1_vac_2d flew through.
+  cost_note: 320 transverse columns x 2200 axial cells; ~26.8M macroparticles (5x P1_vac_2d).
+    BENCHMARKED, not scaled -- see the run README's Cost section.

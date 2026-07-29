@@ -1,0 +1,111 @@
+meta:
+  run_id: P1_vac_2d_spot_off
+  phase: 1
+  deck: inputs_P1_vac_2d_spot_off
+  description: Gate-G3 laser-off control for P1_vac_2d_spot. Byte-for-byte the same deck
+    except laser.intensity = 0, same 9.96 ps, same 320 x 2200 grid. It cannot be inherited
+    from P1_vac_2d_off -- that control has 64 transverse columns, and grid heating depends on
+    the grid and on the macroparticle statistics, so a control run on a 5x smaller box does
+    not bound this one. It is also the only way to tell a genuine transverse structure in the
+    finite-spot run from shot noise, which is exactly the service P1_vac_2d_off performed for
+    the planar run (it proved the 5 percent ripple there was noise, not filamentation).
+  reference: TEST_PLAN.md 7.2; parent P1_vac_2d_spot; control convention from P1_vac_2d_off
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 0.0
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 14400
+  beam:
+    profile: gaussian
+    waist_de: 20
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 400
+    scale_length_de: 60
+    center_de: -200
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 2
+  normal_axis: z
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  axis:
+    lo_de: -400
+    hi_de: 700
+  transverse:
+    lo_de: -80
+    hi_de: 80
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: periodic
+      hi: periodic
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 144000
+  ppc:
+    target: 36
+    ambient: 36
+
+diagnostics:
+  plotfile_intervals: 14400
+  field_intervals: 1800
+  phase_intervals: 7200
+  reduced_intervals: 360
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+
+controls:
+  physics_run: P1_vac_2d_spot
+  planar_2d_control: P1_vac_2d_off
+  planar_1d_baseline: P1_vac_1d_thick
+  parent_geometry: P1_vac_2d_spot
+  ray_cfl_ladder: studies/exit_overshoot (moot at intensity 0; declared so this deck stays
+    identical to P1_vac_2d_spot in every respect the gates can see)
+
+targets:
+  note: The beam profile is still declared gaussian with the same waist, because
+    tests/test_structures.py renders both decks and diffs them line by line -- a control is
+    only a control if the ONLY difference is the intensity. At intensity 0 the profile has no
+    effect (P0_ray = 0 for every ray, so no ray is traced at all).
+  expect_no_piston: true
+  discriminator: the SIGN of the net particle-KE change. Grid heating is a net GAIN shared by
+    both species; the 1D and planar-2D controls instead measured a NEGATIVE net, dominated by
+    an ambipolar electron-to-ion transfer that cancels. At 36 ppc the planar control's
+    excursion was -3.09 percent of its driven gain, 47x the -0.066 percent measured at 400
+    ppc, so this run is what sets the error bar on any few-percent claim from the spot run.
+  transverse_noise_floor: with 36 ppc split over two species the per-cell shot-noise floor on
+    n_e is 1/sqrt(72) = 11.8 percent. Any transverse structure the DRIVEN run shows must beat
+    what this control shows before it can be called laser-driven.

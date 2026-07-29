@@ -22,6 +22,7 @@ python scripts/<script>.py <run_dir> [options]
 | `make_inputs.py` | `config.yaml` → deck (`--verify`, `--check`) | `config.yaml` | `inputs_<id>` | **built** |
 | `run_checks.py` | Derived scales + numerical gates G1–G7 + a pre-run figure | `config.yaml`, `run.log`, reduced diags | `media/<ID>/checks.png`, `gates.png` | **built** |
 | `laser_report.py` | `LASERDEP` history + per-cell profile dumps → `f_abs(t)`, `E_abs`, `t_s`, `Tlocalfrac` | `run.log`, `diags/laserdep_profile_*.txt` | `media/<ID>/laser_*.png` | **built** |
+| `spot_report.py` | **Finite-spot transverse diagnostics** -- deposition vs the analytic `I(x)`, `w_eff(t)`, on-axis `f_ax(t)`, edge-column regression | `config.yaml`, `diags/laserdep_profile_*.txt`, `run.log` | `media/<ID>/spot_*.png` | **built** |
 | `plot_fields.py` | (z,t) streaks of `n_e`/`B_y`/`E_z`, lineouts, 2D x–z map | `config.yaml`, plotfiles | `media/<ID>/fields_*.png` | **built** |
 | `phase_space.py` | **The arbiter** — ion (z, u_z), reflected-ion population | `config.yaml`, plotfiles | `media/<ID>/phase_space.png` | **built** |
 | `make_movies.py` | Movies: evolving lineouts + laser cursor, phase space, 2D map | `config.yaml`, plotfiles | `media/<ID>/movie_*.mp4` | **built** |
@@ -97,6 +98,45 @@ python scripts/run_progress_logger.py runs/P1/P1_vac_1d --every-pct 5 --poll 20
 
 
 ---
+
+## `spot_report.py`
+
+**The only script that keeps the transverse direction.** Every other analysis here reduces `x`
+away, which is right for a planar run -- there, transverse structure is noise or a bug -- and
+useless for a finite spot, where it is the subject.
+
+```bash
+python scripts/spot_report.py runs/P1/P1_vac_2d_spot
+python scripts/spot_report.py runs/P1/P1_vac_2d_spot --baseline runs/P1/P1_vac_1d_thick
+```
+
+Three things it measures, in order of how much trouble they save:
+
+1. **`f_ax`, the on-axis local absorbed fraction** (absorption inside `|x| < w0/4` divided by the
+   incident power in those same columns). Quote **this**, not the whole-beam `f_abs`, against a 1D
+   run. The whole-beam figure mixes two opposite finite-spot effects: lateral rarefaction lowers
+   coupling, while the cooler wings (lower `I`, so less heating, so higher `K` proportional to
+   `T_e^-3/2`) raise it -- and at early times the second one wins, so a Gaussian reads *above* a
+   flat-top of the same peak intensity. That is not the drive being better.
+2. **`w_eff(t)`**, the second-moment width of the absorbed-power profile, normalised so a
+   `exp(-(x/w)^2)` beam returns `w`. This is the lateral-spreading rate H5 is about.
+3. **The edge-column share, as a standing regression test** for the transverse-wrap fix
+   (`warpx-cda` c817b63). An unilluminated wall must carry `exp(-(x_wall/w0)^2)` and nothing more;
+   the script prints that prediction next to the measurement. The bug the fix removed only switched
+   on *after* structure developed (3.2 % of absorption in the edge columns at `t` = 0 -> 98.8 % at
+   26.9 ps), so a step-0 check cannot catch a regression -- which is why the whole dump series is
+   tracked, and why a finite-spot run doubles as the regression test for free.
+
+Two implementation notes that were bugs first:
+
+- **The dumps are written box by box, not row-major.** The operator gathers the field to one rank
+  and walks its `MFIter`, so the row order is the AMReX box decomposition. Reshaping to `(nx, nz)`
+  silently transposes patches of the domain; the reader scatters by rounded cell index instead, and
+  refuses to continue if the cell count does not match the grid.
+- **A column integral of `P_abs` is W per metre**, matching `laserprod.io.incident_power`'s 2D
+  convention, so only the dimensionless ratio is comparable to 1D. `incident_power` already
+  integrates the Gaussian profile over the face, so `f_abs` is correct for a spot deck with no
+  special-casing.
 
 ## Figure conventions
 
