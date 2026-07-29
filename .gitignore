@@ -6,6 +6,9 @@ runs/**/diags_movie/
 # --- studies scratch (WarpX variant runs, regenerable from the runner) ---
 studies/**/scratch/
 
+# --- preserved pre-optimisation WarpX binaries (45 MB, rebuildable from the commit) ---
+studies/ray_march_perf/baseline_bin/
+
 # --- any media (figures, movies and their frame scratch: all regenerable) ---
 media/
 
