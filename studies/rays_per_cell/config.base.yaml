@@ -1,0 +1,95 @@
+meta:
+  run_id: OVERRIDDEN
+  phase: 1
+  deck: OVERRIDDEN
+  description: Base config for the rays_per_cell sub-ray sampling ladder. Byte-identical
+    to runs/P1/P1_vac_2d_spot apart from max_step = 2 and the run_id, because ONLY
+    THE STEP-0 PROFILE DUMP IS NEEDED -- the measurement is of the operator own transverse
+    sampling of the Gaussian against the initial, analytically known density, where
+    the right answer is I0*exp(-(x/w0)^2) with no fitting. A ladder at a DEVELOPED
+    plume would be a different (and ~100x more expensive) study; whether it is needed
+    is decided by the ac1 column of scripts/spot_report.py on the physics run itself.
+  reference: TEST_PLAN.md 7.2 (rays_per_cell convergence belongs with the finite-spot
+    run); parent runs/P1/P1_vac_2d_spot
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e18
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 14400
+  beam:
+    profile: gaussian
+    waist_de: 20
+    rays_per_cell: 1
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 400
+    scale_length_de: 60
+    center_de: -200
+    shape: planar
+    theta_e_init: 0.0001
+    theta_i_init: 1.0e-06
+  ambient: null
+field:
+  orientation: none
+  vA_over_c: 0.0
+geometry:
+  dims: 2
+  normal_axis: z
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  axis:
+    lo_de: -400
+    hi_de: 700
+  transverse:
+    lo_de: -80
+    hi_de: 80
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: periodic
+      hi: periodic
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 2
+  ppc:
+    target: 36
+    ambient: 36
+diagnostics:
+  plotfile_intervals: 14400
+  field_intervals: 1800
+  phase_intervals: 7200
+  reduced_intervals: 360
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+controls:
+  parent_run: runs/P1/P1_vac_2d_spot
+  note: the ladder overrides laser.beam.rays_per_cell only; every other key is the
+    physics run value so the result transfers to it
+targets:
+  expect: rays_per_cell = 1 launches one ray per transverse cell from the cell centre,
+    so it samples the Gaussian at 0.5 d_e spacing over a w0 = 20 d_e waist -- 40 samples
+    per waist, which should already be converged in the MEAN. The prediction is therefore
+    that the mean ratio to the analytic profile is unchanged to <0.1 percent while
+    the column-to-column SCATTER falls, because scatter is set by how far individual
+    rays wander, not by how many there are.
+  falsified_by: a change in the mean absorbed power or in the measured 1/e radius
+    with rays_per_cell -- that would mean one ray per cell mis-samples the beam profile
+    itself, and the finite-spot run would need re-running at higher sampling.

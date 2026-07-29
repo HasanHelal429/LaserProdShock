@@ -160,6 +160,38 @@ class SpotDump:
         inc = float((np.exp(-((self.xs[m] / w0) ** 2))).sum()) * self.dx * self.sc.intensity
         return float(self.Pcol[m].sum()) / inc if inc > 0 else float("nan")
 
+    def roughness(self, k=9):
+        """Column-to-column scatter about a smooth trend, and its lag-1 autocorrelation.
+
+        This is the cheap test of WHETHER a `rays_per_cell` convergence study is needed.
+        Sub-cell ray sampling matters when ray wander becomes COHERENT -- rays bending
+        systematically into density valleys, as refractive self-channelling would do. A
+        random exchange of power between neighbouring columns instead shows up as scatter
+        that is anti-correlated at lag 1 (one column loses what the next one gains) and it
+        averages out of any multi-column measure. Positive autocorrelation growing with
+        time is the signature that would demand the ladder; that is a measurement, not an
+        assumption, and it costs nothing.
+        """
+        y = self.Pcol
+        if y.sum() <= 0 or len(y) < 4 * k:
+            return float("nan"), float("nan")
+        # QUADRATIC (Savitzky-Golay) trend, not a boxcar. A boxcar mean of a curved
+        # profile sits below its centre value wherever the profile is convex, and the
+        # Gaussian's own curvature then leaks into the residual as a POSITIVE lag-1
+        # correlation -- which is exactly the signature this measure exists to detect. A
+        # local quadratic removes curvature to O(h^4), so what is left is the scatter.
+        h = k // 2
+        o = np.arange(-h, h + 1, dtype=float)
+        A = np.vstack([np.ones_like(o), o, o * o]).T
+        ker = np.linalg.pinv(A)[0]              # value of the fit at the window centre
+        trend = np.convolve(y, ker[::-1], mode="valid")
+        core = y[h: h + len(trend)]
+        keep = trend > 1e-4 * max(trend.max(), 1e-300)      # only where the beam is
+        r = (core[keep] / trend[keep]) - 1.0
+        if len(r) < 4:
+            return float("nan"), float("nan")
+        return float(r.std()), float(np.corrcoef(r[:-1], r[1:])[0, 1])
+
     def front_face(self, z_lo, z_hi):
         """Transverse n_e and T_e[eV] averaged over an axial band (the front face)."""
         m = (self.zs >= z_lo) & (self.zs <= z_hi)
@@ -357,7 +389,7 @@ def main() -> int:
 
     hdr = (f"{'t [ps]':>8} {'f_abs':>8} {'f_ax':>7} {'w_eff/w0':>9} {'x_cen':>7} "
            f"{'edge share':>11} {'core<w0':>8} {'z50':>7} {'z99':>7} "
-           f"{'ne_ax':>8} {'Te_ax[eV]':>10}")
+           f"{'ne_ax':>8} {'Te_ax[eV]':>10} {'rough':>7} {'ac1':>6}")
     print("\n" + hdr)
     print("-" * len(hdr))
     dumps = []
@@ -367,11 +399,18 @@ def main() -> int:
         _, z50, z99 = d.axial(0.25 * w0)
         ne, te = d.front_face(-10 * sc.de_ref, 10 * sc.de_ref)
         ax_m = np.abs(d.xs) < 0.25 * w0
+        rough, ac1 = d.roughness()
         print(f"{d.t*1e12:8.3f} {d.total/P_inc:8.4f} {d.f_axis(w0):7.4f} "
               f"{d.w_eff/w0:9.4f} "
               f"{d.centroid/sc.de_ref:7.2f} {d.edge_share():11.3e} "
               f"{d.core_share(w0):8.4f} {z50/sc.de_ref:7.1f} {z99/sc.de_ref:7.1f} "
-              f"{ne[ax_m].mean()/sc.n_cr:8.4f} {te[ax_m].mean():10.1f}")
+              f"{ne[ax_m].mean()/sc.n_cr:8.4f} {te[ax_m].mean():10.1f} "
+              f"{rough*100:6.2f}% {ac1:+6.2f}")
+
+    print("  rough = column-to-column scatter about a 9-column trend; ac1 = its lag-1\n"
+          "  autocorrelation. ac1 < 0 means power is exchanged between NEIGHBOURS (random\n"
+          "  ray wander, averages out of f_ax). ac1 turning positive and growing is what\n"
+          "  would demand a rays_per_cell ladder -- coherent refractive channelling.")
 
     d0, dl = dumps[0], dumps[-1]
     wall_expect = (2.0 * math.exp(-((float(d0.xs[0]) / w0) ** 2)) * d0.dx
