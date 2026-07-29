@@ -943,3 +943,93 @@ that still asserted the H2 "shuts off / intensity-independent" picture.
 **Media.** `media/P1/P1_vac_2d{,_off}/` and `media/P1/P1_vac_1d_thick/` — `checks`, `gates`,
 `laser_history`, `laser_profile`, `fields_streak`, `fields_lineouts`, `fields_map2d`,
 `phase_space`, `movie_fields.mp4`, `movie_phase.mp4`, `movie_map2d.mp4`.
+
+
+---
+
+## 2026-07-29 — `studies/spot_leak_ppc`: the finite-spot "7 % leak" is **two** effects, one artifact and one real
+
+`runs/P1/P1_vac_2d_spot` puts ~7 % of its absorbed power outside 2.5 beam waists, where the launch
+profile has 0.2 %. The ppc pair (36 vs 144, everything else fixed; target thinned to 100 `d_e` and
+`t_end` cut to 1 ps so 144 ppc fits in 12 GB) was launched to decide artifact-or-physics. It
+decided both, because the single number contained two effects with different ppc scalings.
+
+Full write-up and the reproducing command in `studies/spot_leak_ppc/README.md`. 36 ppc ran 14 400
+steps in 1103 s, 144 ppc in 2331 s.
+
+### `t` = 0 is exact, and identical at both ppc
+
+Before the plasma evolves, `T_e` and `n_e` are uniform, so the absorbed-power profile must be the
+intensity profile. It is: `w_eff/w₀` = **1.0000**, `f_ax` = **0.9999**, `f(1w₀)` = **0.9973**,
+`f(2w₀)` = **1.0009**, leak beyond 2.5 `w₀` = **0.00041** (the launch Gaussian's own tail). The
+same five numbers at 36 and 144 ppc. A quantity that does not move when the particle count
+quadruples is **geometry, not statistics** — so this is the first transverse measurement in the
+campaign with no `1/√ppc` floor, and it is now the Tier-2 acceptance baseline for Phase 1.5
+(`TEST_PLAN.md` §7.5.4). Third independent confirmation of `warpx-cda` c817b63.
+
+### The far-wing leak: noise, and it scales as a POWER
+
+| `t` [ps] | leak 36 ppc | leak 144 ppc | ratio |
+|---|---|---|---|
+| 0.249 | 0.0156 | 0.0039 | **×0.25** |
+| 0.498 | 0.0466 | 0.0125 | **×0.27** |
+| 0.747 | 0.0299 | 0.0146 | ×0.49 |
+
+×4 particles halves a noise *amplitude* (the ripple at `n_cr` went 9.32 % → 4.56 %, ×0.49 against
+×0.50 predicted; the peak `n_e` excess ×0.43). Weakly scattered *power* goes as that amplitude
+squared, so ×0.25 — which is what the first two dumps give. Independently, the wings absorb
+**4.1–4.3× the light incident on them** (`f(2w₀)` ≫ 1), and no column can absorb power that never
+fell on it, so the pedestal is transported core light. The leak is an artifact.
+
+**But do not extrapolate the saturated state.** By 0.75 ps the law breaks: the 36 ppc leak *turns
+over* (0.0466 → 0.0299) while 144 ppc still rises. The saturated corona is not weakly scattering,
+so the ppc at which `f_ax` converges is **bounded** by this pair, not predicted by it. Two points
+cannot claim convergence.
+
+### The ~1.5× broadening: real, thermal, and it must survive
+
+`w_eff/w₀` is 1.000 at `t` = 0 and grows to 1.62 (36 ppc) / 1.52 (144 ppc) — it does not scale with
+ppc, so it is not the noise. Cause, by elimination and then by direct measurement:
+
+- **not density.** Transverse `n_e` stays flat to **0.6 %** at every dump. And 0.75 ps of
+  `c_s` ≈ 1.7×10⁵ m/s is 0.13 µm = 4 % of a waist, so it *could* not have responded.
+- **temperature.** `T_e` = **248 eV on axis vs 126 eV at two waists** (36 ppc; 271/115 at 144).
+  Inverse bremsstrahlung goes as `T_e^{−3/2}`, so **the spot suppresses its own coupling where it
+  is brightest**, and the deposition profile ends up ~1.5× wider than the beam that made it.
+
+Two consequences for H5 that outlive this study:
+
+1. **the heated radius is not `w₀`.** A waist-`w₀` spot heats a ~1.5 `w₀` profile, so
+   `t_cross = w₀/c_s` *understates* the crossing time and the peak `T_e` is below what a
+   `w₀`-wide deposition would give.
+2. **`f_ax` is not `f_abs`.** 0.39 against 0.63 here. Quoting a whole-beam absorbed fraction for a
+   finite spot overstates what the axis receives by **60 %**.
+
+### What this costs the 36 ppc runs already taken
+
+`f_ax` reads 0.329 where 144 ppc reads 0.393 — **36 ppc under-reports the on-axis coupling by 16 %
+of its own value**. The *sign* settles the cause: the 36 ppc axis is **cooler** (248 vs 271 eV),
+which alone would *raise* its absorption, so the deficit is scattering loss out of the core rather
+than a thermal difference. The two effects push opposite ways, which is what makes them separable.
+Only the **ratio** transfers to the headline run; the 0.329 does not (thinner target, 1 ps).
+
+### An unplanned cross-check on Phase 1.5's premise
+
+The march is independent of ppc, the particle work is proportional to it, so from 1103 s and 2331 s:
+ppc-independent cost **694 s**, particle work at 36 ppc **409 s** → march share **62.9 % at 36 ppc**,
+**29.8 % at 144**. The 694 s *bounds the march from above* (it also holds the field solve and
+diagnostics), and it lands within three points of the **65.6 %** the profiler reported on the
+physics run. Two independent routes to the same number, so §7.5 is resting on a measurement that
+reproduces.
+
+It also marks a limit Phase 1.5 cannot lift: **a faster march does not buy ppc.** 144 ppc at the
+headline geometry does not fit in 12 GB — which is why this study had to thin the target — and that
+is a memory bound the march has no bearing on. Phase 1.5 buys transverse extent and sweep points;
+converging `f_ax` needs a bigger card or a smaller box.
+
+### Verdict
+
+Hypothesis (`the leak is a resolution artifact and falls with ppc`) **confirmed**. The lesson is
+the one §2.8 already taught in a different costume: a single summary number — here 7 % "in the
+wrong place" — held an artifact and a real physical effect together, and treating it as one thing
+would have optimised the physics away with the noise.

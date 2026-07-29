@@ -2,3 +2,10 @@
 # logging_started 2026-07-29T11:56:07  total_steps=144000  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
 2026-07-29T11:56:37 | 190/144000 ( 0.1%) | 0h00m | 0.1579 s/step(wall) | 0.1409 s/step(warpx) | ETA ~6h18m | x1.12 | load 17.9 | laser 0.997 of peak, Eabs 0.078 J
+2026-07-29T12:30:07 | 14600/144000 (10.1%) | 0h34m | 0.1395 s/step(wall) | 0.1395 s/step(warpx) | ETA ~5h00m | x1.00 | load 18.6 | laser 0.568 of peak, Eabs 4.225 J
+2026-07-29T13:04:39 | 28930/144000 (20.1%) | 1h08m | 0.1446 s/step(wall) | 0.1420 s/step(warpx) | ETA ~4h37m | x1.02 | load 25.3 | laser 0.531 of peak, Eabs 7.462 J
+2026-07-29T13:39:42 | 43330/144000 (30.1%) | 1h43m | 0.1461 s/step(wall) | 0.1433 s/step(warpx) | ETA ~4h05m | x1.02 | load 18.4 | laser 0.501 of peak, Eabs 10.52 J
+2026-07-29T14:13:17 | 57795/144000 (40.1%) | 2h17m | 0.1392 s/step(wall) | 0.1423 s/step(warpx) | ETA ~3h20m | x0.98 | load 18.3 | laser 0.480 of peak, Eabs 13.5 J
+2026-07-29T14:46:52 | 72170/144000 (50.1%) | 2h50m | 0.1402 s/step(wall) | 0.1419 s/step(warpx) | ETA ~2h47m | x0.99 | load 28.0 | laser 0.496 of peak, Eabs 16.41 J
+2026-07-29T15:21:29 | 86580/144000 (60.1%) | 3h25m | 0.1441 s/step(wall) | 0.1422 s/step(warpx) | ETA ~2h17m | x1.01 | load 18.7 | laser 0.495 of peak, Eabs 19.3 J
+2026-07-29T15:55:37 | 100960/144000 (70.1%) | 3h59m | 0.1424 s/step(wall) | 0.1423 s/step(warpx) | ETA ~1h42m | x1.00 | load 21.3 | laser 0.506 of peak, Eabs 22.17 J

@@ -321,6 +321,32 @@ not, and work while a run is still going.
   65×. `P1_vac_1d` lost 0.68 % of macroparticles but only **0.0104 % of the weight**, because
   the escapers are the tenuous corona tail. That is why G6 finally closed (**−0.74 %**) where
   Phase 0 could only report +218 %/+235 %.
+- **A finite spot heats a profile ~1.5× WIDER than it is illuminated with, and that is real.**
+  `w_eff/w₀` is 1.000 at `t` = 0 and 1.5–1.6 by 1 ps, at *both* 36 and 144 ppc, while the
+  transverse `n_e` stays flat to 0.6 % (and 0.75 ps of `c_s` is 4 % of a waist, so density could
+  not have responded). What changed is `T_e` — 248 eV on axis against 126 eV at 2 `w₀` — and
+  inverse bremsstrahlung goes as `T_e^{−3/2}`, so **the spot suppresses its own coupling where it
+  is brightest**. Consequences: `t_cross = w₀/c_s` *understates* the crossing time, and
+  **`f_ax` is not `f_abs`** (0.39 vs 0.63) — a whole-beam absorbed fraction overstates what the
+  axis receives by 60 %. Do not "fix" this broadening; it shares a profile with the shot-noise
+  leak below but scales differently.
+- **The transverse leak in a spot run is shot noise, and it scales as a POWER not an amplitude.**
+  ×4 ppc halved the ripple at `n_cr` (9.32 → 4.56 %) but cut the far-wing leak **×0.25** at 0.25
+  and 0.5 ps — because weakly scattered power goes as `δn²`. The tell that it is transported
+  rather than absorbed light: the wings take in **4.1–4.3× the power incident on them**. It also
+  costs a number you might quote — 36 ppc under-reports `f_ax` by **16 %** — and the *sign*
+  identifies the mechanism, since the 36 ppc axis is *cooler* and so should absorb *more*. By
+  0.75 ps the `δn²` law fails (the 36 ppc leak turns over while 144 ppc rises), so **two ppc
+  points bound the requirement and cannot claim convergence**.
+- **The step-0 spot profile is the one transverse check with NO shot-noise floor.** `w_eff/w₀`
+  1.0000, `f_ax` 0.9999, `f(1w₀)` 0.9973, `f(2w₀)` 1.0009, leak 0.00041 — *identical* at 36 and
+  144 ppc, so it is geometry and the tolerance is the print precision. Use it, not a driven
+  total, to regression-test anything that touches the ray march.
+- **A faster ray march does not buy ppc.** 144 ppc at the spot geometry does not fit in 12 GB;
+  that is a memory bound the march has no bearing on. Cost decomposes as
+  `T = M + P·ppc` — from 1103 s (36 ppc) and 2331 s (144 ppc), `M` = 694 s, so the march is
+  **62.9 % at 36 ppc but only 29.8 % at 144** (and 694 s bounds it from above, since `M` also
+  holds the field solve). Optimising the march buys transverse extent and sweep points.
 - **A `_off` control must differ ONLY in `laser.intensity`.** Grid heating accumulates with
   step count and depends on the grid, the ppc and the species, so any other difference makes
   the G3 subtraction meaningless. `tests/test_structures.py` renders both decks and diffs

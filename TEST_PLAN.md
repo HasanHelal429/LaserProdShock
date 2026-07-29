@@ -928,9 +928,22 @@ known analytically rather than to shot noise.
 | `P1_vac_2d_spot` | the Gaussian spot, 320 columns | per-column profile vs analytic `I₀exp(−(x/w₀)²)`: mean ratio **1.00010 ± 0.0002**, column-to-column scatter **2.54 % ± 0.1**, lag-1 autocorrelation **−0.51 ± 0.03**, 2 edge columns / peak column **2.33×10⁻⁷ ± 5 %** |
 | `P1_vac_2d_spot` | total, as a cross-check only | absorbed `5.940787×10¹²` W/m vs analytic `I₀w₀√π`, agreement **≤ 3×10⁻⁵** (it is 2.2×10⁻⁵ today) |
 | `P1_vac_2d` (invalid physics, valid cost) | the 89 %-vacuum geometry | O2's win must appear here as ~9×, and the step-0 column profile must stay flat to shot noise |
+| `spot_leak_ppc` `t` = 0, either variant | that the deposition is an exact image of the beam, with **no shot-noise allowance at all** | `w_eff/w₀` **1.0000**, `f_ax` **0.9999**, `f(1w₀)` **0.9973**, `f(2w₀)` **1.0009**, leak > 2.5 `w₀` **0.00041** |
 
 `scripts/spot_report.py` already prints every Tier-2 number; the acceptance test is a diff of its
 output, not a new script.
+
+The `spot_leak_ppc` row is the sharpest transverse criterion in the suite and deserves its
+reasoning stated: those five numbers came out **identical at 36 and 144 ppc** (2026-07-29, see
+`studies/spot_leak_ppc/README.md`). A quantity that does not move when the particle count
+quadruples is geometry, not statistics — so unlike every other transverse number in this campaign
+it carries no `1/√ppc` floor, and the tolerance is the precision it is printed to rather than a
+noise budget. Any change to the ray march that shifts these has changed the operator.
+
+Its companion warning for Tier 3: `w_eff/w₀` grows from 1.000 to ~1.5 by 1 ps because inverse
+bremsstrahlung goes as `T_e^{−3/2}` and the spot suppresses its own coupling on the hot axis. That
+is **real physics and must survive the optimisation** — it is not the shot-noise leak that sits in
+the same profile, and an O2 vacuum threshold set carelessly could flatten it.
 
 **Tier 3 — time-integrated agreement on a real slice.** Re-run 1–3 ps slices of
 `P1_vac_1d_thick` and `P1_vac_2d_spot` and compare against the runs on disk:
@@ -1167,6 +1180,18 @@ boundaries, is the project's headline output.
 - [ ] Self-similar rarefaction / Schaeffer Eq. 1 recovered
 - [ ] `P1_vac_2d` planar reproduces 1D on axis
 - [ ] `P1_vac_2d` finite spot: `w₀` scan, `rays_per_cell` convergence, H5
+- [x] `studies/rays_per_cell/` — sub-ray convergence: scatter RISES x4.4 from rpc 1 to 4
+      (my written prediction was falsified); `ac1` negative at every dump, so the developed-plume
+      ladder is unnecessary and rpc 1 stands
+- [x] `studies/spot_leak_ppc/` — the 7 % transverse leak is **two** effects. The far-wing
+      pedestal is macroparticle noise (falls x0.25 = the noise POWER at 0.25/0.50 ps, and the
+      wings absorb 4x the light incident on them, so it is transported core light). The ~1.5x
+      broadening of the absorbed profile is **real and thermal**: `w_eff/w₀` = 1.000 at `t` = 0,
+      transverse `n_e` flat to 0.6 %, `T_e` 2.0x hotter on axis, and IB goes as `T_e^{−3/2}` — the
+      spot suppresses its own coupling where it is brightest. Consequences: 36 ppc under-reports
+      `f_ax` by 16 %, the heated radius is ~1.5 `w₀` not `w₀`, and `f_ax` (0.39) is not `f_abs`
+      (0.63). Unsettled: the converging ppc (2 points, and the weak-scattering law fails by
+      0.75 ps)
 
 **Phase 1.5 — the ray march (a CODE phase, §7.5)**
 - [ ] O3: cache the redundant end-of-step `sample()` (6 -> 5 per step, bit-identical)
