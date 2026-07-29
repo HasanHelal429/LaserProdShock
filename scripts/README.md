@@ -23,6 +23,7 @@ python scripts/<script>.py <run_dir> [options]
 | `run_checks.py` | Derived scales + numerical gates G1–G7 + a pre-run figure | `config.yaml`, `run.log`, reduced diags | `media/<ID>/checks.png`, `gates.png` | **built** |
 | `laser_report.py` | `LASERDEP` history + per-cell profile dumps → `f_abs(t)`, `E_abs`, `t_s`, `Tlocalfrac` | `run.log`, `diags/laserdep_profile_*.txt` | `media/<ID>/laser_*.png` | **built** |
 | `spot_report.py` | **Finite-spot transverse diagnostics** -- deposition vs the analytic `I(x)`, `w_eff(t)`, on-axis `f_ax(t)`, edge-column regression | `config.yaml`, `diags/laserdep_profile_*.txt`, `run.log` | `media/<ID>/spot_*.png` | **built** |
+| `g3_spot.py` | works; validated | G3 restricted to the illuminated columns, from plotfiles. Whole-box column reproduces `ParticleEnergy` to 0.000 % |
 | `plot_fields.py` | (z,t) streaks of `n_e`/`B_y`/`E_z`, lineouts, 2D x–z map | `config.yaml`, plotfiles | `media/<ID>/fields_*.png` | **built** |
 | `phase_space.py` | **The arbiter** — ion (z, u_z), reflected-ion population | `config.yaml`, plotfiles | `media/<ID>/phase_space.png` | **built** |
 | `make_movies.py` | Movies: evolving lineouts + laser cursor, phase space, 2D map | `config.yaml`, plotfiles | `media/<ID>/movie_*.mp4` | **built** |
@@ -206,3 +207,39 @@ what went wrong, and `--keep-frames` retains them deliberately for debugging.
 
 Encoding is libx264 with `-pix_fmt yuv420p` and an even-dimension scale filter, both
 required for the result to play in a browser.
+
+
+## `g3_spot.py` — G3 where the light actually went
+
+The standard G3 subtraction uses the `ParticleEnergy` reduced diagnostic, which is a
+whole-domain total. For a **finite spot** that is structurally unfair: `P1_vac_2d_spot` drives
+a `w₀` = 20 `d_e` beam inside a ±80 `d_e` box, so ~78 % of the transverse extent is never lit.
+The driven gain is diluted by the dark region while grid heating — a property of the grid and
+the ppc, not of the beam — fills the whole box, so the whole-box ratio overstates the control.
+
+This script re-computes the same quantity from the plotfiles, which have positions, and reports
+three regions: **illuminated** (`|x−x_c| < waists·w₀`), **dark** (`> 2.5 w₀`, where the beam
+puts 0.04 % of its power at `t` = 0 — so it is a control-free grid-heating measure), and
+**whole box** (so the effect of restricting is visible rather than asserted).
+
+```bash
+python scripts/g3_spot.py runs/P1/P1_vac_2d_spot --control runs/P1/P1_vac_2d_spot_off
+```
+
+**Two self-tests run every time, and both must be read before quoting the restricted number:**
+
+1. **the whole-box column must reproduce `ParticleEnergy`.** It does, to **0.000 %**
+   (+60.258 and −1.8615 J/m on the `P1_vac_2d` pair). An independent code path measuring the
+   same thing is the only reason to believe the restricted column.
+2. **a `profile: uniform` run must give the same G3 in every region.** On `P1_vac_2d` the three
+   regions spread **0.02 percentage points**. Run it on the planar pair after any change here.
+
+### Two traps this script exists downstream of
+
+* `lpio.plotfiles(rd)` **with no prefix** matches `diag1*`, `diag_fields*` and `diag_phase*`
+  alike, so a `{step: path}` dict keeps whichever sorted last. Pass `--prefix` (default
+  `diag1`, the only family with the full particle record).
+* a particle-field read wrapped in `except: continue` contributes **zero** when the field is
+  absent. That is how the family mix-up first presented: a confident, smooth, *positive*
+  control ratio of +17.16 %, i.e. apparent grid heating, instead of −3.09 %. Missing species
+  and missing fields are now hard errors naming the fix.

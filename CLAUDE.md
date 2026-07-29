@@ -347,6 +347,20 @@ not, and work while a run is still going.
   `T = M + P·ppc` — from 1103 s (36 ppc) and 2331 s (144 ppc), `M` = 694 s, so the march is
   **62.9 % at 36 ppc but only 29.8 % at 144** (and 694 s bounds it from above, since `M` also
   holds the field solve). Optimising the march buys transverse extent and sweep points.
+- **`lpio.plotfiles(rd)` without a prefix silently mixes three diagnostic families.** The
+  default prefix `"diag"` is a prefix of `diag1*`, `diag_fields*` AND `diag_phase*`, so a
+  `{step: path}` dict built from it keeps whichever came last and quietly reads the wrong dumps.
+  Only `diag1*` carries the full particle record (`particle_momentum_{x,y,z}`,
+  `particle_weight`); `diag_phase*` carries **none** of `targ_electrons`' fields. Every other
+  script passes an explicit prefix — do the same. And never wrap a particle-field read in
+  `except: continue`: a missing field then contributes **zero**, which turns a wrong-family
+  mistake into a confident fabricated number (it produced a *positive* G3 control ratio, i.e.
+  apparent grid heating, before the cross-check caught it).
+- **Cross-check any new whole-domain measurement against `ParticleEnergy` before restricting
+  it.** `scripts/g3_spot.py` computes G3 from plotfiles so it can be restricted to the
+  illuminated columns; its whole-box column reproduces the reduced diagnostic to **0.000 %**,
+  and that agreement — not the plausibility of the restricted number — is what makes the
+  restricted number quotable.
 - **A `_off` control must differ ONLY in `laser.intensity`.** Grid heating accumulates with
   step count and depends on the grid, the ppc and the species, so any other difference makes
   the G3 subtraction meaningless. `tests/test_structures.py` renders both decks and diffs
