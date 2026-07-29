@@ -137,6 +137,36 @@ class SpotDump:
             return float("nan")
         return float(self.Pcol[0] + self.Pcol[-1]) / self.total
 
+    def leak_share(self, w0, k=2.5):
+        """Share of absorption OUTSIDE |x| > k*w0 -- power that left the spot.
+
+        This, not the edge-column share, is the finite-spot number. Rays scatter off the
+        transverse density ripple near the critical surface, where `n_ref = sqrt(1 -
+        n_e/n_cr)` -> 0 amplifies a gradient by 1/n_ref, and with periodic transverse faces
+        the scattered light wraps and fills the box. The result is a broad flat PEDESTAL,
+        which an edge-column statistic reports as if it were a boundary pile-up: at 1 ps in
+        P1_vac_2d_spot the edge share read 4e-4 (10^5 above its t=0 value, alarming) while
+        the actual wall columns sat BELOW their inward neighbours. Two measures, two
+        distinct failure modes -- keep both.
+        """
+        if self.total <= 0 or not w0:
+            return float("nan")
+        m = np.abs(self.xs) > k * w0
+        return float(self.Pcol[m].sum()) / self.total
+
+    def wall_ratio(self, n_edge=2, lo=10, hi=30):
+        """(mean of the outermost n_edge columns) / (mean of columns lo..hi inward).
+
+        The pile-up detector, insensitive to a broad pedestal: the clamp bug of
+        warpx-cda pre-c817b63 drove this to 20-25, an unilluminated wall on a smooth
+        profile keeps it at or below 1.
+        """
+        if self.total <= 0:
+            return float("nan")
+        edge = 0.5 * (self.Pcol[:n_edge].mean() + self.Pcol[-n_edge:].mean())
+        inner = 0.5 * (self.Pcol[lo:hi].mean() + self.Pcol[-hi:-lo].mean())
+        return float(edge / inner) if inner > 0 else float("nan")
+
     def core_share(self, w):
         """Fraction of all absorption inside |x| < w of the beam centre."""
         if self.total <= 0 or not w:
@@ -388,7 +418,7 @@ def main() -> int:
           f"{math.exp(-((xw/w0)**2)):.2e} of peak")
 
     hdr = (f"{'t [ps]':>8} {'f_abs':>8} {'f_ax':>7} {'w_eff/w0':>9} {'x_cen':>7} "
-           f"{'edge share':>11} {'core<w0':>8} {'z50':>7} {'z99':>7} "
+           f"{'leak>2.5w0':>11} {'wall/in':>8} {'core<w0':>8} {'z50':>7} {'z99':>7} "
            f"{'ne_ax':>8} {'Te_ax[eV]':>10} {'rough':>7} {'ac1':>6}")
     print("\n" + hdr)
     print("-" * len(hdr))
@@ -402,7 +432,8 @@ def main() -> int:
         rough, ac1 = d.roughness()
         print(f"{d.t*1e12:8.3f} {d.total/P_inc:8.4f} {d.f_axis(w0):7.4f} "
               f"{d.w_eff/w0:9.4f} "
-              f"{d.centroid/sc.de_ref:7.2f} {d.edge_share():11.3e} "
+              f"{d.centroid/sc.de_ref:7.2f} {d.leak_share(w0):11.4f} "
+              f"{d.wall_ratio():8.2f} "
               f"{d.core_share(w0):8.4f} {z50/sc.de_ref:7.1f} {z99/sc.de_ref:7.1f} "
               f"{ne[ax_m].mean()/sc.n_cr:8.4f} {te[ax_m].mean():10.1f} "
               f"{rough*100:6.2f}% {ac1:+6.2f}")
@@ -416,10 +447,15 @@ def main() -> int:
     wall_expect = (2.0 * math.exp(-((float(d0.xs[0]) / w0) ** 2)) * d0.dx
                    * sc.intensity / max(d0.total, 1e-300))
     print("\nTRANSVERSE BOUNDARY (standing regression test for warpx-cda c817b63)")
-    print(f"  edge share  t=0: {d0.edge_share():.3e}   t={dl.t*1e12:.2f} ps: "
-          f"{dl.edge_share():.3e}   an unilluminated wall predicts {wall_expect:.3e}")
-    print("  the pre-fix planar run went 3.2e-2 -> 9.88e-1 over 26.9 ps, so anything "
-          "above ~1e-3 here means the wrap is leaking again")
+    print(f"  wall/interior column ratio   t=0: {d0.wall_ratio():.2f}   "
+          f"t={dl.t*1e12:.2f} ps: {dl.wall_ratio():.2f}     (clamp bug drove this to 20-25)")
+    print(f"  raw edge-column share        t=0: {d0.edge_share():.3e}   "
+          f"t={dl.t*1e12:.2f} ps: {dl.edge_share():.3e}  (unilluminated wall: "
+          f"{wall_expect:.3e})")
+    print("  The RATIO is the regression test, not the share. A growing share with a ratio "
+          "at or\n  below 1 is light scattered out of the spot filling the box (see the "
+          "leak column), which\n  is a physics/ppc question; a ratio of 20+ is the index "
+          "clamp coming back.")
 
     launch = sc.intensity * np.exp(-((d0.xs / w0) ** 2)) * d0.dx
     sel = np.exp(-((d0.xs / w0) ** 2)) > 1e-3
@@ -465,16 +501,21 @@ def main() -> int:
             if m.sum() and mb.sum():
                 print(f"{a*1e12:6.2f}-{b*1e12:6.2f} {f[m].mean():10.4f} "
                       f"{fb[mb].mean():10.4f} {f[m].mean()/fb[mb].mean():8.4f}")
-        # On-axis degradation at the dump times: the H5 curve. The baseline f_abs is
-        # noisy application-to-application (10.4 % 1-sigma on f_abs(0) across seeds), so
-        # compare a local mean of it, not a single application.
-        print(f"\n{'t [ps]':>8} {'f_ax (spot)':>12} {'f_abs (1D)':>11} {'ratio':>8}")
+        # On-axis degradation at the dump times: the H5 curve. Both sides are noisy --
+        # the baseline is a SINGLE ray per application (10.4 % 1-sigma on f_abs(0) across
+        # RNG seeds, RESULTS 2026-07-28) and the spot's f_ax averages ~10 columns of a
+        # profile whose column-to-column scatter reaches 20 %. So average the baseline
+        # over +-HALF_WIN rather than reading one application, and print how many
+        # applications went into each mean so the reader can size the error bar.
+        HALF_WIN = 0.10e-12
+        print(f"\n{'t [ps]':>8} {'f_ax (spot)':>12} {'f_abs (1D)':>11} {'ratio':>8} "
+              f"{'n_1D':>6}")
         for d in dumps:
-            wnd = (tb >= d.t - 0.02e-12) & (tb <= d.t + 0.02e-12)
+            wnd = (tb >= d.t - HALF_WIN) & (tb <= d.t + HALF_WIN)
             if wnd.sum() and d.t <= tb[-1]:
                 b = fb[wnd].mean()
                 print(f"{d.t*1e12:8.3f} {d.f_axis(w0):12.4f} {b:11.4f} "
-                      f"{d.f_axis(w0)/b:8.4f}")
+                      f"{d.f_axis(w0)/b:8.4f} {int(wnd.sum()):6d}")
         mi, mbi = t <= t_end, tb <= t_end
         e, eb = _trapz(f[mi], t[mi]), _trapz(fb[mbi], tb[mbi])
         print(f"  time-integrated coupling to t = {t_end*1e12:.2f} ps: "
