@@ -56,9 +56,63 @@ measured cost of the serial host-side ray march for 320 rays.
 | G3 net particle-KE change | | post-run |
 | G6 energy closure / weight lost | | post-run |
 
+## Cost (measured)
+
+144 000 steps in **2 h 48 m** on one RTX 4070 at 0.0702 s/step, against the driven run's
+0.140 s/step. The ratio is the measurement: **50 % of a driven 2D step is the serial host-side
+eikonal ray march** for 320 rays, and it is the reason a finite-spot run costs what it does.
+26 823 000 macroparticles (5.0x `P1_vac_2d_off`), 320 x 2200 = 704 000 cells.
+
 ## Result
 
-(pending)
+`--verify` OK. Zero errors, all 144 000 steps, t = 9.961 ps.
+
+### 1. G3 passes: the net particle-KE change is NEGATIVE, as in every control here
+
+| | value |
+|---|---|
+| net particle KE | **−3.325 J/m** (75.416 -> 72.091) |
+| target electrons / ions | **−2.542 / −0.783 J/m** |
+| electron *mean* KE | −4.8 % (1.22798e−17 -> 1.16953e−17 J) |
+| ion *mean* KE | **−1.6e−5 %** (1.22746e−17 -> 1.22744e−17 J) |
+| weight lost | 2.077 % |
+| macroparticles lost | 3.816 % |
+
+Negative and carried almost entirely by the electrons, so this is the ambipolar/expansion
+signature again, **not grid heating** — which would be a net gain shared by both species. G2
+(`dz/λ_D` = 61.2) therefore stays bounded at this box size, at 36 ppc, for 144 000 steps.
+
+Note the weight/macroparticle split (2.08 % vs 3.82 %, a factor 1.8): the escapers are the
+tenuous corona tail, as in `P1_vac_1d`, so quote the **weight**.
+
+### 2. The number that matters for the finite-spot run: THE RIPPLE IS SHOT NOISE
+
+This is what the control was really for. The transverse `n_e` ripple, with **no beam at all**:
+
+| t [ps] | 0 | 1.0 | 2.0 | 3.0 | 4.0 | 5.0 | 6.0 | 7.0 | 8.0 | 9.0 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| at the critical surface | 0.07 % | 8.15 | 8.39 | 8.31 | 10.15 | 9.86 | 9.84 | 10.80 | 10.28 | 10.16 |
+| at z = 50 `d_e` | 0.07 % | 9.42 | 9.08 | 9.26 | 10.11 | 10.94 | 9.83 | 10.31 | 10.23 | 10.83 |
+
+The driven run measures **9.43 %** at the critical surface at 1 ps. The control gives 8.15 % with
+no laser. So the ripple is **laser-independent macroparticle shot noise** — 36 electrons per cell
+is a 16.7 % floor, smoothed by `particle_shape = 2`, and `NUniformPerCell` starts on a quiet
+sub-cell lattice (0.07 %) and fills in to Poisson within a plasma period.
+
+That matters because `n_ref = √(1 − n_e/n_cr)` → 0 at the critical surface, so the eikonal ray
+equation amplifies a transverse density gradient by `1/n_ref`: this noise is what refracts light
+out of the finite spot (the 7 % pedestal in `P1_vac_2d_spot`). The control turns "the ripple looks
+like the shot-noise floor" into a measurement — exactly the service `P1_vac_2d_off` performed when
+it proved the planar run's 5 % ripple was noise rather than filamentation.
+
+### 3. A finite spot makes G3's subtraction relatively worse, and the fix is spatial
+
+−3.325 J/m has to be set against the driven run's gain, and the **drive only covers ~35 `d_e` of
+a 160 `d_e` box** while this ambipolar excursion covers all of it. Against the whole box the
+control is a much larger fraction of the driven gain than the planar run's −3.09 % was, for a
+reason that has nothing to do with the drive. **G3 for a finite spot must be evaluated on the
+illuminated columns**, from the plotfiles, not on the box-total `EP` reduced diagnostic — see the
+driven run's README.
 
 ## Retracted
 
