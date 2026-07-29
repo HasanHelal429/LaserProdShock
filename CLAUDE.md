@@ -212,6 +212,34 @@ not, and work while a run is still going.
   never (which is all 10 ps could show). **H2 stays falsified**: `E_abs = ∫f_abs(t)·I₀ dt`
   with `f_abs` set by the target's hydrodynamic state (`TEST_PLAN.md` §2.4–2.5). Quote the
   **plateau level, the `n_cr`-crossing time and `dE/dt`** — never a half-peak shutoff time.
+- **⚠️ 2D IS BLOCKED by an operator BUG: rays that drift past a periodic transverse boundary are
+  clamped into the edge column.** In `LaserDeposition.cpp`, `deposit()` (~line 739) does
+  `idx[d] = min(max(ii, lo3[d]), hi3[d])` — clamping in *every* dimension — while the ray march's
+  exit test (line 893) checks **only the propagation axis**. So a transversely-deflected ray is
+  neither wrapped nor terminated; it marches on outside the domain and dumps its remaining power
+  into column 0 or N−1. In `P1_vac_2d` (exactly planar: uniform beam, periodic transverse) the two
+  edge columns' share of all absorption went **3.2 % at t = 0 (= 2/64, correct) → 73 % at 3 ps →
+  98.8 % at 26.9 ps**, and net absorption ran **+12 %** above matched 1D. Not a plumbing error
+  otherwise: 1D and 2D agree on absorbed power at t = 0 to **2×10⁻⁵** and on weight loss to 0.2 %.
+  The deflection itself is benign — the G3 control shows the same ~5 % transverse density ripple
+  with **no beam** (PIC shot noise; the start is quiet, 0.06 %). **It will not converge away** —
+  ppc, `rays_per_cell` and smoothing are irrelevant to a deterministic clamp. Fix upstream: wrap
+  periodic dimensions via `geom.periodicity()`, terminate on non-periodic transverse faces.
+  **1D is unaffected** (no transverse dimension to drift into). `TEST_PLAN.md` §2.7.
+- **Diagnose non-uniformity from the PATTERN, not the variance.** rms/mean = 4.17 was equally
+  consistent with smooth refractive channelling and with an edge pile-up, and I first asserted the
+  former — which would have wasted GPU time on a convergence study of a deterministic bug. Printing
+  the per-column profile showed two hot edge columns and 62 flat ones, which is a boundary
+  signature and pointed straight at the index clamp. **Always look at the spatial profile.**
+- **Compare energy-integrated `E_abs` or the mean across dimensionalities — NEVER the median.**
+  The 5–25 ps median `f_abs` differed 1D vs 2D by **48 %** where the energy-integrated figure
+  differed by **12 %**: 2D sums 64 rays so its distribution is smooth and median ≈ mean, while
+  1D's single ray is spiky and median ≪ mean. The median difference was an estimator artifact.
+- **A `_off` control is worth more than its energy budget.** `P1_vac_2d_off` is what proved the 2D
+  transverse structure was shot noise rather than laser-driven filamentation — a question that
+  would otherwise have been unresolvable speculation. Also: at 36 ppc its excursion is **−3.09 %**
+  of the driven gain against **−0.066 %** at 400 ppc (47× larger), so quote it beside any
+  few-percent 2D number.
 - **Target thickness is a DRIVE-DURATION knob, and it trades against piston speed.** A 5×
   thicker target keeps the peak above `n_cr` for the whole run (it even *compresses*, to 1.92
   `n_cr`) where the 80 d_e target crossed at 28.8 ps and lost its plateau — so thickness extends

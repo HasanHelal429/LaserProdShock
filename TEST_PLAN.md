@@ -6,7 +6,10 @@
 `ParticleHeater` + `TargetInjector` piston surrogate that `KinShock2020` used to replicate
 Schaeffer et al. 2020.
 
-**Status.** **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
+**Status.** **Phase 1's 2D path is BLOCKED** (2026-07-29) — the planar validation fails on a located
+**operator bug** — rays that drift past the periodic transverse boundary are clamped into the edge
+column, so 98.8 % of absorption ends up in 2 of 64 columns; see §2.7. Phase 1 in **1D** is complete and its findings (§2.4–2.6) already overturn H2 and H3's
+thickness clause. **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
 done, and the boundary decision recorded (`open` on the propagation axis + periodic
 transverse; B₀ uniform to 1.000000 under pec).
 The config schema (§3), the deck renderer, gates G1–G7, the laser diagnostics and the
@@ -334,6 +337,76 @@ the rear-boundary density fell 37 %, and the truncation was sound. Truncation al
 energy budget: **6.13 % weight loss at 30 ps** against 1.14 % at 100 ps untruncated, so
 **G6 cannot be closed tightly on a truncated run** — strict closure claims must come from
 untruncated runs.
+
+### 2.7 BLOCKER 2026-07-29 — **the 2D planar validation FAILS on an operator BUG: rays clamped at the transverse boundary**
+
+`P1_vac_2d` (uniform beam, periodic transverse, therefore *exactly planar*) against its matched
+1D baseline `P1_vac_1d_thick`. §7.2 makes this the gate on every 2D physics claim, and it does
+not pass.
+
+**Not a plumbing bug.** At t = 0 the two agree on total absorbed power per unit area to
+**2×10⁻⁵** (1.0000×10¹⁸ vs 9.9998×10¹⁷ W/m²), and boundary weight loss matches to **0.2 %**
+(6.133 % vs 6.146 %). Ray launch, power apportionment over 64 rays, deposition mapping and the
+boundaries are all correct.
+
+**What fails.** Column-integrated `P_abs` across the 64 transverse columns, which must be uniform
+to shot noise for a planar configuration:
+
+| t [ps] | 0 | 2.99 | 8.97 | 20.92 | 26.90 |
+|---|---|---|---|---|---|
+| `P_abs` column rms/mean | **0.021** | 4.02 | 4.17 | 5.09 | **5.53** |
+
+At 8.97 ps the columns span **0.10× to 25.2× the mean — a factor of 250** — and it **grows**
+while the density noise does not.
+
+**The cause is a located BUG, not physics.** The non-uniformity is confined to the **two edge
+columns** — 23.2× and 25.2× the mean at 8.97 ps, with all 62 interior columns at 0.10–0.51× — and
+their share of all absorption goes **3.2 % (t = 0, exactly 2/64) → 73.0 % (3 ps) → 98.8 %
+(26.9 ps)**. `theta_e` and `n_e` in those columns respond accordingly, so the energy really lands
+there. In `warpx-cda/Source/Particles/LaserDeposition/LaserDeposition.cpp`:
+
+```cpp
+// deposit(), ~line 739 -- clamps the cell index in EVERY dimension:
+idx[d] = amrex::min(amrex::max(ii, lo3[d]), hi3[d]);
+// the ray march exit test, line 893 -- checks ONLY the propagation axis:
+if (c[m_axis] < plo[m_axis] || c[m_axis] > phi[m_axis]) { break; }
+```
+
+A ray that acquires transverse deflection and passes `xlo`/`xhi` is therefore **neither wrapped
+periodically nor terminated**: it marches on outside the domain and every further deposit is
+**clamped into the edge column**, where it unloads its remaining power.
+
+**What supplies the deflection is benign.** The G3 control develops the same ~5 % transverse
+density ripple with **no beam** (corona rms/mean 0.040 → 0.044 vs 0.056 → 0.063 driven), so it is
+ordinary PIC shot noise; the start is quiet (`NUniformPerCell`, 0.06 % initial variation). At
+t = 0 rays are exactly normal-incidence and the profile is uniform, which is why the artifact
+switches on only once structure exists — and grows as more rays drift out.
+
+**Therefore it will NOT converge away.** `rays_per_cell`, ppc and field smoothing are all
+irrelevant to a deterministic index clamp. **The fix is upstream**: wrap the index for periodic
+dimensions via `geom.periodicity()` instead of clamping, and terminate on non-periodic transverse
+faces.
+
+**Consequence.** 2D couples **+12.4 %** more energy than matched 1D (`E_abs/(P_inc·t_end)`
+0.4169 vs 0.3710).
+
+**Measurement caution.** The *median* `f_abs` over 5–25 ps differs by 48 % (0.385 vs 0.260), which
+badly overstates it: 2D sums 64 rays so its distribution is smooth and median ≈ mean, while 1D's
+single ray is spiky and median ≪ mean. **Compare energy-integrated `E_abs` or the mean across
+dimensionalities, never the median.**
+
+**Required before any 2D physics claim (this supersedes §7.2's ordering):**
+1. **Fix the transverse boundary handling upstream** — a code change, not a convergence study.
+2. **Re-run `P1_vac_2d` / `P1_vac_1d_thick` as a regression test.** The pass criterion is sharp:
+   the 2 edge columns must carry ~3.1 % of the absorption (2/64), not 98.8 %, and `E_abs` must
+   match the 1D baseline rather than exceed it by 12 %.
+3. Only then the finite-spot run (H5) — a real transverse intensity profile cannot be separated
+   from an edge pile-up of this size.
+
+**The 1D results are unaffected**: 1D has no transverse dimension for rays to refract into, which
+is precisely why this comparison isolates the effect. Also recorded: at 36 ppc the G3 control's
+excursion is **−3.09 %** of the driven gain against **−0.066 %** at 400 ppc — 47× larger, the
+honest price of 2D-affordable ppc, and the same poor statistics that seed the artifact.
 
 ---
 

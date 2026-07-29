@@ -853,3 +853,93 @@ trace is a solid block, and the median is what makes the plateau's abrupt end at
 **Media.** `media/P1/P1_vac_1d_long{,_off}/` — `checks`, `gates`, `laser_history` (the headline),
 `laser_profile`, `fields_streak`, `fields_lineouts`, `phase_space`, `movie_fields.mp4`,
 `movie_phase.mp4`; plus `media/P1/P1_long_g3/compare.png`.
+
+---
+
+## 2026-07-29 — 2D planar validation **FAILS on a located operator bug**; `runs/`+`media/` regrouped by phase
+
+Three runs: `P1_vac_2d` (2D planar, 5 h 07 m), `P1_vac_2d_off` (its G3 control, 1 h 57 m), and
+`P1_vac_1d_thick` (the matched 1D baseline, 21 min). All 432 000 / 305 600 steps to 29.9 ps, zero
+errors, `--verify` OK. Built to the user's spec: **rear side not simulated** (domain cut at the
+target's rear face with the validated `open` boundary) and a **thick target** (400 d_e = 67 µm,
+5× the 1D reference, 2.45× upstream).
+
+### THE HEADLINE: 2D is blocked, and it is a bug with a line number
+
+`P1_vac_2d` is *exactly planar* — uniform beam, periodic transverse — so it must reproduce 1D on
+axis. It does not.
+
+**Not a plumbing error.** At t = 0 the two agree on absorbed power per unit area to **2×10⁻⁵**
+(1.0000×10¹⁸ vs 9.9998×10¹⁷ W/m²) and on boundary weight loss to **0.2 %** (6.133 vs 6.146 %). Ray
+launch, power apportionment over 64 rays, deposition mapping and boundaries are all correct.
+
+**The failure is an edge pile-up.** Column-integrated `P_abs` in units of the mean at 8.97 ps:
+column 0 = **23.2×**, column 63 = **25.2×**, all 62 interior columns 0.10–0.51×. Share of all
+absorption in those two columns:
+
+| t [ps] | 0 | 2.99 | 8.97 | 26.90 |
+|---|---|---|---|---|
+| edge share | **3.2 %** (= 2/64, correct) | 73.0 % | 75.6 % | **98.8 %** |
+
+`theta_e` (1.16–1.54× higher) and `n_e` (lower) in those columns respond, so the energy really
+lands there. Net absorption is **+12.4 %** above matched 1D.
+
+**The cause**, in `warpx-cda/Source/Particles/LaserDeposition/LaserDeposition.cpp`:
+
+```cpp
+// deposit(), ~line 739 -- clamps the cell index in EVERY dimension:
+idx[d] = amrex::min(amrex::max(ii, lo3[d]), hi3[d]);
+// ray-march exit test, line 893 -- checks ONLY the propagation axis:
+if (c[m_axis] < plo[m_axis] || c[m_axis] > phi[m_axis]) { break; }
+```
+
+A ray that acquires transverse deflection and passes `xlo`/`xhi` is **neither wrapped periodically
+nor terminated** — it marches on outside the domain and every further deposit is **clamped into
+the edge column**.
+
+**The deflection itself is benign.** The G3 control develops the same ~5 % transverse density
+ripple with **no beam at all** (corona rms/mean 0.040 → 0.044 vs 0.056 → 0.063 driven), so it is
+ordinary PIC shot noise; the start is quiet (`NUniformPerCell` → 0.06 % initial variation). At
+t = 0 rays are exactly normal-incidence, which is why the artifact switches on only once structure
+exists, then grows as more rays drift out and paths lengthen.
+
+**It will NOT converge away** — ppc, `rays_per_cell` and field smoothing are irrelevant to a
+deterministic index clamp. Fix upstream (wrap periodic dims via `geom.periodicity()`, terminate on
+non-periodic transverse faces), then re-run this pair as a **regression test** with a sharp
+criterion: edge share ~3.1 %, and `E_abs` matching the 1D baseline instead of exceeding it by 12 %.
+
+**1D is unaffected** — no transverse dimension for rays to drift into, which is exactly why the
+1D↔2D comparison isolated it.
+
+### A wrong mechanism I asserted first, and what corrected it
+
+My initial reading was *refractive self-channelling*: rays bending away from density maxima and
+concentrating in valleys over long paths. **That was wrong**, and it would have cost a pointless
+ppc convergence study of a deterministic bug. The summary statistic (rms/mean = 4.17) fits both
+stories equally; only the **spatial pattern** distinguishes them — two hot edge columns and 62 flat
+ones is a boundary signature, not channelling. **Diagnose non-uniformity from the profile, never
+from its variance.**
+
+### Also: median vs mean across dimensionalities
+
+The 5–25 ps **median** `f_abs` differs 1D vs 2D by **48 %** (0.260 vs 0.385) where the
+energy-integrated figure differs by **12.4 %**. 2D sums 64 rays so its distribution is smooth and
+median ≈ mean; 1D's single ray is spiky and median ≪ mean. **Compare energy-integrated `E_abs` or
+the mean — never the median — across runs of different dimensionality.**
+
+### Gate G3 at 36 ppc (the 2D-affordable value)
+
+Control net particle-KE gain **−1.8615 J/m = −3.09 %** of the driven +60.258 J/m. Still
+**negative**, so not grid heating, and G2 stays bounded — but 47× the −0.066 % measured at 400 ppc.
+Quote it beside any few-percent 2D number. G6: −8.42 % at 6.15 % weight loss (the truncation's
+price, matching the 1D baseline's −8.53 % / 6.13 %).
+
+### Housekeeping
+
+`runs/<phase>/<run_id>/` and `media/<phase>/<run_id>/`; `media_dir()` derives the phase from the
+run-ID prefix. Also fixed **two stale falsified claims** in `CLAUDE.md` and `TEST_PLAN.md` §1.2
+that still asserted the H2 "shuts off / intensity-independent" picture.
+
+**Media.** `media/P1/P1_vac_2d{,_off}/` and `media/P1/P1_vac_1d_thick/` — `checks`, `gates`,
+`laser_history`, `laser_profile`, `fields_streak`, `fields_lineouts`, `fields_map2d`,
+`phase_space`, `movie_fields.mp4`, `movie_phase.mp4`, `movie_map2d.mp4`.

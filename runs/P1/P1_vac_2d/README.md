@@ -134,11 +134,188 @@ makes the comparison valid.
 
 ## Media
 
-*(not generated yet)*
+- `media/P1/P1_vac_2d/checks.png`
+- `media/P1/P1_vac_2d/fields_lineouts.png`
+- `media/P1/P1_vac_2d/fields_map2d.png`
+- `media/P1/P1_vac_2d/fields_streak.png`
+- `media/P1/P1_vac_2d/gates.png`
+- `media/P1/P1_vac_2d/laser_history.png`
+- `media/P1/P1_vac_2d/laser_profile.png`
+- `media/P1/P1_vac_2d/movie_fields.mp4`
+- `media/P1/P1_vac_2d/movie_map2d.mp4`
+- `media/P1/P1_vac_2d/movie_phase.mp4`
+- `media/P1/P1_vac_2d/phase_space.png`
 
 ## Result
 
-*(running)*
+Ran **432 000/432 000 steps = 29.88 ps in 5 h 07 m** on GPU 0, zero errors, `--verify` OK,
+gates 4 pass / 0 warn / 0 fail. Control: 1 h 57 m.
+
+> ## VERDICT: the planar validation **FAILS**, and it is an **operator BUG**, located.
+> Rays whose *transverse* coordinate drifts past the periodic transverse boundary are neither
+> wrapped nor terminated. `deposit()` **clamps** the cell index in every dimension, and the
+> domain-exit test checks **only the propagation axis** — so such a ray keeps marching outside
+> the domain and dumps all its remaining energy into the edge column. By 26.9 ps **98.8 % of
+> all absorption lands in 2 of 64 columns.** Net absorption is **+12 %** above matched 1D.
+> **This invalidates 2D results from this operator whenever rays acquire any transverse
+> deflection — i.e. always, once the plasma has structure.** Exact lines and fix in §3.
+
+### 1. What agrees, and it is most of the budget
+
+Normalised so the J/m² (1D) vs J/m (2D) unit difference cancels:
+
+| quantity | 1D (`P1_vac_1d_thick`) | 2D planar | 2D/1D |
+|---|---|---|---|
+| **`f_abs(0)`** | 0.99999 | 0.99997 | **1.0000** |
+| **total absorbed at t = 0, per unit area** | 1.0000×10¹⁸ W/m² | 9.9998×10¹⁷ W/m² | **1.0000** |
+| **boundary weight lost** | 6.1334 % | 6.1459 % | **1.0020** |
+| particle-KE gain / `E_abs` | 0.8730 | 0.9019 | 1.033 |
+| ion share of particle KE | 38.29 % | 40.70 % | 1.063 |
+| `T_e` final | 298.5 eV | 322.4 eV | 1.080 |
+| G6 raw gap | −8.53 % | −8.42 % | — |
+
+**The t = 0 agreement to 2×10⁻⁵ is the important one**: it says the 2D ray launch, the power
+apportionment across 64 rays, and the deposition mapping are all correct. Weight loss matching
+to 0.2 % says the truncation and the boundaries behave identically. **So this is not a 2D
+plumbing bug.**
+
+### 2. What fails: transverse uniformity (prediction 3)
+
+Column-integrated `P_abs` across the 64 transverse columns, which for an exactly planar
+configuration should be uniform to shot noise:
+
+| t [ps] | 0 | 2.99 | 8.97 | 14.94 | 20.92 | 26.90 |
+|---|---|---|---|---|---|---|
+| `P_abs` column **rms/mean** | **0.021** | 4.02 | 4.17 | 4.91 | 5.09 | **5.53** |
+| `n_e` transverse rms/mean (absorbing layer) | 0.0006 | 0.150 | 0.125 | 0.109 | 0.111 | 0.109 |
+
+At 8.97 ps the columns span **0.10× to 25.2× the mean — a factor of 250.** And the deposition
+non-uniformity **grows monotonically** (4.02 → 5.53) while the density noise does *not*.
+
+### 3. The mechanism: a located bug in the operator's transverse boundary handling
+
+**Step one — the structure is at the EDGES, not distributed.** Column-integrated `P_abs`
+in units of the mean, at 8.97 ps:
+
+| column | 0 (x = xlo) | 1 … 62 (interior) | 63 (x = xhi) |
+|---|---|---|---|
+| `P_abs` / mean | **23.18** | 0.10 – 0.51 | **25.24** |
+
+| t [ps] | 0 | 2.99 | 8.97 | 26.90 |
+|---|---|---|---|---|
+| **share of all absorption in the 2 edge columns** | **3.2 %** | 73.0 % | 75.6 % | **98.8 %** |
+| interior rms/mean (edges excluded) | 0.021 | 0.579 | 0.370 | 0.352 |
+
+At t = 0 the edges carry **3.2 %**, which is exactly 2/64 = 3.1 % — perfectly uniform. The
+pile-up appears within ~3 ps and grows to swallow essentially everything.
+
+**Step two — the energy really goes there.** `theta_e` in the absorbing layer is 1.16–1.54×
+higher in the edge columns and their density is correspondingly lower (0.675 vs 0.791 `n_cr` at
+8.97 ps), so the particles respond. This is real deposition, not a diagnostic artifact.
+
+**Step three — the cause, in `warpx-cda/Source/Particles/LaserDeposition/LaserDeposition.cpp`:**
+
+```cpp
+// deposit(), ~line 739 — clamps the cell index in EVERY dimension:
+const int ii = static_cast<int>(std::floor((c[d] - plo[d]) * dxi[d]));
+idx[d] = amrex::min(amrex::max(ii, lo3[d]), hi3[d]);
+
+// the ray march's exit test, line 893 — checks ONLY the propagation axis:
+if (c[m_axis] < plo[m_axis] || c[m_axis] > phi[m_axis]) { break; }
+```
+
+A ray that acquires transverse deflection and wanders past `xlo`/`xhi` is therefore **neither
+wrapped periodically nor terminated**. It continues marching with its transverse coordinate
+outside the domain, and every subsequent `deposit` is **clamped into the edge column**, where it
+unloads the rest of its power.
+
+**Why this matches every observation.** At t = 0 rays are exactly normal-incidence with no
+transverse velocity, so nothing drifts and the profile is uniform. The G3 control shows a ~5 %
+transverse density ripple develops from ordinary PIC shot noise within ~3 ps **with no beam at
+all** (corona rms/mean 0.040 → 0.044, versus 0.056 → 0.063 driven; the start is quiet —
+`NUniformPerCell` gives 0.06 % initial variation). Those gradients deflect rays; the deflected
+ones hit the transverse boundary and are pinned. More of them do so as time passes and paths
+lengthen, hence 3.2 % → 73 % → 98.8 %.
+
+**So the seed is benign shot noise and the amplifier is a boundary bug** — not physics, and not
+the refractive channelling I first assumed (see Retracted).
+
+**The fix**, upstream: wrap the index for periodic dimensions using `geom.periodicity()` instead
+of clamping, and extend the exit test to terminate on non-periodic transverse faces. Until then
+`rays_per_cell`, ppc and smoothing are all irrelevant — **the artifact is not statistical and
+will not converge away.**
+
+### 4. Consequence: 2D absorbs 12 % more, and the excess is not uniform in time
+
+| t-bin [ps] | 0–3 | 6–9 | 12–15 | 18–21 | 24–27 | 27–30 |
+|---|---|---|---|---|---|---|
+| `dE/dt` ratio 2D/1D | 1.21 | 1.11 | 1.20 | 1.15 | 1.12 | 1.06 |
+
+Run-integrated: `E_abs/(P_inc·t_end)` = 0.3710 (1D) vs 0.4169 (2D), i.e. **+12.4 %**.
+
+**A caution on how not to measure this.** The *median* `f_abs` over 5–25 ps differs by **48 %**
+(0.2597 vs 0.3853), which badly overstates it. 2D sums 64 rays, so its `f_abs` distribution is
+much smoother and its median sits close to its mean, while 1D's single ray is spiky and its
+median falls well below its mean. **Compare energy-integrated `E_abs`, or the mean — never the
+median — across runs of different dimensionality.**
+
+### 5. The rear truncation held, as designed
+
+Checked by **core decoupling** (the criterion `P1_vac_1d_thick` established, not
+boundary-density invariance): the slab retains a large undisturbed core, and boundary weight
+loss matched the 1D run to 0.2 % (6.146 % vs 6.133 %). The 400 d_e thickness and the
+"don't simulate the far side" instruction were both sound — **this run's failure is unrelated
+to the geometry it was asked to use.**
+
+### 6. Gate G3 in 2D at 36 ppc — passes, with a caveat worth stating
+
+| | value |
+|---|---|
+| driven particle-KE gain | +60.258 J/m |
+| **laser-off gain** | **−1.8615 J/m = −3.09 % of driven** |
+| control electrons / ions | −1.495 / −0.3666 J/m |
+| control weight lost | 6.030 % |
+
+Still **negative**, so not grid heating — but −3.09 % against the 1D runs' −0.066 % at 400 ppc,
+a **47× larger** relative excursion. That is the honest price of 36 ppc, and it is the same
+low-ppc statistics that seed §3's artifact. It does not invalidate the run's energetics, but a
+2D result at the few-percent level cannot be quoted without this term.
+
+### 7. What has to happen before any 2D physics claim
+
+1. **Fix the transverse boundary handling upstream** (§3). This is a code fix, not a
+   convergence study — the artifact is deterministic, so **no amount of ppc, `rays_per_cell` or
+   field smoothing will remove it.** Wrap periodic dimensions in `deposit()` instead of
+   clamping, and make the exit test terminate on non-periodic transverse faces.
+2. **Re-run this exact pair afterwards.** It is now a regression test with a sharp pass
+   criterion: the 2 edge columns must carry ~3.1 % of the absorption (2/64), not 98.8 %, and
+   `E_abs` must match `P1_vac_1d_thick` rather than exceeding it by 12 %.
+3. Only then the finite-Gaussian-spot run (H5) — a real transverse intensity profile cannot be
+   separated from an edge pile-up of this size.
+
+**None of this is a reason to distrust the 1D results** — 1D has no transverse dimension for
+rays to refract into, which is precisely why the 1D↔2D comparison isolates the effect.
+
+## Retracted
+
+**A wrong mechanism I asserted during this analysis, before finding the bug.** My first reading of
+the factor-250 deposition non-uniformity was that *"the ray tracer amplifies a 5 % density ripple
+into 500 % because `n_ref = √(1 − n_e/n_cr)` bends rays away from density maxima, channelling them
+into density valleys over hundreds of `d_e` of path"* — i.e. a physics-like refractive
+self-channelling, to be tackled with a ppc convergence study and density smoothing.
+
+**That was wrong, and it was wrong in a way that would have wasted real GPU time** on a
+convergence study of a deterministic bug. What disproved it was looking at the *pattern* rather
+than its variance: the non-uniformity is not distributed across columns as channelling would give,
+it is confined to **the two edge columns**, which is a boundary signature. That led to
+`deposit()`'s index clamp and the axis-only exit test (§3). Recorded because the summary statistic
+(rms/mean = 4.17) was equally consistent with both stories and only the spatial pattern
+distinguished them.
+
+**Also corrected**: prediction 3 said "no transverse structure … `n_e(x)` should stay uniform to
+shot noise". The density *is* uniform to shot noise (~5 %, and the same with the laser off) — that
+part held. What I did not anticipate was that a benign 5 % ripple would be enough to push rays
+into a boundary bug.
 
 ## Retracted
 

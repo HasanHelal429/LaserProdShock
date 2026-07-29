@@ -92,7 +92,13 @@ comparison, the control becomes mandatory — record that here if it happens.
 
 ## Media
 
-*(not generated yet)*
+- `media/P1/P1_vac_1d_thick/checks.png`
+- `media/P1/P1_vac_1d_thick/fields_lineouts.png`
+- `media/P1/P1_vac_1d_thick/fields_streak.png`
+- `media/P1/P1_vac_1d_thick/gates.png`
+- `media/P1/P1_vac_1d_thick/laser_history.png`
+- `media/P1/P1_vac_1d_thick/laser_profile.png`
+- `media/P1/P1_vac_1d_thick/phase_space.png`
 
 ## Result
 

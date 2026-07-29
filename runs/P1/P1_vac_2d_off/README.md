@@ -88,11 +88,66 @@ that difference into the subtraction. Launched after `P1_vac_1d_thick` frees its
 
 ## Media
 
-*(not generated yet)*
+- `media/P1/P1_vac_2d_off/checks.png`
+- `media/P1/P1_vac_2d_off/fields_lineouts.png`
+- `media/P1/P1_vac_2d_off/fields_map2d.png`
+- `media/P1/P1_vac_2d_off/fields_streak.png`
+- `media/P1/P1_vac_2d_off/gates.png`
+- `media/P1/P1_vac_2d_off/laser_history.png`
+- `media/P1/P1_vac_2d_off/laser_profile.png`
+- `media/P1/P1_vac_2d_off/movie_fields.mp4`
+- `media/P1/P1_vac_2d_off/movie_map2d.mp4`
+- `media/P1/P1_vac_2d_off/movie_phase.mp4`
+- `media/P1/P1_vac_2d_off/phase_space.png`
 
 ## Result
 
-*(queued)*
+Ran **432 000/432 000 steps = 29.88 ps in 1 h 57 m** on GPU 1, zero errors, `--verify` OK.
+(2.6× faster than its driven partner — the ray march is serial host code, so a run without it
+keeps the GPU at a steady 82 % where the driven run oscillates 0 %/61 %.)
+
+### 1. G3 passes at 36 ppc, but the excursion is 47× the 400-ppc value
+
+| | this control (36 ppc) | 1D controls (400 ppc) |
+|---|---|---|
+| net particle-KE gain | **−1.8615 J/m** | −7 962 J (100 ps), −1 696 J (10 ps) |
+| **as a share of the driven gain** | **−3.09 %** | **−0.066 %** |
+| electrons / ions | −1.495 / −0.3666 J/m | −221.8 / +213.9 kJ |
+| weight lost | 6.030 % | 0.0014 % |
+
+**The sign is still negative**, which is the discriminator: grid heating appears as a net *gain*
+shared by both species, and this is not that. So gate G2 (`dz/λ_D` = 61) remains bounded and
+`P1_vac_2d`'s ablation is real. **But −3.09 % against −0.066 % is a 47× larger relative
+excursion**, and that is the honest price of dropping ppc 400 → 36. A 2D result quoted at the
+few-percent level must carry this term.
+
+Note the electron and ion terms no longer cancel the way they did at 400 ppc (there both were
+large and opposite; here both are negative). With 11× worse per-cell statistics the ambipolar
+bookkeeping is simply noisier.
+
+### 2. This run is what identified the 2D validation failure
+
+Its most valuable output was not its energy budget. `P1_vac_2d` developed a **factor-250
+transverse non-uniformity in laser deposition**, and the obvious first suspicion was that the
+laser was driving a filamentation instability. **This control ruled that out:** it develops the
+*same* transverse density modulation with no beam at all —
+
+| transverse rms/mean of `n_e` | driven | **this control** |
+|---|---|---|
+| corona (0…120 d_e), 7.5 → 29.9 ps | 0.063 → 0.056 | **0.040 → 0.044** |
+| slab (−380…−100 d_e) | 0.030 → 0.028 | **0.031 → 0.033** |
+
+So the ~5 % density ripple is **ordinary PIC shot noise**, not laser-driven, and what the driven
+run adds is *amplification of it by ray refraction*. Being able to say that — rather than
+speculating about filamentation — is exactly why G3 controls are mandatory here. Full analysis in
+`runs/P1/P1_vac_2d/README.md` §3.
+
+Also worth recording: the ripple appears despite a **quiet start**. `NUniformPerCell` puts
+particles on a regular sub-cell lattice, so the initial transverse variation is only **0.06 %**;
+it reaches a few percent within ~3 ps as thermal motion decorrelates the lattice.
+
+Boundary weight loss is **6.030 %**, essentially the driven run's 6.146 % — so the loss is the
+rear free surface draining through the truncated boundary, not something the drive causes.
 
 ## Retracted
 
