@@ -421,7 +421,12 @@ def geometry_diagram(cfg: dict, width: int = 66) -> str:
       f"{sc.length_scale} density = {de*1e6:.4f} um")
     a("")
     arrow_row = [" "] * width
-    lab = "<== laser" if inject_hi else "laser ==>"
+    # A laser-off control (gate G3) is geometrically IDENTICAL to its physics run, so the
+    # drive is the only thing that can distinguish the two diagrams -- say so here, or the
+    # control's README shows an incoming beam that the deck does not have.
+    laser_off = float(las.get("intensity", 0.0) or 0.0) == 0.0
+    lab = ("x  LASER OFF (I = 0)" if laser_off else
+           ("<== laser" if inject_hi else "laser ==>"))
     if inject_hi:
         for i, ch in enumerate(lab):
             arrow_row[width - len(lab) + i] = ch

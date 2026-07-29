@@ -1,0 +1,89 @@
+meta:
+  run_id: P1_vac_1d_off
+  phase: 1
+  deck: inputs_P1_vac_1d_off
+  description: Gate-G3 laser-off control for P1_vac_1d. Byte-for-byte the same deck
+    except laser.intensity = 0, run for the same 10.018 ps. The cold near-critical
+    target is Debye-under-resolved by construction (G2 dz/lambda_D = 61), so grid
+    heating can only be separated from LASER heating by an identical run with the
+    drive switched off. Every Phase-1 number is quoted with this run subtracted.
+  reference: TEST_PLAN.md 7.1, 6 (gate G3); physics run P1_vac_1d
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 0.0
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 10240
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 80
+    scale_length_de: 60
+    center_de: -40
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -300
+    hi_de: 700
+  boundary:
+    axis:
+      lo: open
+      hi: open
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 102400
+  ppc:
+    target: 400
+    ambient: 48
+
+diagnostics:
+  plotfile_intervals: 10240
+  field_intervals: 1280
+  phase_intervals: 5120
+  reduced_intervals: 256
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 400
+  compression_factor: 2.0
+
+controls:
+  physics_run: P1_vac_1d
+  parent_geometry: P0_thick_open
+  ray_cfl_ladder: studies/exit_overshoot (moot at intensity 0; declared so this deck
+    stays identical to P1_vac_1d in every respect the gates can see)
+
+targets:
+  note: With no drive the target should merely relax -- a slow thermal expansion of
+    the corona at the initial 51 eV sound speed (c_s = 0.001 c = 1.8 d_e/ps, so ~18
+    d_e in 10 ps) plus whatever the Debye-under-resolved grid adds. The measured
+    total particle energy gain IS the grid-heating budget for P1_vac_1d, and the
+    quantity that decides whether the ablation is physical.
+  expect_no_piston: true

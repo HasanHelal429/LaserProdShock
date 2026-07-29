@@ -178,8 +178,28 @@ not, and work while a run is still going.
 - **Performance.** `OMP_NUM_THREADS=8 OMP_PROC_BIND=spread OMP_PLACES=cores` — near-linear
   to 8 cores (~1.8× vs 4), memory-bandwidth-bound beyond. `max_grid_size`, tiling and
   `sort_intervals` were benchmarked as neutral-to-negative in `KinShock2020` — don't bother.
+- **GPU: `launch.sh --gpu [N]`, and the CUDA build is ONE TREE PER DIMENSIONALITY.**
+  `WarpX_DIMS` is compile-time, so `build_cuda/` is **2D only** and 1D needs its own
+  `build_cuda1d/`. Two RTX 4070s (12 GB, arch 8.9) — `-g 0` and `-g 1` carry two runs at
+  once. `--gpu` forces `OMP_NUM_THREADS=1` (the push is on the device; host threads only
+  contend) and pins with `CUDA_VISIBLE_DEVICES`.
+  **The system `nvcc` is 12.0 and AMReX requires ≥ 12.2** — configure with the 12.9 toolkit
+  at `/home/hhelal/opt/cuda-12.9`, which is what `build_cuda` used. CUDA and OMP builds are
+  both double precision but **not bit-identical** (device reductions run in a different
+  order), so a GPU-vs-CPU cross-check is a physics comparison, not a diff.
+- **In a VACUUM run extra domain is nearly free — do not truncate to save cells.**
+  `density_min = 1e-4·n_t` means WarpX creates no macroparticles below that density, so in
+  `P1_vac_1d` only **525 of 2000 cells** carry particles and the other 1475 are empty field
+  cells (a rounding error next to the particle push in 1D). Rear-face truncation pays off
+  when an *ambient* fills the cushion at 48 ppc; with no ambient, spend the cells on genuine
+  free surfaces at both faces instead. It is also why a 10 ps vacuum run is affordable.
+- **A `_off` control must differ ONLY in `laser.intensity`.** Grid heating accumulates with
+  step count and depends on the grid, the ppc and the species, so any other difference makes
+  the G3 subtraction meaningless. `tests/test_structures.py` renders both decks and diffs
+  them, rather than trusting that two hand-edited configs stayed in step.
 - **Env.** conda env at `/opt/anaconda3/envs/physics`; WarpX binaries
-  `/home/hhelal/warpx-cda/build/bin/warpx.{1d,2d,3d}` (OMP/CPU, double precision).
+  `/home/hhelal/warpx-cda/build/bin/warpx.{1d,2d,3d}` (OMP/CPU, double precision) and
+  `build_cuda1d/bin/warpx.1d` + `build_cuda/bin/warpx.2d` (CUDA, double precision).
 
 ## Working preferences
 - Work in the **regular repo folders** (not git worktrees). Commit to `main`.

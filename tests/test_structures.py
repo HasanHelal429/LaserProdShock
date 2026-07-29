@@ -133,6 +133,40 @@ def test_background_field_is_transverse_to_the_propagation_axis(run_dir):
         assert "B0" in (bx, by), "a background field was requested but B is all zero"
 
 
+OFF_RUNS = [d for d in RUN_DIRS if os.path.basename(d).endswith("_off")]
+
+
+@pytest.mark.parametrize("run_dir", OFF_RUNS,
+                         ids=[os.path.basename(d) for d in OFF_RUNS])
+def test_laser_off_control_differs_only_in_intensity(run_dir):
+    """A `_off` control (gate G3) is only a valid control if the deck is identical to its
+    physics run apart from the drive. Grid heating accumulates with step count and depends
+    on the grid, the ppc and the species, so ANY other difference makes the subtraction
+    meaningless -- and the subtraction is the only thing that turns G2's `dz/lambda_D` = 61
+    from a number into a bound. Checked here rather than trusted, because the two configs
+    are edited by hand and a drifted duration would be invisible in the result."""
+    off = lpconfig.load(run_dir)
+    physics_id = (off.get("controls") or {}).get("physics_run")
+    assert physics_id, f"{os.path.basename(run_dir)} declares no controls.physics_run"
+    sib = os.path.join(os.path.dirname(run_dir), str(physics_id))
+    assert os.path.isdir(sib), f"controls.physics_run -> {physics_id} does not exist"
+    on = lpconfig.load(sib)
+
+    assert float(off["laser"]["intensity"]) == 0.0, "a laser-off control needs intensity 0"
+    assert float(on["laser"]["intensity"]) > 0.0, f"{physics_id} has no drive to control for"
+
+    # Compare the rendered decks line by line, ignoring the header comment block (which
+    # carries each run's own description) and the intensity line itself.
+    def body(cfg):
+        return [ln for ln in lpdeck.render(cfg).splitlines()
+                if not ln.startswith("#") and "laser_deposition.intensity" not in ln]
+
+    d_off, d_on = body(off), body(on)
+    assert d_off == d_on, (
+        f"{os.path.basename(run_dir)} is not a valid control for {physics_id}: "
+        + "; ".join(f"{a!r} != {b!r}" for a, b in zip(d_on, d_off) if a != b)[:400])
+
+
 def test_vacuum_runs_have_only_target_species():
     for run_dir in RUN_DIRS:
         cfg = lpconfig.load(run_dir)

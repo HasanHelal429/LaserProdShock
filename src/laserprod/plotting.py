@@ -181,12 +181,15 @@ def density_panel(ax, z_de, n_target, n_ambient, sc, cfg, log=True):
     ax.plot(z_de, tot, color=INK_MUTED, lw=1.0, ls="--", label="total (what the ray sees)")
 
     ax.axhline(1.0, color=INK, lw=1.2, ls=":")
+    # Both labels hang BELOW the n_cr line: with a vacuum run's floored axis the line
+    # sits ~85% up, which is exactly where a legend box and an upper-anchored annotation
+    # land, and all three then print on top of each other.
     ax.text(0.005, 1.0, " n$_{cr}$", transform=ax.get_yaxis_transform(),
-            va="bottom", ha="left", fontsize=8, color=INK)
+            va="top", ha="left", fontsize=8, color=INK)
     if sc.n_targ_over_ncr > 1.0:
-        ax.text(0.99, 0.94, "target is OVERDENSE → interior critical surface\n"
-                            "(turning point + specular reflection; gate G4 applies)",
-                transform=ax.transAxes, ha="right", va="top", fontsize=7,
+        ax.text(0.995, 1.0, "target is OVERDENSE → interior critical surface\n"
+                            "(turning point + specular reflection; gate G4 applies) ",
+                transform=ax.get_yaxis_transform(), ha="right", va="top", fontsize=7,
                 color=INK_2)
 
     inject_hi = str(cfg["laser"].get("inject_side", "lo")) == "hi"
@@ -200,13 +203,22 @@ def density_panel(ax, z_de, n_target, n_ambient, sc, cfg, log=True):
 
     if log:
         ax.set_yscale("log")
-        floor = max(1e-6, 0.5 * min([v for v in tot if v > 0] or [1e-6]))
+        # Floor the axis at the deck's own `density_min`: below it WarpX creates no
+        # macroparticles at all, so plotting further down draws plasma that will not
+        # exist. It matters in vacuum runs, where the Gaussian corona's tail otherwise
+        # runs off many decades of empty axis and squeezes the real profile flat.
+        dmin = 1e-4 * (sc.n_amb / ncr if sc.n_amb else sc.n_targ / ncr)
+        floor = max(dmin, 0.5 * min([v for v in tot if v > 0] or [dmin]))
         ax.set_ylim(floor, max(5.0, 2.0 * max(tot)))
+        ax.axhline(dmin, color=INK_MUTED, lw=0.8, ls=(0, (1, 3)))
+        ax.text(0.005, dmin, " density_min (no particles below)",
+                transform=ax.get_yaxis_transform(), va="bottom", ha="left",
+                fontsize=6.5, color=INK_MUTED)
     ax.set_xlabel(f"z  [d$_e$ at {sc.length_scale} density]")
     ax.set_ylabel("n$_e$ / n$_{cr}$")
     ax.set_title("Initial density — from the deck's own density_function",
                  loc="left", fontweight="bold")
-    ax.legend(loc="upper left" if inject_hi else "upper right")
+    ax.legend(loc="best")
     style_axes(ax)
 
 
@@ -265,6 +277,13 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg, n_targ=None, n_amb=None
     ax_K.plot(z_de, K, color=C_LASER)
     label_line(ax_K, z_de[len(z_de) // 2], max(K) if K else 1.0, "", C_LASER)
     ax_K.set_yscale("log")
+    # Clip the dynamic range. K ~ n_e^2, so in a VACUUM run the Gaussian corona's tail
+    # drags K down ~130 decades, and an unclipped log axis then compresses the only part
+    # that matters -- the corona, where tau reaches 1 -- into a couple of pixels. Ten
+    # decades below the peak is already far past anything that can absorb.
+    K_pos = [v for v in K if v > 0]
+    if K_pos:
+        ax_K.set_ylim(max(min(K_pos), 1e-10 * max(K_pos)), 3.0 * max(K_pos))
     ax_K.set_ylabel("K  [1/m]")
     ax_K.set_title("Predicted inverse-bremsstrahlung absorption at the initial "
                    "profile, at the GROUP T$_e$ the operator measures", loc="left",

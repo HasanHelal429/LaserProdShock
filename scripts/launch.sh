@@ -18,12 +18,26 @@
 #
 # Usage:  scripts/launch.sh [options] <run_dir> [-- <warpx args>]
 #
-#   -j, --threads N    OMP_NUM_THREADS (default 8)
+#   -j, --threads N    OMP_NUM_THREADS (default 8; forced to 1 with --gpu)
 #   -w, --warpx PATH   WarpX binary (default: $LPS_WARPX, else picked from geometry.dims)
+#   -g, --gpu [N]      run the CUDA build on GPU N (default 0) -- see below
 #   -b, --background   detach and return immediately (prints the PID)
 #   -L, --logger       also start scripts/run_progress_logger.py in the background
 #   -f, --force        launch even though diags/ already holds output (see below)
 #   -n, --dry-run      print what would run, change nothing
+#
+# --gpu picks the binary out of the CUDA build tree instead of the OMP one, pins the run
+# to a single device with CUDA_VISIBLE_DEVICES, and sets OMP_NUM_THREADS=1 (with the CUDA
+# backend the particle push is on the device; host threads only add contention). There
+# are two RTX 4070s on this machine, so `-g 0` and `-g 1` can carry two runs at once.
+#
+# WarpX_DIMS is a COMPILE-time setting, so the CUDA build is one tree PER DIMENSIONALITY:
+#   build_cuda1d/bin/warpx.1d      build_cuda/bin/warpx.2d
+# --gpu therefore searches $LPS_WARPX_DIR_CUDA, then build_cuda<D>d/bin, then
+# build_cuda/bin, and names the missing tree if it finds nothing. The CUDA and OMP builds
+# are both double precision but are NOT bit-identical: device reductions run in a
+# different order, so cross-checking a GPU run against a CPU one is a physics comparison,
+# not a diff.
 #
 # Anything after `--` is appended as ParmParse overrides, e.g.
 #   scripts/launch.sh runs/P0_bc_1d -- max_step=20
@@ -39,9 +53,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WARPX_DIR="${LPS_WARPX_DIR:-/home/hhelal/warpx-cda/build/bin}"
+WARPX_ROOT="${LPS_WARPX_ROOT:-/home/hhelal/warpx-cda}"
+WARPX_DIR="${LPS_WARPX_DIR:-$WARPX_ROOT/build/bin}"
 WARPX="${LPS_WARPX:-}"          # empty => resolve from geometry.dims below
 THREADS=8
+GPU=""                          # empty => CPU/OMP build; else the device index
 BACKGROUND=0
 LOGGER=0
 FORCE=0
@@ -56,11 +72,14 @@ while [[ $# -gt 0 ]]; do
         --)              shift; EXTRA=("$@"); break ;;
         -j|--threads)    THREADS="${2:-}"; shift 2 ;;
         -w|--warpx)      WARPX="${2:-}";   shift 2 ;;
+        -g|--gpu)        # optional argument: only consume $2 when it is a bare number
+                         if [[ "${2:-}" =~ ^[0-9]+$ ]]; then GPU="$2"; shift 2
+                         else GPU=0; shift; fi ;;
         -b|--background) BACKGROUND=1; shift ;;
         -L|--logger)     LOGGER=1;     shift ;;
         -f|--force)      FORCE=1;      shift ;;
         -n|--dry-run)    DRYRUN=1;     shift ;;
-        -h|--help)       sed -n '2,42p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help)       sed -n '2,56p' "${BASH_SOURCE[0]}"; exit 0 ;;
         -*)              die "unknown option '$1' (try --help)" ;;
         *)               [[ -n "$RUN_DIR" ]] && die "one run_dir at a time (got '$RUN_DIR' and '$1')"
                          RUN_DIR="$1"; shift ;;
@@ -77,13 +96,39 @@ RUN_DIR="$(cd "$RUN_DIR" && pwd)"                       # absolute: we are about
      itself before it is launched (see runs/README.md for the template)."
 
 # --- WarpX binary: 1D and 2D are both first-class here, so pick by dimensionality ---
+DIMS="$(sed -n 's/^[[:space:]]*dims:[[:space:]]*\([0-9]\).*/\1/p' "$RUN_DIR/config.yaml" | head -1)"
 if [[ -z "$WARPX" ]]; then
-    DIMS="$(sed -n 's/^[[:space:]]*dims:[[:space:]]*\([0-9]\).*/\1/p' "$RUN_DIR/config.yaml" | head -1)"
     [[ -n "$DIMS" ]] || die "could not read geometry.dims from $RUN_DIR/config.yaml
      (add it, or pass --warpx / set \$LPS_WARPX)"
-    WARPX="$WARPX_DIR/warpx.${DIMS}d"
+    if [[ -n "$GPU" ]]; then
+        # WarpX_DIMS is compile-time, so the CUDA build is one tree per dimensionality.
+        for d in "${LPS_WARPX_DIR_CUDA:-}" \
+                 "$WARPX_ROOT/build_cuda${DIMS}d/bin" "$WARPX_ROOT/build_cuda/bin"; do
+            [[ -n "$d" && -x "$d/warpx.${DIMS}d" ]] && { WARPX="$d/warpx.${DIMS}d"; break; }
+        done
+        [[ -n "$WARPX" ]] || die "no CUDA warpx.${DIMS}d found. The CUDA build is one tree
+     per dimensionality (WarpX_DIMS is compile-time), so ${DIMS}D needs
+     $WARPX_ROOT/build_cuda${DIMS}d. Build it with:
+       PATH=/home/hhelal/opt/cuda-12.9/bin:\$PATH cmake -S $WARPX_ROOT \\
+         -B $WARPX_ROOT/build_cuda${DIMS}d -DCMAKE_BUILD_TYPE=Release \\
+         -DWarpX_DIMS=${DIMS} -DWarpX_COMPUTE=CUDA -DAMReX_CUDA_ARCH=8.9 \\
+         -DWarpX_PRECISION=DOUBLE -DWarpX_PARTICLE_PRECISION=DOUBLE
+     (the SYSTEM nvcc is 12.0 and AMReX requires >= 12.2 -- use the 12.9 toolkit in
+     ~/opt, which is what build_cuda was built with), or pass --warpx / \$LPS_WARPX."
+    else
+        WARPX="$WARPX_DIR/warpx.${DIMS}d"
+    fi
 fi
 [[ -x "$WARPX" ]] || die "WarpX binary not executable: $WARPX (set --warpx or \$LPS_WARPX)"
+
+# A CUDA binary on a machine with no visible device fails deep inside AMReX init; catch it
+# here where the message can say what to do.
+if [[ -n "$GPU" ]]; then
+    command -v nvidia-smi >/dev/null || die "--gpu but no nvidia-smi on PATH"
+    NGPU="$(nvidia-smi --list-gpus 2>/dev/null | wc -l)"
+    [[ "$NGPU" -gt 0 ]] || die "--gpu but nvidia-smi lists no devices"
+    [[ "$GPU" -lt "$NGPU" ]] || die "--gpu $GPU but only $NGPU device(s) present (0..$((NGPU-1)))"
+fi
 
 # Exactly one deck, so we never guess which input file was meant.
 shopt -s nullglob
@@ -107,6 +152,11 @@ if [[ -d "$RUN_DIR/diags" ]] && compgen -G "$RUN_DIR/diags/*" >/dev/null; then
     fi
 fi
 
+if [[ -n "$GPU" ]]; then
+    THREADS=1                   # the push is on the device; host threads only contend
+    echo "launch: GPU mode -- device $GPU ($(nvidia-smi --query-gpu=name \
+        --format=csv,noheader -i "$GPU" 2>/dev/null)), OMP_NUM_THREADS forced to 1"
+fi
 echo "launch: $(basename "$RUN_DIR")  deck=$DECK  warpx=$(basename "$WARPX")  threads=$THREADS"
 echo "launch: cwd=$RUN_DIR  (so diags/ lands here, not in the repo root)"
 echo "launch: $WARPX $DECK ${EXTRA[*]:-} > run.log 2>&1"
@@ -117,6 +167,10 @@ fi
 
 cd "$RUN_DIR"                                           # THE POINT OF THIS SCRIPT
 export OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=spread OMP_PLACES=cores
+if [[ -n "$GPU" ]]; then
+    export CUDA_VISIBLE_DEVICES="$GPU"
+    unset OMP_PROC_BIND OMP_PLACES         # meaningless with one host thread
+fi
 
 start_logger() {   # after WarpX, so run.log exists (the logger waits for it anyway)
     [[ $LOGGER -eq 1 ]] || return 0
