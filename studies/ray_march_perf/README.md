@@ -75,6 +75,34 @@ One subtlety decides whether it is bit-identical: the turning-point branch rewin
 That path sets `s_valid = false` and stage 1 takes its own sample. Miss this and the change
 is *nearly* exact, which is the worst outcome available.
 
+### The O1 race audit (done; O1 not yet written)
+
+A bare `#pragma omp parallel for` over the ray loop would be **wrong for a reason the plan had
+not named**. There are three pieces of shared mutable state, not two:
+
+| state | where | consequence of racing |
+|---|---|---|
+| `H_arr(...) +=` | `deposit()` | lost updates; the known one |
+| `absorbed_power_total +=` | `deposit()` | a `reduction(+:)`; trivial |
+| **`A_loc`** | enclosing scope, line ~716 | **corrupts the absorption coefficient** |
+
+`A_loc` is the interpolated IB coefficient at the most recent `sample()`, kept as a side channel
+in the enclosing scope *because* the RK4 stages call `sample` without needing it. Threaded, every
+thread overwrites it five times per step and then reads someone else's value. That is not a
+rounding perturbation — it changes the physics, silently, with no crash and no conservation
+violation. Fix by making it an out-parameter so it is never shared, which also retires the
+"read it immediately after the sample you mean" ordering contract.
+
+Everything else is safe, and the compiler says so: `n_arr`/`A_arr` are `const_array(mfi)`, the
+geometry is `const`, and all of `trace_ray`'s march state is invocation-local — including O3's
+`s_valid`, which is why it was written inside `trace_ray` rather than beside `rk4`. The `MFIter`
+walks the gathered full-domain box, so there is exactly one iteration and the ray loop is the
+unambiguous parallel region.
+
+Accumulator memory, to budget before an H5-scale run: `N_ACC × n_cells × 8 B`. The spot box
+(320×2200) is 5.6 MB per buffer — 45 MB at `N_ACC` = 8. A 3424-column H5-scale spot is 60 MB per
+buffer, i.e. **482 MB at 8**, so `N_ACC` wants to be a runtime parameter that gets logged.
+
 ### Still to do
 
 * build and run Tier 1 for O3; then O1, then O2, re-running Tier 1 after each

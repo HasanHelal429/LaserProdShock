@@ -815,14 +815,40 @@ budget has failed even if the code is faster.
 (`ParallelCopy` to a single full-domain box, then `dtoh_memcpy`) and is **not written** during the
 march, and `trace_ray` has no ray-to-ray coupling. The frozen field is what makes this safe.
 
-**The entire race surface is two lines, both in `deposit()`:**
+**The race surface is THREE pieces of state, not two.** The source audit of 2026-07-29 corrected
+this section: two are in `deposit()`, and the third is easy to miss and much more dangerous.
 
 ```cpp
-H_arr(idx[0], idx[1], idx[2]) += absorbed / (n_e * V_cell) * inv_me;
-absorbed_power_total += absorbed;
+H_arr(idx[0], idx[1], idx[2]) += absorbed / (n_e * V_cell) * inv_me;   // deposit(), line ~780
+absorbed_power_total += absorbed;                                      // deposit(), line ~782
+amrex::Real A_loc = m_K_coeff;                                         // line ~716  <-- THIS
 ```
 
-The second is a `reduction(+:)`. The first is the design decision:
+`A_loc` is the interpolated inverse-bremsstrahlung coefficient at the most recent `sample()`
+position. It is declared in the enclosing scope and captured by reference precisely *because*
+`sample` is called from the RK4 stages that do not need it — it is a side channel, documented as
+"read it immediately after the `sample` whose position you mean". Under `#pragma omp parallel for`
+over rays, every thread writes it on every one of the five samples per step, and each then reads
+whatever another thread last wrote. **That does not perturb rounding — it corrupts the absorption
+coefficient**, so the run would produce plausible, smooth, entirely wrong physics with no crash and
+no conservation violation. It is exactly the failure mode §2.8 was written about.
+
+The fix is to stop it being shared at all rather than to guard it: make it an out-parameter of
+`sample()`, so callers that need it own a local and callers that do not pass scratch. That also
+removes the "read it immediately after" ordering contract, which is a latent hazard even in serial
+code. **O1 must not be attempted as a bare `parallel for`.**
+
+Everything else in the enclosing scope is safe to share, and the compiler enforces the important
+part: `n_arr` and `A_arr` are `const_array(mfi)`, and the geometry (`plo`, `dxi`, `lo3`, `hi3`,
+`wrap`, `h`, `max_steps`, …) is `const`. All of `trace_ray`'s march state (`c`, `T`, `P`, `n_ref`,
+`g`, `r_prev`, `ne_prev`, and O3's `s_valid`) is local to the invocation, so it is per-ray already —
+one reason O3 was written with its state inside `trace_ray` rather than beside `rk4`.
+
+The `MFIter` at line ~683 walks the **gathered full-domain box**, so there is exactly one iteration
+and the ray loop is the unambiguous parallel region — no question of nesting the parallelism at the
+box level.
+
+`absorbed_power_total` is a `reduction(+:)`. `H_arr` is the design decision:
 
 - **Atomics** (`#pragma omp atomic`) — two lines, low contention (nearest-cell deposition keeps a
   normally-incident ray in its own column), but the summation order into a cell becomes run-to-run
@@ -830,7 +856,10 @@ The second is a `reduction(+:)`. The first is the design decision:
   `laser_deposition` checksum to **≤4×10⁻¹⁶** (§2.8), and this campaign has just had to reset
   those benchmarks once.
 - **Per-accumulator buffers, reduced in fixed order** — deterministic, and the memory is trivial in
-  2D (one full-domain FAB is 320×2200×8 B = 5.6 MB).
+  2D. Budget it as `N_ACC × n_cells × 8 B`: the spot run's 320×2200 box is 5.6 MB per buffer, so
+  **45 MB at `N_ACC` = 8** and 90 MB at 16. Worth checking before an H5-scale spot, where 3424
+  columns give 60 MB per buffer — **482 MB at 8, 963 MB at 16** — so `N_ACC` should be a runtime
+  parameter, not a compile-time constant, and it must be logged with the run.
 
 **Take the buffers, and decouple the accumulator count from the thread count.** Use a fixed
 `N_ACC` (16) buffers with ray `i` → buffer `i % N_ACC`, reduced in buffer order. Then the result is
