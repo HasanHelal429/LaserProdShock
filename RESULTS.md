@@ -1090,8 +1090,8 @@ autocorrelation **−0.521** (negative ⇒ neighbour exchange, not boundary pile
 **c817b63 regression passes on all 10 dumps.** `wall/interior` = 0.02 → 0.95, peak 1.16 — never
 near the clamp's **20–25**.
 
-**Coupling:** `f_abs` peak 1.0000, final 0.4943; `E_abs` = **31.01 J/m**; shutoff 1.227 ps;
-`Tlocalfrac` 0.432 → 0.859. Time-integrated on-axis coupling **0.5240 vs the 1D baseline's
+**Coupling:** `f_abs` peak 1.0000, final **0.5193**; `E_abs` = **31.01 J/m**; shutoff 1.227 ps;
+`Tlocalfrac` 0.432 → 0.860 (14 400 applications to t = 9.961 ps). Time-integrated on-axis coupling **0.5240 vs the 1D baseline's
 0.3034** (ratio 1.73), but that number mixes two opposite finite-spot effects — lateral
 rarefaction lowers it, cooler wings (`K ∝ T_e^{−3/2}`) raise it.
 

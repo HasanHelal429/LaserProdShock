@@ -109,7 +109,7 @@ Benchmarked, not scaled — `CLAUDE.md`'s rule after a 4× miss on `P1_vac_1d`.
 
 **2026-07-29. Complete: 144 000 steps, 9.961 ps, 20 308 s (5 h 38 m) on GPU 0, mean
 0.1411 s/step.** Deck verified against `config.yaml`. Gates: G1 0.214 pass, G2 61.2 pass,
-**G3 −13.17 % (pass, negative)**, G4 pass, G5 pass (`Tlocalfrac` 0.432 → 0.859),
+**G3 −13.17 % (pass, negative)**, G4 pass, G5 pass (`Tlocalfrac` 0.432 → 0.860),
 **G6 −16.86 % at 2.06 % weight loss**.
 
 ### The headline: this run stops being a finite spot after ~2 ps
@@ -157,7 +157,7 @@ linearly with columns. Or keep this box and stop at **`t` ≲ 1.6 ps**.
 share grows to 1.9×10⁻³, but with a ratio ≤ 1 that is light *filling* the box, not piling at a
 clamped edge.
 
-**Coupling, in the valid window.** `f_abs` peak 1.0000, final 0.4943; `E_abs` = **31.01 J/m**;
+**Coupling, in the valid window.** `f_abs` peak 1.0000, final **0.5193**; `E_abs` = **31.01 J/m**;
 shutoff (½ peak) **1.227 ps**. Against `P1_vac_1d_thick` at matched physical time, the
 time-integrated on-axis coupling is **0.5240 vs 0.3034 (ratio 1.73)** — but read the two opposite
 finite-spot effects before quoting it: lateral rarefaction *lowers* the coupling while the cooler

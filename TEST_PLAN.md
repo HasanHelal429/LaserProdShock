@@ -13,7 +13,15 @@ be re-run before any 2D claim. Phase 1 in **1D** is complete and its findings (�
 thickness clause. **Phase 0 is complete** (2026-07-28): tooling built, all five boundary runs
 done, and the boundary decision recorded (`open` on the propagation axis + periodic
 transverse; B₀ uniform to 1.000000 under pec).
-**Phase 1.5 (§7.5) is now on the plan**: the ray march is **65.6 %** of a driven 2D run by
+**2026-07-29, `P1_vac_2d_spot` (§7.2.1): the operator is validated in 2D and H5 is still
+untested.** Step 0 is exact on a *spatial* measure (per-column ratio 1.00010, total within
+2.2×10⁻⁵ of `I₀w₀√π`) and c817b63 holds on all 10 dumps — but the run **loses transverse
+isolation after 1.99 ps**, because its box was sized from `c_s` where `v_th,e` = 10 `c_s` governs.
+A valid H5 spot run needs a **4.9× wider** transverse box, which makes Phase 1.5 a prerequisite
+rather than an optimisation. The **box-sizing rule** in §7.2.1 applies to Phase 2 and 3B too, and
+`scripts/spot_isolation.py` now checks it.
+
+**Phase 1.5 (§7.5) is on the plan, and is now blocking**: the ray march is **65.6 %** of a driven 2D run by
 WarpX's own profiler, so before Phase 2's 2D runs and Phase 3B's ~30-point `beam_waist` sweep pay
 that cost ~30 more times, three changes are scoped — cache a redundant `sample()`, OMP over rays,
 and skip the provably-no-op march through vacuum (measured at 47 % of the path at `t` = 0, but
