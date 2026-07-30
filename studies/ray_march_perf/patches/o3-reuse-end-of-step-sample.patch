@@ -1,0 +1,85 @@
+diff --git a/Source/Particles/LaserDeposition/LaserDeposition.cpp b/Source/Particles/LaserDeposition/LaserDeposition.cpp
+index 431ba31de..bebe8d386 100644
+--- a/Source/Particles/LaserDeposition/LaserDeposition.cpp
++++ b/Source/Particles/LaserDeposition/LaserDeposition.cpp
+@@ -784,8 +784,19 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+ 
+         // RK4 step of the eikonal system  dc/ds = T/n_ref,  dT/ds = grad n_ref
+         // (T = n_ref * unit-direction), integrated over arc length h.
++        //
++        // Stage 1 samples at `c`, which is exactly where the caller's end-of-step sample
++        // was already taken -- so the caller passes those values in rather than paying
++        // for a sixth field sample per step. `s_valid` is false only when the caller has
++        // moved `c` since that sample (the turning-point rewind), and then stage 1 takes
++        // its own. This is bit-identical, not an approximation: `sample` is a pure
++        // function of position and the field arrays, which are frozen for the march.
++        // Only `nref` and `g` are needed -- no RK4 stage reads the density.
+         auto rk4 = [&] (amrex::Real (&c)[AMREX_SPACEDIM],
+-                        amrex::Real (&T)[AMREX_SPACEDIM])
++                        amrex::Real (&T)[AMREX_SPACEDIM],
++                        const bool s_valid,
++                        const amrex::Real s_nref,
++                        const amrex::Real (&s_g)[AMREX_SPACEDIM])
+         {
+             amrex::Real ne, nref, g[AMREX_SPACEDIM];
+             amrex::Real ct[AMREX_SPACEDIM], Tt[AMREX_SPACEDIM];
+@@ -794,7 +805,12 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             amrex::Real dc3[AMREX_SPACEDIM], dT3[AMREX_SPACEDIM];
+             amrex::Real dc4[AMREX_SPACEDIM], dT4[AMREX_SPACEDIM];
+ 
+-            sample(c, ne, nref, g);
++            if (s_valid) {
++                nref = s_nref;
++                for (int d = 0; d < AMREX_SPACEDIM; ++d) { g[d] = s_g[d]; }
++            } else {
++                sample(c, ne, nref, g);
++            }
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                 dc1[d] = T[d] / nref; dT1[d] = g[d];
+                 ct[d] = c[d] + 0.5_rt * h * dc1[d];
+@@ -847,11 +863,17 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             amrex::Real r_prev = n_e * inv_n_cr;
+             amrex::Real ne_prev = n_e;
+ 
++            // True while (n_ref, g) are the sample at the ray's CURRENT `c`, so RK4
++            // stage 1 can reuse them. The sample above establishes that at launch; the
++            // end-of-step sample re-establishes it every step; only the turning-point
++            // rewind of `c` breaks it.
++            bool s_valid = true;
++
+             for (int istep = 0; istep < max_steps && P > P_min; ++istep) {
+                 amrex::Real c_old[AMREX_SPACEDIM];
+                 for (int d = 0; d < AMREX_SPACEDIM; ++d) { c_old[d] = c[d]; }
+ 
+-                rk4(c, T);
++                rk4(c, T, s_valid, n_ref, g);
+ 
+                 // Absorption over the step, evaluated at the midpoint.
+                 amrex::Real c_mid[AMREX_SPACEDIM];
+@@ -869,8 +891,10 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                     P -= absorbed;
+                 }
+ 
+-                // Refractive index at the new position.
++                // Refractive index at the new position. This also becomes RK4
++                // stage 1 of the next step, which is at this same point.
+                 sample(c, n_e, n_ref, g);
++                s_valid = true;
+                 const amrex::Real r_cur = n_e * inv_n_cr;
+                 const amrex::Real drds = (r_cur - r_prev) / h;
+ 
+@@ -919,10 +943,13 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                         }
+                     }
+                     // Nudge back into the underdense region to avoid being
+-                    // re-trapped at the same point on the next step.
++                    // re-trapped at the same point on the next step. This moves `c`
++                    // away from where (n_ref, g) were sampled, so the next RK4 stage 1
++                    // must take its own sample.
+                     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                         c[d] = c_old[d];
+                     }
++                    s_valid = false;
+                 }
+ 
+                 if (n_e > 0._rt) { r_prev = r_cur; ne_prev = n_e; }
