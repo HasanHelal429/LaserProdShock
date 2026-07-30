@@ -324,6 +324,26 @@ not, and work while a run is still going.
   65×. `P1_vac_1d` lost 0.68 % of macroparticles but only **0.0104 % of the weight**, because
   the escapers are the tenuous corona tail. That is why G6 finally closed (**−0.74 %**) where
   Phase 0 could only report +218 %/+235 %.
+- **Size every box from `v_th,e`, NEVER from `c_s`. This has now cost three separate
+  mistakes.** Electrons carry the energy and `v_th,e/c_s` ≈ 10 here (37.7 vs 4.0 `d_e`/ps at a
+  227 eV corona). `P1_vac_2d_spot` sized its ±80 `d_e` transverse box from `c_s` — predicting the
+  lateral flow would reach the wall at 14 ps, beyond its 9.96 ps — and **lost its transverse
+  contrast after 1.99 ps**, against the 2.1 ps `v_th,e` predicts. The same error appeared in
+  Phase 0 (confining the ambient electron excursion needs ~2 400 `d_e` per open direction) and in
+  O2's vacuum estimate (a forward gap is consumed at `v_th,e`, so it lasts ~1/10 as long as a
+  `c_s` estimate says). **Ask it of every dimension:** `L/2 ≳ v_th,e·t_end + (initial extent)`.
+- **A periodic transverse box turns a finite spot into an infinite ARRAY of spots.** Once heat
+  crosses half the pitch they merge and the run is planar with extra steps — silently, with every
+  gate passing and energy conserved. Run `scripts/spot_isolation.py <run> --control <run>_off`:
+  it measures the transverse profile of the NET absorbed energy (driven minus the control's drain)
+  and reports `dark/lit` — **< 0.2 isolated, 0.2–0.5 marginal, > 0.5 effectively planar**. On
+  `P1_vac_2d_spot` it goes 0.135 at 1 ps to **0.946 at 10 ps**, i.e. the deposited energy ends
+  **flat to 7 % across a box the beam illuminates at 1.1×10⁻⁷ of peak**.
+- **`w_eff` is not the heated radius, and `T_e` needs its weighting stated.** `w_eff` is the
+  second moment of the ABSORBED POWER, so the shot-noise leak inflates it (2.39 `w₀` at a 16 %
+  leak). And on-axis `T_e` at `t_end` is **243 eV absorption-weighted** (the tenuous corona the
+  rays cross) against **81 eV density-weighted** (the bulk mass) — a factor 3, so √3 in `c_s` and
+  in every timescale built on it.
 - **A finite spot heats a profile ~1.5× WIDER than it is illuminated with, and that is real.**
   `w_eff/w₀` is 1.000 at `t` = 0 and 1.5–1.6 by 1 ps, at *both* 36 and 144 ppc, while the
   transverse `n_e` stays flat to 0.6 % (and 0.75 ps of `c_s` is 4 % of a waist, so density could

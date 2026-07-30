@@ -1036,3 +1036,99 @@ Hypothesis (`the leak is a resolution artifact and falls with ppc`) **confirmed*
 the one §2.8 already taught in a different costume: a single summary number — here 7 % "in the
 wrong place" — held an artifact and a real physical effect together, and treating it as one thing
 would have optimised the physics away with the noise.
+
+
+---
+
+## 2026-07-29 — `P1_vac_2d_spot` completes: the operator is validated, **H5 is not tested**, and a transverse box must be sized by `v_th,e` not `c_s`
+
+144 000 steps, 9.961 ps, 20 308 s (5 h 38 m) on GPU 0, mean 0.1411 s/step. Control
+`P1_vac_2d_spot_off` complete in 10 107 s. Full write-up in the run README; figures in
+`media/P1/P1_vac_2d_spot/`.
+
+### The run stops representing a finite spot after ~2 ps
+
+`scripts/spot_isolation.py` (new) measures the transverse profile of the **net** absorbed energy —
+driven particle-KE gain minus the control's boundary drain, per band:
+
+| `t` [ps] | 1.0 | 2.0 | 3.0 | 5.0 | 7.0 | 10.0 |
+|---|---|---|---|---|---|---|
+| dark/lit (\|x\|>2.5`w₀` over \|x\|<`w₀`) | **0.135** | 0.408 | 0.544 | 0.712 | 0.823 | **0.946** |
+| min/max across the box | 0.069 | 0.340 | 0.477 | 0.675 | 0.793 | **0.931** |
+
+By `t_end` the deposited energy is **flat to 7 % across the whole box**, from a beam whose wall
+intensity is **1.1×10⁻⁷ of peak**. Periodic transverse faces make the run an infinite *array* of
+spots at 8 `w₀` pitch; once heat crosses half the pitch the array merges.
+
+### The cause: `v_th,e` = 10 `c_s`, and the box was sized with `c_s`
+
+The run's `expect` block predicted lateral flow would reach the wall at (80−20)/`c_s` = **14 ps**,
+beyond `t_end`. Electrons carry the energy: at the measured coronal `T_e` = 227 eV,
+**`v_th,e` = 37.7 `d_e`/ps against `c_s` = 4.0**, so 80 `d_e` is crossed in **2.1 ps** — and the
+measurement says contrast was lost after **1.99 ps**. Prediction and measurement agree to 5 %; the
+original estimate was optimistic by **7×** purely from the wrong speed. My own
+`revision_2026_07_29` fixed the heated *radius* and repeated the same `c_s` error, so it was wrong
+too.
+
+**The rule, in sizeable form:** `L_t/2 ≳ v_th,e(T_e,corona)·t_end + w₀`. For this run that is
+**396 `d_e`, 4.9× the 80 used** (1 584 transverse columns against 320) — or keep the box and stop
+at **`t` ≲ 1.6 ps**.
+
+This is the **third** time this campaign has been caught by `v_th,e`: the Phase-0 blocker
+(confining the ambient electron excursion needs ~2 400 `d_e` per open direction), the O2 vacuum
+measurement earlier today (the forward gap is consumed at `v_th,e`, not `c_s`), and now this. It
+is the same physics each time and deserves to be the first question asked of any box dimension.
+
+### What IS established
+
+**The operator is exact at `t` = 0, on a spatial measure** (§2.8's rule): per-column mean ratio to
+`I₀exp(−(x/w₀)²)` = **1.00010**, spread 2.537 % (36 ppc shot noise), residual lag-1
+autocorrelation **−0.521** (negative ⇒ neighbour exchange, not boundary pile-up), total absorbed
+**5.940787×10¹² W/m** against the analytic `I₀w₀√π` = 5.940916×10¹² (**2.2×10⁻⁵** apart),
+`f_abs(0)` = 0.999978.
+
+**c817b63 regression passes on all 10 dumps.** `wall/interior` = 0.02 → 0.95, peak 1.16 — never
+near the clamp's **20–25**.
+
+**Coupling:** `f_abs` peak 1.0000, final 0.4943; `E_abs` = **31.01 J/m**; shutoff 1.227 ps;
+`Tlocalfrac` 0.432 → 0.859. Time-integrated on-axis coupling **0.5240 vs the 1D baseline's
+0.3034** (ratio 1.73), but that number mixes two opposite finite-spot effects — lateral
+rarefaction lowers it, cooler wings (`K ∝ T_e^{−3/2}`) raise it.
+
+**H5 is untested.** `f_ax/f_abs(1D)` is 1.09 at `t` = 0, then 0.80–1.01 through 7 ps *with no
+trend*, then 0.62 and 0.56 at 8 and 9 ps — entirely inside the invalid window. And the periodic
+images would push the answer *toward* planar (ratio → 1), so they do not explain a drop to 0.56:
+the late fall is **unexplained, not attributed**, and must not be read either way.
+
+### Two measurement lessons
+
+**`w_eff` is not the heated radius.** It grows 1.000 → 2.39, past the ≥1.5 lower bound the ppc
+study predicted — but the shot-noise leak (16 % here) inflates the second moment. And the two
+temperature weightings differ by 3×: on-axis `T_e` ends at **243 eV absorption-weighted** (the
+corona the rays cross) against **81 eV density-weighted** (the bulk mass). `c_s` differs by √3
+between them. State the weighting.
+
+**The wing heating is 71 % real.** Time-integrated, 9.5 % of absorbed energy lands beyond
+2.5 `w₀` (±10 %, coarse 10-dump trapezoid). Against the dark region's 9.18 J/m KE gain that is
+**29 % leaked light (a 36 ppc artifact) and 71 % genuine lateral transport**. So the loss of
+isolation would *not* be fixed by more particles.
+
+### `g3_spot.py`: the premise I built it on was falsified
+
+Restricting G3 to the illuminated columns gives **−12.93 %** against **−13.17 %** whole-box —
+**×0.98**, no meaningful change. I had argued the whole-box G3 must overstate the control by
+roughly the inverse illuminated fraction (~4×). Wrong, and for the reason above: the dark region
+is not dark, its per-band gain being 95 % of the lit bands'. The script still earned its place —
+it is the only way this could have been known, and its whole-box column reproduces
+`ParticleEnergy` to **0.000 %**, which is what makes the restricted number trustworthy.
+
+G3 = **−13.2 %**: negative, so not grid heating, but 4× `P1_vac_2d`'s −3.09 %. G6 = **−16.86 % at
+2.06 % weight loss** (6.81 % of macroparticles; 12.0 % of electron macroparticles) — a bigger
+deficit at a *smaller* weight loss than the planar run, because the escapers are the hot tenuous
+corona.
+
+### Deliverable
+
+`scripts/spot_isolation.py` — a reusable check that would have caught this before 5 h 38 m of GPU
+time, and which prints the box a valid run of a given duration would need. It should become a
+gate.

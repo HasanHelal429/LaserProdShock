@@ -44,8 +44,8 @@ measured cost of the serial host-side ray march for 320 rays.
 | | value |
 |---|---|
 | cells | 320 × 2200 = 704 000 |
-| macroparticles | (fill in from `PN.txt`) |
-| wall time | (fill in from `progress.log`) |
+| macroparticles | same initial 2.682×10⁷ (the deck differs only in `laser.intensity`) |
+| wall time | 10 107 s = 2 h 48 m on GPU 1 — half the driven cost, since with no beam there is no ray march |
 
 ## Gates
 
@@ -116,4 +116,31 @@ driven run's README.
 
 ## Retracted
 
-Nothing.
+**2026-07-29 — section 3 above ("A finite spot makes G3's subtraction relatively worse, and the
+fix is spatial") is WRONG, and the measurement that refutes it is the one it asked for.**
+
+The argument was that the drive covers only ~35 of 160 `d_e`, so a box-total G3 must overstate the
+control relative to the driven gain, and G3 should therefore be evaluated on the illuminated
+columns. `scripts/g3_spot.py` was written to do exactly that. Measured at `t_end`:
+
+| region | control / driven |
+|---|---|
+| illuminated, \|x\| < `w₀` | **−12.93 %** |
+| dark, \|x\| > 2.5 `w₀` | −13.73 % |
+| whole box (the standard G3) | **−13.17 %** |
+
+**Restricting changes the verdict by ×0.98 — nothing.** The premise fails because the dark region
+is not dark: by `t_end` the driven run's per-band energy gain in the dark bands is **95 %** of that
+in the lit bands (1.740 vs 1.840 J/m). Electron thermal transport at `v_th,e` = 37.7 `d_e`/ps
+crosses the 80 `d_e` half-box in ~2 ps, so the "unilluminated" four-fifths of the box is heated
+almost as strongly as the spot itself. 71 % of that wing heating is real transport; 29 % is the
+36 ppc leak (`studies/spot_leak_ppc`).
+
+What survives: the **whole-box G3 was right all along** for this run, and `g3_spot.py` remains
+worth having — a premise this plausible could only be dismissed by measuring it, and the script's
+whole-box column reproduces `ParticleEnergy` to 0.000 %, which is what makes its restricted number
+believable. It also earns its place on any *future* spot run that is actually transversely
+isolated (`scripts/spot_isolation.py`, `dark/lit` < 0.2), where the original argument should hold.
+
+The deeper retraction is the sizing, not the gate: see the driven run's README and
+`TEST_PLAN.md` §7.2.1. This box was never large enough for a 10 ps finite-spot run.

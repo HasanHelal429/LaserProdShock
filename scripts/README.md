@@ -24,6 +24,7 @@ python scripts/<script>.py <run_dir> [options]
 | `laser_report.py` | `LASERDEP` history + per-cell profile dumps → `f_abs(t)`, `E_abs`, `t_s`, `Tlocalfrac` | `run.log`, `diags/laserdep_profile_*.txt` | `media/<ID>/laser_*.png` | **built** |
 | `spot_report.py` | **Finite-spot transverse diagnostics** -- deposition vs the analytic `I(x)`, `w_eff(t)`, on-axis `f_ax(t)`, edge-column regression | `config.yaml`, `diags/laserdep_profile_*.txt`, `run.log` | `media/<ID>/spot_*.png` | **built** |
 | `g3_spot.py` | works; validated | G3 restricted to the illuminated columns, from plotfiles. Whole-box column reproduces `ParticleEnergy` to 0.000 % |
+| `spot_isolation.py` | works; **should become a gate** | is a finite-spot run still a finite spot? `dark/lit` of the net absorbed energy, plus the box a valid run would need |
 | `plot_fields.py` | (z,t) streaks of `n_e`/`B_y`/`E_z`, lineouts, 2D x–z map | `config.yaml`, plotfiles | `media/<ID>/fields_*.png` | **built** |
 | `phase_space.py` | **The arbiter** — ion (z, u_z), reflected-ion population | `config.yaml`, plotfiles | `media/<ID>/phase_space.png` | **built** |
 | `make_movies.py` | Movies: evolving lineouts + laser cursor, phase space, 2D map | `config.yaml`, plotfiles | `media/<ID>/movie_*.mp4` | **built** |
@@ -243,3 +244,23 @@ python scripts/g3_spot.py runs/P1/P1_vac_2d_spot --control runs/P1/P1_vac_2d_spo
   absent. That is how the family mix-up first presented: a confident, smooth, *positive*
   control ratio of +17.16 %, i.e. apparent grid heating, instead of −3.09 %. Missing species
   and missing fields are now hard errors naming the fix.
+
+
+## `spot_isolation.py` — is the finite spot still finite?
+
+With periodic transverse faces a localized-heating run is really an infinite **array** of spots at
+pitch `L_t`. Once heat has crossed `L_t/2` the array merges and the result is planar physics with
+extra steps — and nothing announces it: every gate passes and energy is conserved.
+
+```bash
+python scripts/spot_isolation.py runs/P1/P1_vac_2d_spot --control runs/P1/P1_vac_2d_spot_off
+```
+
+It bands the transverse axis and reports the **net** absorbed energy per band — the driven
+particle-KE gain minus the laser-off control's boundary drain, so the boundary drain cannot
+masquerade as structure — then `dark/lit`: **< 0.2 isolated, 0.2–0.5 marginal (quote it), > 0.5
+effectively planar**. It also prints the box a valid run of that duration would need.
+
+**The timescale is `v_th,e`, not `c_s`** — a factor ~10. On `P1_vac_2d_spot`: `c_s` said the box
+would last 45 ps, `v_th,e` said 2.1 ps, and the measurement lost contrast after **1.99 ps**. Sizing
+rule: `L_t/2 ≳ v_th,e(T_e,corona)·t_end + w₀`.

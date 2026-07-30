@@ -763,6 +763,48 @@ Same target and laser, 2D, transverse extent from the Phase-0 finding. Two sub-c
 `rays_per_cell` convergence belongs here — a structured beam on a structured plume is where
 sub-cell ray sampling first matters.
 
+#### 7.2.1 RESULT 2026-07-29 — `P1_vac_2d_spot` ran; **H5 is untested, and the reason is a box-sizing rule**
+
+The finite-spot run completed (144 000 steps, 9.961 ps, 5 h 38 m) with its control. The operator
+came out **exact at `t` = 0 on a spatial measure** — per-column mean ratio to `I₀exp(−(x/w₀)²)` =
+1.00010, residual lag-1 autocorrelation −0.521, total absorbed within **2.2×10⁻⁵** of `I₀w₀√π` —
+and c817b63's `wall/interior` ratio stayed ≤ 1.16 on all 10 dumps against the clamp's 20–25.
+
+**But the run stops being a finite spot after ~2 ps.** `scripts/spot_isolation.py` measures the
+transverse profile of the *net* absorbed energy (driven minus the control's drain): `dark/lit` goes
+**0.135 at 1 ps → 0.946 at 10 ps**, i.e. the deposited energy ends flat to 7 % across a box the
+beam illuminates at **1.1×10⁻⁷ of peak**. Periodic transverse faces make the run an infinite array
+of spots at 8 `w₀` pitch, and once heat crosses half the pitch the array merges.
+
+**Cause: the box was sized with `c_s`.** The prediction was 14 ps to the wall; electrons carry the
+energy and `v_th,e` = 37.7 `d_e`/ps against `c_s` = 4.0 at the measured 227 eV corona, giving
+**2.1 ps** — measured 1.99 ps. Optimistic by 7× from the wrong speed alone.
+
+> **BOX-SIZING RULE, and it applies to Phase 2 and Phase 3B as much as here:**
+> `L/2 ≳ v_th,e(T_e,corona)·t_end + (initial extent)`, for **every** dimension.
+> This is the third time this campaign has been caught by `v_th,e` — the Phase-0 open-boundary
+> blocker, O2's vacuum estimate (§7.5.2) and now this. Ask it of every dimension before launching.
+
+**What a valid H5 spot run costs.** `L_t/2 ≳ 396 `d_e`` for a 10 ps run — **4.9× wider**, 1 584
+transverse columns against 320 — and the ray march scales *linearly* with columns. So a valid H5
+run is ~5× this one on the dominant term, which is precisely what §7.5 exists to buy. The cheap
+alternative is to keep the box and stop at **`t` ≲ 1.6 ps**, which no longer covers a crossing
+time and so cannot test H5 either.
+
+**H5 is untested, not falsified.** `f_ax/f_abs(1D)` is 1.09 at `t` = 0, then 0.80–1.01 through 7 ps
+**with no trend**, then 0.62 and 0.56 at 8 and 9 ps — inside the invalid window. Note also that the
+periodic images push the answer *toward* planar (ratio → 1), so they do not explain a fall to 0.56:
+the late drop is **unexplained rather than attributed** and must not be read either way.
+
+**Two things to carry forward.** (1) `w_eff` is the second moment of the ABSORBED POWER and the
+shot-noise leak inflates it (2.39 `w₀` at a 16 % leak) — it is not the heated radius. (2) On-axis
+`T_e` ends at **243 eV absorption-weighted** against **81 eV density-weighted**; state which, since
+`c_s` differs by √3 and every derived timescale with it.
+
+**`rays_per_cell` convergence is settled and needs no ladder here**: `ac1` stayed negative on all
+10 dumps (−0.51 → −0.24), so the scatter is neighbour exchange from random ray wander, not the
+coherent refractive channelling that would demand sub-cell sampling (`studies/rays_per_cell`).
+
 ### 7.3 Pass criteria
 
 1D and 2D-planar agree on axis; the energy budget closes (G6); the deposition profile sits
@@ -1248,7 +1290,17 @@ boundaries, is the project's headline output.
 - [ ] `f_abs(t)`, `t_s`, `T_e,shutoff`, `v_p` measured; H1/H3 confirmed or replaced
 - [ ] Self-similar rarefaction / Schaeffer Eq. 1 recovered
 - [ ] `P1_vac_2d` planar reproduces 1D on axis
-- [ ] `P1_vac_2d` finite spot: `w₀` scan, `rays_per_cell` convergence, H5
+- [x] `P1_vac_2d_spot` + `_off` RAN (9.96 ps, 5 h 38 m). Operator **exact at `t` = 0** on a
+      spatial measure (per-column ratio 1.00010, ac1 −0.521, total within 2.2e-5 of `I₀w₀√π`);
+      c817b63 `wall/in` ≤ 1.16 on all 10 dumps. G3 −13.2 % (negative), G6 −16.86 % at 2.06 %
+      weight loss
+- [ ] **H5 still untested** — the run loses transverse isolation after **1.99 ps** (`dark/lit`
+      0.135 → 0.946), so the predicted degradation appears only in the invalid window. Needs
+      `L_t/2` ≳ 396 `d_e` (4.9× wider, 1 584 columns) for 10 ps — i.e. it waits on Phase 1.5
+- [x] `w₀` scan NOT started, and deliberately deferred: a scan in a box this size would measure
+      the box, not `w₀`
+- [x] `rays_per_cell` convergence settled without a ladder — `ac1` negative on all 10 dumps
+- [x] `scripts/spot_isolation.py` — the reusable check, and the `v_th,e` box-sizing rule (§7.2.1)
 - [x] `studies/rays_per_cell/` — sub-ray convergence: scatter RISES x4.4 from rpc 1 to 4
       (my written prediction was falsified); `ac1` negative at every dump, so the developed-plume
       ladder is unnecessary and rpc 1 stands
