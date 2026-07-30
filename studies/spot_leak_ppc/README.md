@@ -46,9 +46,17 @@ improvement at higher ppc is not measured for the saturated state.
 ```
 config.base.yaml   the spot config, thinned target, 1 ps
 run_variants.sh    launches the pair (-g N to pick a GPU)
-analyze.py         leak share, ripple at n_cr, w_eff -> one verdict line
+analyze.py         the time series, the t=0 check, and two separate verdicts
+figures.py         -> media/spot_leak_ppc/spot_leak_ppc.png
 scratch/           the variant run dirs (gitignored)
 ```
+
+**Figure** (`python studies/spot_leak_ppc/figures.py`) — four panels, one per conclusion:
+(a) `w_eff/w0` is 1.000 at `t` = 0 and rises identically at both ppc, so the width is real;
+(b) the leak falls as the noise POWER, with the `36 ppc / 4` line tracking 144 ppc exactly at
+0.25 and 0.50 ps and visibly breaking by 0.75 ps; (c) `f_ax` against whole-beam `f_abs`, with the
+16 % ppc bias marked; (d) transverse `T_e` peaked 250 -> 60 eV while `n_e` stays flat -- the
+mechanism, and the reason the two effects are separable.
 
 ## Result
 

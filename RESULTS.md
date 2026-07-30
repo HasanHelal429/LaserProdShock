@@ -957,6 +957,9 @@ decided both, because the single number contained two effects with different ppc
 Full write-up and the reproducing command in `studies/spot_leak_ppc/README.md`. 36 ppc ran 14 400
 steps in 1103 s, 144 ppc in 2331 s.
 
+**Figure:** `media/spot_leak_ppc/spot_leak_ppc.png` — four panels, one per conclusion below
+(`python studies/spot_leak_ppc/figures.py`).
+
 ### `t` = 0 is exact, and identical at both ppc
 
 Before the plasma evolves, `T_e` and `n_e` are uniform, so the absorbed-power profile must be the
