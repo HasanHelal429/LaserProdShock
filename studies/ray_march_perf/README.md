@@ -103,6 +103,41 @@ Accumulator memory, to budget before an H5-scale run: `N_ACC × n_cells × 8 B`.
 (320×2200) is 5.6 MB per buffer — 45 MB at `N_ACC` = 8. A 3424-column H5-scale spot is 60 MB per
 buffer, i.e. **482 MB at 8**, so `N_ACC` wants to be a runtime parameter that gets logged.
 
+### O2's payoff, measured — and the plan's estimate was wrong by 4.5×
+
+`vacuum_fraction.py` reads `n_e` from dumps that already exist, so O2's benefit is known before
+it is written. Figure: `media/ray_march_perf/o2_vacuum_fraction.png`.
+
+The plan estimated "~9× on `P1_vac_2d`" from that run's 89 %-vacuum **geometry**. Measured, the
+answer differs in kind, because `f_vac` is a function of **time**:
+
+| run | `f_vac`(0) | speedup | `f_vac`(`t_end`) | speedup |
+|---|---|---|---|---|
+| `P1_vac_1d_thick` | 0.636 | 2.75× | 0.011 @ 26.9 ps | **1.01×** |
+| `P1_vac_2d` | 0.636 | 2.75× | 0.010 @ 26.9 ps | **1.01×** |
+| `P1_vac_2d_spot` | 0.471 | 1.89× | 0.360 @ 8.0 ps | **1.56×** |
+
+**The vacuum is eaten by the fast-electron halo, not the plume.** At the measured coronal
+`T_e` ≈ 300 eV, `v_th,e` = 43 `d_e`/ps = **10× `c_s`**, so the `10⁻⁴ n_cr` contour crosses a
+1200 `d_e` forward gap in ~28 ps — which is exactly when `P1_vac_2d`'s `f_vac` reaches 0.01. Size
+a vacuum gap's *ray-trace* lifetime from `v_th,e`; sizing it from `c_s` overestimates by 10×.
+
+The model `(L_vac(0) − v_th,e t)/L_tot` tracks `P1_vac_2d` closely and over-predicts the spot's
+decay, so it is a mechanism and a timescale, not a fit. **A tempting explanation for the spot was
+tested and falsified**: it is *not* that only the illuminated columns develop a halo. Dark columns
+retain **1.01×** the vacuum of lit ones — the halo crosses the 160 `d_e` transverse box in ~4 ps
+and fills it. Recorded because a plausible unfalsified story is worse than none.
+
+**`n_th` chosen from the trade-off** (`--sweep`), on the spot at 8 ps: 10⁻⁴ → 1.56× at
+`τ_disc` = 3×10⁻¹⁰; **3×10⁻² → 2.00× at `τ_disc` = 3.5×10⁻⁴**, still 300× under the 10.4 % 1σ seed
+spread; 10⁻¹ → 2.10× but 17× the error. Take **3×10⁻² `n_cr`** — the knee. The plan's 10⁻⁴ was
+over-conservative by 0.44× in speedup for no measurable accuracy gain.
+
+**Consequence for the phase:** combined best case falls from ~15× to **~10×**, and to ~7× on a
+long run. §7.5.2, §7.5.4 and §7.5.5 corrected accordingly — the old Tier-2 criterion ("O2's win
+must appear as ~9×") would have **failed a correct implementation**, which is worse than having no
+criterion. It now demands agreement with `1/(1−f_vac)` measured on the same dump.
+
 ### Still to do
 
 * build and run Tier 1 for O3; then O1, then O2, re-running Tier 1 after each

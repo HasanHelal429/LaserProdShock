@@ -22,6 +22,10 @@ import sys
 
 import numpy as np
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src"))
+
+from laserprod import io as lpio            # noqa: E402
+
 # Analytic expectation for the oblique deck: 30 deg tilt, rays drift 2.9 transverse domain
 # widths, density uniform in x -- so the correct per-column share is EXACTLY 1/8, known in
 # closed form rather than to shot noise. This is the deck that would have caught the clamp.
@@ -30,9 +34,21 @@ OBLIQUE_COLS = 8
 
 
 def columns(path):
-    """Per-column absorbed power from a profile dump (2D only)."""
+    """Per-column absorbed power from a profile dump (2D only).
+
+    Columns are resolved BY NAME through `lpio.PROFILE_TAIL`, never by a hardcoded index.
+    The tail is `["n_e", "H", "P_abs", "theta_e", "A"]` -- density FIRST -- so in 2D
+    `P_abs` is column 4 and column 2 is `n_e`. Reading index 2 gives the per-column
+    DENSITY share, which in the oblique deck is uniform in x by construction and therefore
+    passes the 1/8 test no matter what the ray march does.
+    """
     a = np.loadtxt(path)
-    x, P = a[:, 0], a[:, 2]
+    ncoord = max(a.shape[1] - len(lpio.PROFILE_TAIL), 0)
+    names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}[ncoord]
+    cols = names + lpio.PROFILE_TAIL[:a.shape[1] - ncoord]
+    if "x" not in cols or "P_abs" not in cols:
+        raise SystemExit(f"{path}: no transverse coordinate or no P_abs in {cols}")
+    x, P = a[:, cols.index("x")], a[:, cols.index("P_abs")]
     xs = np.unique(x)
     return xs, np.array([P[x == v].sum() for v in xs])
 

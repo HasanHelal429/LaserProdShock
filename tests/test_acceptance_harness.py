@@ -23,24 +23,48 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 COMPARE = os.path.join(ROOT, "studies", "ray_march_perf", "compare.py")
 
-# One 2D dump with 8 transverse columns and a uniform per-column share, i.e. the shape of
-# the oblique deck's step-0 output. Two cells per column so a column sum is a real sum.
+# A synthetic 2D dump with 8 transverse columns and a uniform per-column share, i.e. the
+# shape of the oblique deck's step-0 output. Two cells per column so a column sum is a real
+# sum.
+#
+# The layout MUST resemble a real dump, and `test_fixture_layout_matches_the_real_dump_format`
+# pins it to `lpio.PROFILE_TAIL` so it cannot drift. The tail is
+# ["n_e", "H", "P_abs", "theta_e", "A"] -- DENSITY FIRST -- so in 2D `P_abs` is column 4 and
+# column 2 is `n_e`. The first version of this fixture wrote six columns with the varying
+# value in position 2, which is `n_e`. The comparator then compared the per-column DENSITY
+# share, and because the oblique deck's density is uniform in x BY CONSTRUCTION, its 1/8 check
+# passed regardless of what the ray march did. A fixture that does not match reality hides
+# precisely the bug the test exists to catch.
 HEADER = ("# laser_deposition per-cell profile\n"
           "# step 0 time 0.00000000e+00 dt_dep 1.00000000e-15\n"
           "# P_abs = H * n_e * m_e [W/m^3]; H [m^2/s^3]; n_e [m^-3]; coordinates [m]\n")
 DX, DZ = 1.0e-6, 2.0e-6
-P_CELL = 2.5601878200000002e24
+P_CELL = 1.0854e18                  # a P_abs magnitude, as in the real oblique dump
+NE_CELL = 2.5601878200000002e24     # an n_e magnitude, as in the real oblique dump
+TAIL = ["n_e", "H", "P_abs", "theta_e", "A"]
+
+
+def test_fixture_layout_matches_the_real_dump_format():
+    """If PROFILE_TAIL ever changes, this fixture must change with it."""
+    sys.path.insert(0, os.path.join(ROOT, "src"))
+    from laserprod import io as lpio
+    assert list(lpio.PROFILE_TAIL) == TAIL, (
+        f"PROFILE_TAIL is now {list(lpio.PROFILE_TAIL)}; these synthetic dumps still write "
+        f"{TAIL}, so they no longer resemble a real dump and the comparator is being tested "
+        f"against a format it will never see.")
 
 
 def _dump(path, bump=None):
-    """Write a synthetic step-0 dump; `bump` = (row, factor) perturbs one cell's P_abs."""
+    """Write a synthetic step-0 dump; `bump` = (row, value) replaces one cell's P_abs."""
     rows = []
     for ix in range(8):
         for iz in range(2):
             p = P_CELL
             if bump is not None and bump[0] == len(rows):
                 p = bump[1]
-            rows.append(f"{ix*DX:.17g} {iz*DZ:.17g} {p:.17g} 1.0 1.0e27 1.0e-3")
+            #        x            z            n_e        H  P_abs   theta_e  A
+            rows.append(f"{ix*DX:.17g} {iz*DZ:.17g} {NE_CELL:.17g} 1.0 {p:.17g} "
+                        f"2.0e-3 5.9344e-25")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
         fh.write(HEADER + "\n".join(rows) + "\n")

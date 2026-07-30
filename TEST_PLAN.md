@@ -16,7 +16,8 @@ transverse; B₀ uniform to 1.000000 under pec).
 **Phase 1.5 (§7.5) is now on the plan**: the ray march is **65.6 %** of a driven 2D run by
 WarpX's own profiler, so before Phase 2's 2D runs and Phase 3B's ~30-point `beam_waist` sweep pay
 that cost ~30 more times, three changes are scoped — cache a redundant `sample()`, OMP over rays,
-and skip the provably-no-op march through vacuum (47 % of the path here, 89 % in `P1_vac_2d`). It
+and skip the provably-no-op march through vacuum (measured at 47 % of the path at `t` = 0, but
+decaying to 36 % by 8 ps and to 1 % on a 27 ps run — see §7.5.2). It
 is a **code** phase: no deck changes, no new physics runs, and its acceptance suite re-validates
 the existing P1 corpus **spatially** (per-column profiles), because §2.8 established that a
 conserved total is not a working operator.
@@ -890,10 +891,47 @@ not, and the header should say which regime the buffers assume.
 the `deposit()` branch entirely. The code spends 24 interpolations per step rediscovering that
 light travels straight through nothing.
 
-Measured waste: **47 % of the path** in `P1_vac_2d_spot` (launch face +700, corona from +182), and
-**89 %** in `P1_vac_2d` (launch face +1200). This is the cost side of the rule that the launch
-plane must sit outside the plasma — a forward vacuum gap is nearly free for particles and
-expensive for the ray trace.
+**CORRECTED 2026-07-29 — the payoff is ~2×, not ~9×, and it decays during the run.** The
+estimate above was geometric: the fraction of the *domain* in front of the target. Measured from
+the `n_e` in the dumps (`studies/ray_march_perf/vacuum_fraction.py`, figure
+`media/ray_march_perf/o2_vacuum_fraction.png`), `f_vac` is a **function of time** and much smaller:
+
+| run | `f_vac` at `t` = 0 | march speedup | `f_vac` at `t_end` | march speedup |
+|---|---|---|---|---|
+| `P1_vac_1d_thick` | 0.636 | 2.75× | 0.011 (26.9 ps) | **1.01×** |
+| `P1_vac_2d` | 0.636 | 2.75× | 0.010 (26.9 ps) | **1.01×** |
+| `P1_vac_2d_spot` | 0.471 | 1.89× | 0.360 (8.0 ps) | **1.56×** |
+
+**Why it decays: the fast-electron halo, not the hydrodynamic plume.** At the measured coronal
+`T_e` ≈ 300 eV, `v_th,e` = 7.3×10⁶ m/s = **43 `d_e`/ps**, which is **10× `c_s`** (4.3 `d_e`/ps). The
+`10⁻⁴ n_cr` contour is therefore carried across the forward gap on a `L_vac/v_th,e` timescale —
+1200 `d_e` in ~28 ps, which is exactly when `P1_vac_2d`'s `f_vac` reaches 0.01. Sizing the vacuum
+gap from `c_s` would have over-estimated O2's lifetime tenfold.
+
+`(L_vac(0) − v_th,e t)/L_tot` tracks `P1_vac_2d` closely but over-predicts the spot's decay, so it
+is the mechanism and the timescale rather than a fit — the contour front is a rarefaction with a
+velocity spectrum, not a step. **A tempting explanation for the spot was tested and falsified**: it
+is *not* that only illuminated columns develop a halo. Dark columns retain **1.01×** the vacuum of
+lit ones, because the halo crosses the 160 `d_e` transverse box in ~4 ps and fills it uniformly.
+
+**Choose `n_th` from the trade-off, do not assume it.** Sweeping the threshold on the last dump
+(same script, `--sweep`) gives, for `P1_vac_2d_spot`:
+
+| `n_th` [`n_cr`] | march speedup | `τ_discarded` |
+|---|---|---|
+| 10⁻⁴ (the value assumed below) | 1.56× | 3.0×10⁻¹⁰ |
+| 10⁻² | 1.93× | 2.7×10⁻⁵ |
+| **3×10⁻²** | **2.00×** | **3.5×10⁻⁴** |
+| 10⁻¹ | 2.10× | 6.0×10⁻³ |
+| 3×10⁻¹ | 2.24× | 1.1×10⁻¹ |
+
+**Take `n_th` = 3×10⁻² `n_cr`**: it buys the full 2.00× while discarding `τ` = 3.5×10⁻⁴, still
+**300× below the 10.4 % 1σ seed spread on `f_abs(0)`**. Going to 10⁻¹ buys 5 % more speed for 17×
+the error — a clear knee. The 10⁻⁴ originally assumed here is over-conservative by 0.44× in speedup
+for no measurable accuracy gain.
+
+This is still the cost side of the rule that the launch plane must sit outside the plasma — but the
+gap is only expensive **early**, and a long run pays the full march regardless.
 
 **Implementation — one reduction, one analytic jump.** Per application, reduce the
 already-gathered host field for the extreme `z` at which any cell exceeds `n_th`, then advance each
@@ -956,7 +994,7 @@ known analytically rather than to shot noise.
 | `P1_vac_1d_thick` | 1D, 36 ppc, thick target, rear truncation | per-cell `P_abs` **bit-identical** (1D has no transverse dimension, so O1's accumulator order is the only thing that could move it) |
 | `P1_vac_2d_spot` | the Gaussian spot, 320 columns | per-column profile vs analytic `I₀exp(−(x/w₀)²)`: mean ratio **1.00010 ± 0.0002**, column-to-column scatter **2.54 % ± 0.1**, lag-1 autocorrelation **−0.51 ± 0.03**, 2 edge columns / peak column **2.33×10⁻⁷ ± 5 %** |
 | `P1_vac_2d_spot` | total, as a cross-check only | absorbed `5.940787×10¹²` W/m vs analytic `I₀w₀√π`, agreement **≤ 3×10⁻⁵** (it is 2.2×10⁻⁵ today) |
-| `P1_vac_2d` (invalid physics, valid cost) | the 89 %-vacuum geometry | O2's win must appear here as ~9×, and the step-0 column profile must stay flat to shot noise |
+| `P1_vac_2d` (invalid physics, valid cost) | the forward-gap geometry | O2's win must match `1/(1−f_vac)` **measured on the same dump** by `vacuum_fraction.py` — 2.75× at step 0, falling to 1.01× by 26.9 ps. (The earlier "~9×" was geometric and would have FAILED a correct implementation.) The step-0 column profile must stay flat to shot noise |
 | `spot_leak_ppc` `t` = 0, either variant | that the deposition is an exact image of the beam, with **no shot-noise allowance at all** | `w_eff/w₀` **1.0000**, `f_ax` **0.9999**, `f(1w₀)` **0.9973**, `f(2w₀)` **1.0009**, leak > 2.5 `w₀` **0.00041** |
 
 `scripts/spot_report.py` already prints every Tier-2 number; the acceptance test is a diff of its
@@ -1006,8 +1044,10 @@ the point of writing them here.
 | a 40 ps 2D run to the formation time | ~22 h fixed-domain | ~11 h |
 | H5-scale spot, `w₀` = 214 `d_e,cr` (~3 400 columns) | unaffordable | expensive but reachable |
 
-Expected factors, to be replaced by measurements: O3 ~1.17×, O1 6–8×, O2 ~1.9× on this deck
-(~9× on `P1_vac_2d`'s geometry) — multiplicative on the same phase, so ~15× combined and the
+Expected factors, partly replaced by measurements: O3 ~1.17×, O1 6–8× (still an estimate),
+O2 **2.00× at `n_th` = 3×10⁻² on the spot at 8 ps, decaying to ~1.0× on a long run** (measured,
+2026-07-29 — not the ~9× first assumed) — multiplicative on the same phase, so **~10× combined at
+best and ~7× on a long run**, not ~15×, and the
 driven step lands within ~6 % of the laser-off control.
 
 ### 7.5.6 Deliverables
