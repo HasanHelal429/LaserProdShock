@@ -55,6 +55,8 @@ scripts/launch.sh -b -L runs/<phase>/<ID>                       # launch WarpX (
 python scripts/make_inputs.py runs/<phase>/<ID> --verify        # deck == config?
 python scripts/run_checks.py   runs/<phase>/<ID>                # derived scales + gates G1-G7
 python scripts/laser_report.py runs/<phase>/<ID>                # f_abs(t), E_abs, t_s, Tlocalfrac
+python scripts/spot_report.py  runs/<phase>/<ID>                # FINITE SPOT only: f_ax, w_eff/w0, leak, wall/in
+python scripts/g3_spot.py      runs/<phase>/<ID> --control ..._off   # FINITE SPOT only: G3 on the LIT columns
 python scripts/plot_fields.py  runs/<phase>/<ID>                # streaks + lineouts (needs yt: physics env)
 python scripts/phase_space.py  runs/<phase>/<ID>                # THE ARBITER -- before any shock claim
 python scripts/make_movies.py  runs/<phase>/<ID>                # movies (needs yt + ffmpeg)
@@ -62,7 +64,8 @@ python scripts/tune_shock.py   runs/<phase>/<ID>                # fit v_sh + fro
 python scripts/make_figures.py runs/<phase>/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
 ```
 Built: `launch.sh`, `run_progress_logger.py`, `make_inputs.py`, `run_checks.py`,
-`laser_report.py`, `compare_runs.py`, `plot_fields.py`, `phase_space.py`, `make_movies.py`,
+`laser_report.py`, `spot_report.py`, `g3_spot.py`, `compare_runs.py`, `compare_frontside.py`,
+`plot_fields.py`, `phase_space.py`, `make_movies.py`,
 and `src/laserprod/{units,config,deck,io,plotting}`. Still to build: `tune_shock.py`,
 `make_figures.py`, `plot_ablation.py`, `sweep.py` and `laserprod.metrics` (Phase 1-3).
 
