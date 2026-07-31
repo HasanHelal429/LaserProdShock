@@ -421,6 +421,18 @@ def render(cfg: dict) -> str:
     a(f"laser_deposition.ray_cfl              = {_num(las.get('ray_cfl', 0.25))}")
     # intervals: an IntervalsParser, so 'start:stop:period' expresses a FINITE PULSE
     a(f"laser_deposition.intervals            = {str(las.get('intervals', 1))}")
+    # Ray-march performance (Phase 1.5). `ray_threads` is separate from
+    # OMP_NUM_THREADS on purpose: a GPU run keeps the push on the device with one
+    # host thread, but the march is host code. `n_accumulators` fixes the
+    # summation order, so two runs are only comparable bit for bit at the same
+    # value -- which is why it is written into the deck rather than left default.
+    if las.get("ray_threads") is not None:
+        a(f"laser_deposition.ray_threads          = {int(las['ray_threads'])}")
+    if las.get("n_accumulators") is not None:
+        a(f"laser_deposition.n_accumulators       = {int(las['n_accumulators'])}")
+    if las.get("vacuum_skip") is not None:
+        a(f"laser_deposition.vacuum_skip          = "
+          f"{1 if las['vacuum_skip'] else 0}")
     if dims > 1:
         prof = str(beam.get("profile", "uniform"))
         if prof != "uniform":
@@ -642,7 +654,11 @@ def key_params(path: str) -> dict:
     for k in ("intensity", "incidence_angle", "Z_eff", "coulomb_log", "ray_cfl",
               "wavelength", "electron_temperature", "temperature_floor",
               "min_macroparticles_per_cell", "beam_waist", "beam_order",
-              "rays_per_cell"):
+              "rays_per_cell",
+              # Phase 1.5. `ray_threads` cannot change the answer, but
+              # `n_accumulators` fixes the summation order and `vacuum_skip`
+              # gates an exact optimisation -- both belong in --verify.
+              "ray_threads", "n_accumulators", "vacuum_skip"):
         kk = f"laser_deposition.{k}"
         if kk in d:
             out[kk] = _eval(d[kk], ns)

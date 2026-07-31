@@ -108,6 +108,40 @@ def test_deck_round_trips_to_the_same_numbers(run_dir):
     assert hi[-1] == pytest.approx(sc.domain_hi, rel=1e-9)
 
 
+def test_ray_march_knobs_reach_the_deck_and_are_verified():
+    """The Phase-1.5 knobs must survive config -> deck -> --verify.
+
+    `n_accumulators` fixes the ray-march summation order, so two runs are comparable bit
+    for bit only at the same value; `vacuum_skip` gates an optimisation that is exact but
+    is still a code path. If either is emitted but not checked by `verify`, a deck could
+    drift from its config in precisely the way that makes two runs incomparable without
+    anything failing. So this pins BOTH directions -- emitted, and caught when changed.
+    """
+    import copy
+    import tempfile
+
+    cfg = lpconfig.load(RUN_DIRS[0])
+    cfg = copy.deepcopy(cfg)
+    cfg["laser"].update(ray_threads=8, n_accumulators=32, vacuum_skip=False)
+    text = lpdeck.render(cfg)
+    d = lpdeck.parse_inputs_str(text)
+    assert d["laser_deposition.ray_threads"].strip() == "8"
+    assert d["laser_deposition.n_accumulators"].strip() == "32"
+    assert d["laser_deposition.vacuum_skip"].strip() == "0"
+
+    with tempfile.NamedTemporaryFile("w", suffix=".inputs", delete=False) as fh:
+        fh.write(text)
+        p = fh.name
+    try:
+        assert lpdeck.verify(cfg, p) == []
+        cfg["laser"]["n_accumulators"] = 16          # the deck now disagrees
+        assert lpdeck.verify(cfg, p), (
+            "verify() ignores n_accumulators, so a deck and its config can differ in the "
+            "ray-march summation order undetected")
+    finally:
+        os.unlink(p)
+
+
 @pytest.mark.parametrize("run_dir", RUN_DIRS, ids=RUN_IDS)
 def test_boundary_tokens_are_consistent(run_dir):
     """No axis may have exactly one periodic face, and the token lists must have one

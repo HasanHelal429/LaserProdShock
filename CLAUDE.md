@@ -196,7 +196,9 @@ not, and work while a run is still going.
   `WarpX_DIMS` is compile-time, so `build_cuda/` is **2D only** and 1D needs its own
   `build_cuda1d/`. Two RTX 4070s (12 GB, arch 8.9) — `-g 0` and `-g 1` carry two runs at
   once. `--gpu` forces `OMP_NUM_THREADS=1` (the push is on the device; host threads only
-  contend) and pins with `CUDA_VISIBLE_DEVICES`.
+  contend) and pins with `CUDA_VISIBLE_DEVICES` — that is still right for the push, but the ray
+  march is host code and now threads, so a **driven** run wants `laser_deposition.ray_threads`
+  in the deck instead (see the ray-march bullet below).
   **The system `nvcc` is 12.0 and AMReX requires ≥ 12.2** — configure with the 12.9 toolkit
   at `/home/hhelal/opt/cuda-12.9`, which is what `build_cuda` used. CUDA and OMP builds are
   both double precision but **not bit-identical** (device reductions run in a different
@@ -262,22 +264,35 @@ not, and work while a run is still going.
   disturbance fronts: 269 of 400 d_e (67 %) undisturbed there. Also, **truncating costs the
   energy budget** — 6.13 % weight loss at 30 ps vs 1.14 % at 100 ps untruncated — so **G6 cannot
   be closed tightly on a truncated run**; take strict closure from untruncated ones.
-- **In 2D the laser operator is ~65 % of the step cost, and it is SERIAL HOST CODE.** The
-  driven 2D run ran at 0.046 s/step against 0.016 for its laser-off control (2.9×; in 1D the two
-  differ by ~15 %). The cause is visible in `nvidia-smi`: the driven run's GPU oscillates
-  **0 % → 61 % → 0 %** while the control holds a steady **82 %**. The eikonal RK4 ray march
-  (`LaserDeposition.cpp` ~747–816) is a plain host loop — **not** in a `ParallelFor`, and the
-  file contains **no `#pragma omp` at all** — so the GPU idles during it and neither a faster
-  GPU nor more host threads helps. **Budget driven 2D runs from the driven rate; single-thread
-  host speed is the bottleneck.**
-- **A forward vacuum gap is free for particles but EXPENSIVE for the ray trace.** The march costs
-  `path/(ray_cfl·dz)` RK4 steps *per ray*, and rays = transverse cells × `rays_per_cell`. In
-  `P1_vac_2d` that is 9 168 steps × 64 rays = **5.9×10⁵ serial RK4 steps per application**, of
-  which **89 % is through empty vacuum** between the domain edge (+1200) and the plasma (+182).
-  So the "extra cells are nearly free in vacuum" rule holds for the *particle* push only — in a
-  **driven** run, size the forward gap to what the plume actually needs. (Upstream improvement
-  worth proposing: skip or coarsen the march where `n_e ≈ 0`, and/or OMP-parallelise over rays,
-  which are independent.)
+- **The ray march is FIXED (Phase 1.5, 2026-07-30): 11.9× faster and it threads.** It *was* ~65 %
+  of a driven 2D step and plain serial host code — the driven run's GPU oscillated
+  **0 % → 61 % → 0 %** while its control held 82 %. Three changes, one patch
+  (`studies/ray_march_perf/patches/o123-ray-march.patch`): **O3** reuses the end-of-step sample
+  as RK4 stage 1 (1.26×), **O2** drops the field samples of steps lying wholly in empty field
+  (1.53×), **O1** threads the ray loop over `n_accumulators` buckets (6.2× at 12 threads). All
+  bit-identical: Tier 1 is 285/285 byte-equal at `n_accumulators=1`, and every `LASERDEP` line is
+  byte-equal across 1/2/4/8/12 threads. **Do not re-derive the old cost model** — but note the
+  new one: what remains of `applyDeposition` is **0.250 s per application that does not thread**
+  (grid machinery, not the march), so the operator is no longer march-dominated on CPU.
+- **`laser_deposition.ray_threads` exists because `--gpu` still wants `OMP_NUM_THREADS=1`.** The
+  push belongs on the device; the march is host code and now threads. Set `ray_threads` in the
+  deck rather than raising `OMP_NUM_THREADS`, and note that O1 is **inert unless the binary was
+  compiled with `-fopenmp`**: `build_cuda` is `AMReX_OMP=OFF`, so the production 2D binary gets
+  O2 + O3 only. `build_cuda_omp/` is the CUDA tree configured `-DAMReX_OMP=ON` for the rest.
+- **A forward vacuum gap is now cheap for the ray trace too, but only because it is EMPTY.** The
+  march costs `path/(ray_cfl·dz)` RK4 steps *per ray*, and rays = transverse cells ×
+  `rays_per_cell`: in `P1_vac_2d` that is 9 168 steps × 64 rays = 5.9×10⁵ steps per application,
+  **89 % of them through vacuum**. O2 now costs those steps ~1/4 of a full one (they keep their
+  arithmetic, they drop their five interpolations), so a gap is ~4× cheaper than it was but not
+  free — still size the forward gap to what the plume needs.
+- **A skip threshold near a discrete trigger is not bounded by its own smallness.** O2 was
+  specified as "treat `n_e < 3×10⁻² n_cr` as vacuum and jump" — the value chosen by sweeping the
+  *discarded optical depth* to 3.5×10⁻⁴. It moved the 1D ramp CI deck by **+6.13 %**, because
+  sub-threshold plasma still refracts: the discrete march lags the straight line by 1.6×10⁻³ `h`
+  over 16 steps, the jump lands the ray ahead of it, and that flips the near-critical trigger
+  `n_ref ≤ n_floor && drds > 0` — which pre-change **never fires** on that deck. Skipping one
+  cell and skipping four gave the identical error, the signature of a discrete flip. **Ask what
+  an approximation does to the branches downstream of it, not only to the quantity it bounds.**
 - **ppc in 2D: 36 (6×6), not 400.** 400 is unaffordable once a transverse dimension multiplies
   both grid and particles. G5's absorption-bias bound rises 0.31 % → 3.5 %, but `Tlocalfrac`
   stayed at 0.90–0.99 (and 0.975–0.987 in the Phase-0 2D runs at only **16** ppc), so `T_e` is

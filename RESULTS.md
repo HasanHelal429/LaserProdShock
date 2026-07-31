@@ -1132,3 +1132,94 @@ corona.
 `scripts/spot_isolation.py` — a reusable check that would have caught this before 5 h 38 m of GPU
 time, and which prints the box a valid run of a given duration would need. It should become a
 gate.
+
+---
+
+## 2026-07-30 — Phase 1.5: the ray march is 11.9× faster and threads; O2's threshold falsified
+
+`TEST_PLAN.md` §7.5. One patch, `studies/ray_march_perf/patches/o123-ray-march.patch`, against
+`warpx-cda` `c817b634`. Full acceptance tables and the benchmark ladder are in
+`studies/ray_march_perf/README.md`; this entry records the findings.
+
+### What was measured
+
+March cost per application on the real `P1_vac_2d_spot` geometry (320 rays, 704 k cells, the
+t = 0 vacuum gap), non-march floor subtracted, CPU build, shared box at load ~18:
+
+| | per application | march only | speedup |
+|---|---|---|---|
+| pre-change | 0.912 s | 0.678 s | 1.00× |
+| O3 (reuse the end-of-step sample) | 0.788 s | 0.538 s | 1.26× |
+| + O2 (skip empty steps' samples) | 0.602 s | 0.351 s | 1.93× |
+| + O1 (OMP over rays, 12 threads) | 0.307 s | 0.057 s | **11.9×** |
+
+Predicted were O3 1.17×, O1 6–8×, O2 ~2×; measured 1.26×, 6.2×, 1.53×. **Combined 11.9×
+against the ~10× best case the plan allowed** — the plan was right, which is worth saying
+because §7.5.2's `n_th` in the same section was not.
+
+### O2's density threshold is FALSIFIED, and the reason generalises
+
+§7.5.2 chose `n_th` = 3×10⁻² `n_cr` by sweeping the **discarded optical depth** and jumping the
+ray analytically to the entry plane. Built exactly as written, it moved the 1D ramp CI deck's
+absorbed fraction **+6.13 %** — 1.2 % below the closed form → 4.9 % above it, against a 0.48 %
+tolerance. Replicating the march in Python against the operator's own density field found why:
+
+* the skipped region there is **sub-threshold plasma, not vacuum**, so it refracts;
+* refraction means the discrete march does not advance by `h` per step — it **lags the straight
+  line by 1.6×10⁻³ h over 16 steps** — so an analytic jump lands the ray *ahead* of the march;
+* that lead flips the discrete near-critical trigger `n_ref ≤ n_floor && drds > 0`. Pre-change it
+  never fires and the ray turns by refraction alone; after the jump it fires and the analytic
+  layer deposits 4.6 % of the beam in one cell. Discrete, hence skipping **one** cell and
+  **four** gave the identical +6.13 %;
+* not general fragility: perturbing `ray_cfl` by 1 part in 10⁷ moves the same total by 9×10⁻⁶.
+
+**The lesson is bigger than the threshold: τ_discarded was not the only error the skip could
+make, and the sweep that chose the value could not see the one that mattered.** A cheap
+approximation upstream of a discrete trigger is not bounded by its own smallness.
+
+So O2 is now what §7.5.2's first sentence claimed it was — a **no-op removal, not an
+approximation**. It skips only steps whose whole extent lies in *exactly* empty field, where
+`sample` provably returns `(1, 0)`, and it takes those steps with the same arithmetic in the
+same order, minus the five samples. **And it costs nothing where it was supposed to pay**:
+`Vskip` on `P1_vac_2d_spot` at t = 0 is **0.47**, the same 0.471 the plan measured with a
+10⁻⁴ `n_cr` contour — a vacuum-ablation run's forward gap is empty to the bit.
+
+### The race O1 would have lost silently
+
+`A_loc`, the interpolated IB coefficient, was a variable in the enclosing scope written by every
+`sample()` and read "immediately after the call whose position you mean". Threaded, each thread
+would have read another's absorption coefficient: no crash, no conservation violation, plausible
+smooth wrong physics. It is now an out-parameter, so it is per-caller by construction.
+
+The parallel loop is over **accumulator buckets, not rays**. With a ray-level `parallel for`,
+rays `i` and `i + n_acc` share a bucket and land on different threads whenever the thread count
+does not divide `n_acc` — 12 threads and 16 buckets — which brings back both the race and the
+thread-dependent summation order.
+
+### Acceptance
+
+* Tier 1 exact (`n_accumulators=1`): **285/285 files bit-identical** across all five CI decks;
+  oblique still exactly 1/8.
+* Tier 1 at defaults: every profile dump bit-identical; only the oblique `EP.txt` moves, by
+  **1.3×10⁻¹⁵** (6 ULP) from the accumulator reordering.
+* Tier 2: `P1_vac_2d_spot` step-0 dump **byte-identical** with O2 active; `Pabs` 5.94085×10¹².
+* Tier 4: every `LASERDEP` line byte-identical at 1/2/4/8/12 threads.
+* The 2–5×10⁻¹⁵ `EP.txt` thread-dependence is **pre-existing** — the pre-change binary produces
+  the identical numbers. Which is why Tier 4's criterion is the operator's output: `EP` cannot
+  resolve a claim about the march.
+
+### The march is no longer the operator's cost, on CPU
+
+Running the same benchmark with `intensity=0` executes everything except the march: **0.250 s
+per application, and it does not thread** (0.248 s at 12 threads). So **81 %** of what
+`applyDeposition` now costs is grid machinery — the 6-component `n_meas` and its `SumBoundary`,
+the `ParallelCopy` onto one full-domain box, the pinned copies, the redistribute — plus 17 ms of
+accumulators and 14 ms of `pow(kT, 1.5)`. Measured at ppc = 1, and mostly device work on a CUDA
+build, so it is a signpost rather than a result.
+
+### GPU
+
+`build_cuda` is `AMReX_OMP=OFF` with no `-fopenmp`, so `_OPENMP` is undefined and **O1 is inert
+on the production 2D binary** — it gets O2 + O3, 1.93×. `build_cuda_omp/` was configured with
+`-DAMReX_OMP=ON` (which puts `-Xcompiler=-fopenmp` in the CUDA flags) as a **separate tree**, so
+`build_cuda/bin/warpx.2d` stays valid whatever happens.

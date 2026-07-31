@@ -1,0 +1,567 @@
+diff --git a/Source/Particles/LaserDeposition/LaserDeposition.H b/Source/Particles/LaserDeposition/LaserDeposition.H
+index 025bf264c..f8771a092 100644
+--- a/Source/Particles/LaserDeposition/LaserDeposition.H
++++ b/Source/Particles/LaserDeposition/LaserDeposition.H
+@@ -139,6 +139,45 @@ private:
+     // (RK4 sub-cell stepping). Smaller = more accurate refraction.
+     amrex::Real m_ray_cfl{0.25};
+ 
++    // ------------------------------------------------------------------
++    // Ray-march performance (the march is serial host code, and in 2D it
++    // dominates the step; see the notes on `deposit` in the .cpp).
++    //
++    // Number of deposition accumulators the ray bundle is split across. Ray i
++    // marches into accumulator i % n_accumulators, and the accumulators are
++    // summed into the heating field in index order, so the result is
++    // INDEPENDENT OF THE THREAD COUNT (and of whether OpenMP is available at
++    // all) rather than merely reproducible at a fixed thread count. It is also
++    // the parallel granularity: one accumulator is owned by one thread for the
++    // whole march, so no ray-to-ray synchronisation is needed and the useful
++    // thread count is capped at this value.
++    //
++    // Memory is n_accumulators * n_cells * 8 B: trivial in 1D/2D (a 320x2200
++    // box is 5.6 MB per accumulator, 90 MB at 16), but 800 MB per accumulator
++    // at a 3D 10^8-cell grid -- so 3D wants a small value here, or atomics.
++    int m_n_acc{16};
++    // Threads used for the ray march. 0 = whatever OpenMP offers. Set this
++    // when the surrounding run wants OMP_NUM_THREADS = 1 (a GPU run: the
++    // particle push is on the device, but this march is host code).
++    int m_ray_threads{0};
++
++    // O2, the vacuum skip. Where n_e is exactly zero, `sample` returns
++    // n_ref = 1 and grad n_ref = 0, so all four RK4 stages return the same
++    // derivative, the step reduces to c += h T with T unchanged, and the
++    // absorption is skipped anyway (n_e = 0). Those steps therefore keep their
++    // arithmetic but drop all five field samples: the ray still walks the empty
++    // gap step by step, at ~1/20 of the cost, and the result is BIT-IDENTICAL.
++    //
++    // This is a no-op removal, not an approximation, and it is deliberately not
++    // a density threshold. A threshold was tried (3e-2 n_cr, from a sweep of the
++    // DISCARDED OPTICAL DEPTH) and rejected: below the threshold the medium
++    // still refracts, so an analytic straight-line jump leaves the ray ~1e-3 h
++    // ahead of where the discrete march arrives, and on the 1D ramp CI deck that
++    // phase error flips the near-critical turning-point trigger and moves the
++    // absorbed fraction by 6 % -- from 1.2 % below the closed form to 4.9 %
++    // above it. The discarded absorption is not the only error a skip can make.
++    bool m_vacuum_skip{true};
++
+     // Transverse beam intensity profile and ray-bundle sampling.
+     // m_beam_profile: 0 = uniform (default), 1 = (super-)Gaussian
+     //   I(r_perp) = I0 exp( -( |r_perp - center|^2 / w0^2 )^m ).
+diff --git a/Source/Particles/LaserDeposition/LaserDeposition.cpp b/Source/Particles/LaserDeposition/LaserDeposition.cpp
+index 431ba31de..166e68313 100644
+--- a/Source/Particles/LaserDeposition/LaserDeposition.cpp
++++ b/Source/Particles/LaserDeposition/LaserDeposition.cpp
+@@ -18,9 +18,11 @@
+ #include <ablastr/profiler/ProfilerWrapper.H>
+ 
+ #include <AMReX_Arena.H>
++#include <AMReX_Array4.H>
+ #include <AMReX_Box.H>
+ #include <AMReX_BoxArray.H>
+ #include <AMReX_DistributionMapping.H>
++#include <AMReX_FArrayBox.H>
+ #include <AMReX_Geometry.H>
+ #include <AMReX_GpuAtomic.H>
+ #include <AMReX_IntVect.H>
+@@ -30,10 +32,16 @@
+ #include <AMReX_ParmParse.H>
+ #include <AMReX_REAL.H>
+ #include <AMReX_Utility.H>
++#include <AMReX_Vector.H>
++
++#ifdef _OPENMP
++#   include <omp.h>
++#endif
+ 
+ #include <algorithm>
+ #include <cctype>
+ #include <cmath>
++#include <cstddef>
+ #include <fstream>
+ #include <iomanip>
+ #include <limits>
+@@ -327,6 +335,15 @@ LaserDeposition::LaserDeposition ()
+         m_ray_cfl > 0._rt && m_ray_cfl <= 1._rt,
+         "laser_deposition: 'ray_cfl' must be in (0, 1]");
+ 
++    // Ray-march performance knobs (see the header for what they buy and cost).
++    pp.query("n_accumulators", m_n_acc);
++    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
++        m_n_acc >= 1, "laser_deposition: 'n_accumulators' must be >= 1");
++    pp.query("ray_threads", m_ray_threads);
++    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
++        m_ray_threads >= 0, "laser_deposition: 'ray_threads' must be >= 0");
++    pp.query("vacuum_skip", m_vacuum_skip);
++
+     // Transverse beam profile and ray-bundle sampling.
+     pp.query("rays_per_cell", m_rays_per_cell);
+     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+@@ -455,6 +472,13 @@ LaserDeposition::LaserDeposition ()
+         (four_pi_eps0 * four_pi_eps0 * std::sqrt(PhysConst::m_e) *
+          PhysConst::c);
+ 
++    // Log the ray-march settings: they change the cost, and `n_accumulators`
++    // also fixes the summation order, so a run's output is only reproducible
++    // against another run with the same value.
++    amrex::Print() << "LASERDEP setup n_accumulators " << m_n_acc
++                   << " ray_threads " << m_ray_threads
++                   << " vacuum_skip " << (m_vacuum_skip ? 1 : 0) << "\n";
++
+     m_defined = true;
+ }
+ 
+@@ -680,6 +704,11 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+     // the invariant direction), accumulated across all rays for diagnostics.
+     amrex::Real absorbed_power_total = 0._rt;
+ 
++    // Fraction of the axial domain the rays skipped analytically (O2), reported
++    // so the optimisation's reach is visible in the run log rather than assumed:
++    // it falls during a run as the corona fills the gap.
++    amrex::Real vacuum_skip_frac = 0._rt;
++
+     for (amrex::MFIter mfi(n_host); mfi.isValid(); ++mfi) {
+         const amrex::Box& bx = mfi.validbox();
+         const auto n_arr = n_host.const_array(mfi);
+@@ -709,18 +738,72 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             return amrex::min(amrex::max(ii, lo3[d]), hi3[d]);
+         };
+ 
+-        // IB coefficient A at the position of the most recent `sample` call.
+-        // Kept as a side output rather than a parameter because `sample` is also
+-        // called from the RK4 stages, which do not need it; read it immediately
+-        // after the `sample` whose position you mean.
+-        amrex::Real A_loc = m_K_coeff;
++        // ------------------------------------------------------------------
++        // O2, the vacuum skip: find the plane the plasma starts at, so the steps
++        // in front of it can drop their field samples. One pass over the
++        // gathered field (~0.5 ms against a march of hundreds of ms), and it is
++        // the GLOBAL extreme over every transverse column, not a per-column
++        // value: an oblique, converging or wandered ray then still cannot have
++        // met plasma before it.
++        //
++        // The test is n_e > 0 exactly -- an EMPTY cell, not a tenuous one. That
++        // is what makes the fast steps below identical rather than approximate:
++        // in an empty cell `sample` returns n_ref = 1 and grad n_ref = 0 exactly,
++        // and in a merely tenuous one it does not (see the header).
++        //
++        // `s_entry` is backed off by one full cell from the outermost non-empty
++        // cell, because `sample` interpolates from the two cells straddling a
++        // position, so a ray half a cell short of that cell would already see it.
++        //
++        // The awkward case documented for this operator (a corona that has
++        // reached the injection face) degrades this to a no-op, correctly: the
++        // entry plane is then the face itself.
++        amrex::Real s_entry = m_inject_hi ? phi[m_axis] : plo[m_axis];
++        amrex::Real skip_frac = 0._rt;
++        if (m_vacuum_skip) {
++            int i_lo = hi3[m_axis] + 1;
++            int i_hi = lo3[m_axis] - 1;
++            for (int k = lo3[2]; k <= hi3[2]; ++k) {
++            for (int j = lo3[1]; j <= hi3[1]; ++j) {
++            for (int i = lo3[0]; i <= hi3[0]; ++i) {
++                if (n_arr(i, j, k) <= 0._rt) { continue; }
++                const int ia = (m_axis == 0) ? i : ((m_axis == 1) ? j : k);
++                i_lo = amrex::min(i_lo, ia);
++                i_hi = amrex::max(i_hi, ia);
++            }}}
++            const amrex::Real L_axis = phi[m_axis] - plo[m_axis];
++            if (i_lo > i_hi) {                       // no plasma anywhere
++                s_entry = m_inject_hi ? plo[m_axis] : phi[m_axis];
++            } else if (m_inject_hi) {                // ray travels toward -axis
++                s_entry = plo[m_axis]
++                    + static_cast<amrex::Real>(i_hi + 2 - lo3[m_axis]) * dx[m_axis];
++                s_entry = amrex::min(s_entry, phi[m_axis]);
++            } else {                                 // ray travels toward +axis
++                s_entry = plo[m_axis]
++                    + static_cast<amrex::Real>(i_lo - 1 - lo3[m_axis]) * dx[m_axis];
++                s_entry = amrex::max(s_entry, plo[m_axis]);
++            }
++            skip_frac = std::abs(s_entry - (m_inject_hi ? phi[m_axis] : plo[m_axis]))
++                / L_axis;
++        }
+ 
+         // Multilinear interpolation of n_e and the (consistent) analytic
+         // gradient of n_e at a physical position c; returns the refractive
+-        // index n_ref = sqrt(1 - n_e/n_cr) and its gradient.
++        // index n_ref = sqrt(1 - n_e/n_cr), its gradient, and the interpolated
++        // IB coefficient A at the same point.
++        //
++        // `A_out` is an OUT-PARAMETER, deliberately. It used to be a variable in
++        // this enclosing scope, written by every `sample` and read "immediately
++        // after the call whose position you mean" -- because the four RK4 stages
++        // call `sample` without needing it. That made it shared mutable state
++        // across rays, so threading the march over rays would have had each
++        // thread reading another thread's absorption coefficient: no crash, no
++        // conservation violation, and entirely wrong physics. As a parameter it
++        // is per-caller by construction, and the ordering contract is gone.
+         auto sample = [&] (const amrex::Real (&c)[AMREX_SPACEDIM],
+                            amrex::Real& n_e, amrex::Real& n_ref,
+-                           amrex::Real (&grad_nref)[AMREX_SPACEDIM])
++                           amrex::Real (&grad_nref)[AMREX_SPACEDIM],
++                           amrex::Real& A_out)
+         {
+             int i0[AMREX_SPACEDIM];
+             amrex::Real fr[AMREX_SPACEDIM];
+@@ -731,7 +814,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             }
+             amrex::Real ne = 0._rt;
+             amrex::Real gne[AMREX_SPACEDIM] = {};
+-            A_loc = 0._rt;
++            A_out = 0._rt;
+             for (int corner = 0; corner < (1 << AMREX_SPACEDIM); ++corner) {
+                 int idx[3] = {0, 0, 0};
+                 amrex::Real wprod = 1._rt;
+@@ -744,7 +827,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                 ne += val * wprod;
+                 // Interpolate A itself rather than T_e: A is what enters K
+                 // linearly, so this keeps K multilinear between cell centres.
+-                A_loc += A_arr(idx[0], idx[1], idx[2]) * wprod;
++                A_out += A_arr(idx[0], idx[1], idx[2]) * wprod;
+                 for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                     const int bit = (corner >> d) & 1;
+                     amrex::Real wd = 1._rt;
+@@ -766,8 +849,20 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+         };
+ 
+         // Deposit `absorbed` (power, W) into the cell holding position c.
++        //
++        // The target is the CALLER'S accumulator, not the shared heating field:
++        // rays are independent (the density field is gathered once and frozen
++        // for the march), so the only thing preventing them from being traced
++        // concurrently is this `+=`. Each accumulator is owned by exactly one
++        // thread for the whole march, so there is no atomic and no lock, and the
++        // accumulators are summed into the heating field in index order
++        // afterwards -- which is what makes the answer independent of the thread
++        // count rather than merely reproducible at a fixed one. `P_sum` is the
++        // caller's absorbed-power partial, reduced the same way.
+         auto deposit = [&] (const amrex::Real (&c)[AMREX_SPACEDIM],
+-                            amrex::Real n_e, amrex::Real absorbed)
++                            amrex::Real n_e, amrex::Real absorbed,
++                            amrex::Array4<amrex::Real> const& H_acc,
++                            amrex::Real& P_sum)
+         {
+             if (n_e <= 0._rt || absorbed <= 0._rt) { return; }
+             int idx[3] = {0, 0, 0};
+@@ -777,42 +872,76 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                 idx[d] = map_index(ii, d);
+             }
+             // H = P_abs / (n_e m_e), P_abs = absorbed / V_cell  [m^2/s^3].
+-            H_arr(idx[0], idx[1], idx[2]) +=
++            H_acc(idx[0], idx[1], idx[2]) +=
+                 absorbed / (n_e * V_cell) * inv_me;
+-            absorbed_power_total += absorbed;
++            P_sum += absorbed;
+         };
+ 
+         // RK4 step of the eikonal system  dc/ds = T/n_ref,  dT/ds = grad n_ref
+         // (T = n_ref * unit-direction), integrated over arc length h.
++        //
++        // Stage 1 samples at `c`, which is exactly where the caller's end-of-step sample
++        // was already taken -- so the caller passes those values in rather than paying
++        // for a sixth field sample per step. `s_valid` is false only when the caller has
++        // moved `c` since that sample (the turning-point rewind), and then stage 1 takes
++        // its own. This is bit-identical, not an approximation: `sample` is a pure
++        // function of position and the field arrays, which are frozen for the march.
++        // Only `nref` and `g` are needed -- no RK4 stage reads the density.
++        //
++        // `vac` says the whole step lies in empty space, where `sample` would
++        // return (n_ref, grad n_ref) = (1, 0) at every stage. Taking that branch
++        // rather than calling `sample` is O2: it leaves the arithmetic below
++        // untouched -- same expressions, same order, same roundings, so the
++        // result is bit-identical -- and removes the multilinear interpolations
++        // that were rediscovering that light travels straight through nothing.
+         auto rk4 = [&] (amrex::Real (&c)[AMREX_SPACEDIM],
+-                        amrex::Real (&T)[AMREX_SPACEDIM])
++                        amrex::Real (&T)[AMREX_SPACEDIM],
++                        const bool s_valid,
++                        const amrex::Real s_nref,
++                        const amrex::Real (&s_g)[AMREX_SPACEDIM],
++                        const bool vac)
+         {
+-            amrex::Real ne, nref, g[AMREX_SPACEDIM];
++            // The RK4 stages need only n_ref and grad n_ref; `ne` and `A_s` are
++            // scratch for `sample`'s other outputs, per-invocation and so
++            // per-ray.
++            amrex::Real ne, nref, A_s, g[AMREX_SPACEDIM];
+             amrex::Real ct[AMREX_SPACEDIM], Tt[AMREX_SPACEDIM];
+             amrex::Real dc1[AMREX_SPACEDIM], dT1[AMREX_SPACEDIM];
+             amrex::Real dc2[AMREX_SPACEDIM], dT2[AMREX_SPACEDIM];
+             amrex::Real dc3[AMREX_SPACEDIM], dT3[AMREX_SPACEDIM];
+             amrex::Real dc4[AMREX_SPACEDIM], dT4[AMREX_SPACEDIM];
+ 
+-            sample(c, ne, nref, g);
++            // In vacuum `sample` returns exactly (1, 0): take that directly.
++            // The sign of the zero is immaterial -- every use of `g` here is an
++            // addition, and x + (-0.0) == x + (+0.0) for every x in round-to-
++            // nearest.
++            if (vac) {
++                nref = 1._rt;
++                for (int d = 0; d < AMREX_SPACEDIM; ++d) { g[d] = 0._rt; }
++            } else if (s_valid) {
++                nref = s_nref;
++                for (int d = 0; d < AMREX_SPACEDIM; ++d) { g[d] = s_g[d]; }
++            } else {
++                sample(c, ne, nref, g, A_s);
++            }
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                 dc1[d] = T[d] / nref; dT1[d] = g[d];
+                 ct[d] = c[d] + 0.5_rt * h * dc1[d];
+                 Tt[d] = T[d] + 0.5_rt * h * dT1[d];
+             }
+-            sample(ct, ne, nref, g);
++            if (!vac) { sample(ct, ne, nref, g, A_s); }
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                 dc2[d] = Tt[d] / nref; dT2[d] = g[d];
+                 ct[d] = c[d] + 0.5_rt * h * dc2[d];
+                 Tt[d] = T[d] + 0.5_rt * h * dT2[d];
+             }
+-            sample(ct, ne, nref, g);
++            if (!vac) { sample(ct, ne, nref, g, A_s); }
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                 dc3[d] = Tt[d] / nref; dT3[d] = g[d];
+                 ct[d] = c[d] + h * dc3[d];
+                 Tt[d] = T[d] + h * dT3[d];
+             }
+-            sample(ct, ne, nref, g);
++            if (!vac) { sample(ct, ne, nref, g, A_s); }
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                 dc4[d] = Tt[d] / nref; dT4[d] = g[d];
+                 c[d] += (h / 6._rt) * (dc1[d] + 2._rt * dc2[d]
+@@ -829,16 +958,36 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+ 
+         // Trace a single ray launched at c0 along unit direction u0 carrying
+         // power P0_ray (W): refract via RK4 of the eikonal equation, absorbing
+-        // IB along the path.
++        // IB along the path. Everything the march touches is either local to
++        // this invocation or the caller's accumulator, so rays are independent
++        // and may be traced concurrently.
+         auto trace_ray = [&] (const amrex::Real (&c0)[AMREX_SPACEDIM],
+                               const amrex::Real (&u0)[AMREX_SPACEDIM],
+-                              amrex::Real P0_ray)
++                              amrex::Real P0_ray,
++                              amrex::Array4<amrex::Real> const& H_acc,
++                              amrex::Real& P_sum)
+         {
+             amrex::Real c[AMREX_SPACEDIM];
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) { c[d] = c0[d]; }
+ 
+-            amrex::Real n_e, n_ref, g[AMREX_SPACEDIM];
+-            sample(c, n_e, n_ref, g);
++            // O2: how many steps at the head of this ray's path are guaranteed
++            // to lie in empty space. In vacuum T is unchanged, so the ray
++            // advances along the axis at a fixed rate and the count follows from
++            // the distance to the entry plane; a whole number of steps means the
++            // ray ends up exactly where the full march would have put it, and
++            // every step in between is still taken -- only its field samples are
++            // dropped. The midpoints are covered too, since they lie between
++            // positions that are both before the entry plane.
++            int n_vac = 0;
++            if (m_vacuum_skip) {
++                const amrex::Real s = (s_entry - c0[m_axis]) / u0[m_axis];
++                if (s > 0._rt) {
++                    n_vac = static_cast<int>(std::floor(s / h));
++                }
++            }
++
++            amrex::Real n_e, n_ref, A_cur, g[AMREX_SPACEDIM];
++            sample(c, n_e, n_ref, g, A_cur);
+             amrex::Real T[AMREX_SPACEDIM];
+             for (int d = 0; d < AMREX_SPACEDIM; ++d) { T[d] = n_ref * u0[d]; }
+ 
+@@ -847,30 +996,56 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             amrex::Real r_prev = n_e * inv_n_cr;
+             amrex::Real ne_prev = n_e;
+ 
++            // True while (n_ref, g) are the sample at the ray's CURRENT `c`, so RK4
++            // stage 1 can reuse them. The sample above establishes that at launch; the
++            // end-of-step sample re-establishes it every step; only the turning-point
++            // rewind of `c` breaks it.
++            bool s_valid = true;
++
+             for (int istep = 0; istep < max_steps && P > P_min; ++istep) {
++                // A vacuum step: everything below is what the general path would
++                // have computed there, with the field samples removed. Those
++                // five (three RK4 stages after O3, the midpoint and the end of
++                // the step) are essentially the whole cost of a step.
++                const bool vac = (istep < n_vac);
++
+                 amrex::Real c_old[AMREX_SPACEDIM];
+                 for (int d = 0; d < AMREX_SPACEDIM; ++d) { c_old[d] = c[d]; }
+ 
+-                rk4(c, T);
++                rk4(c, T, s_valid, n_ref, g, vac);
+ 
+-                // Absorption over the step, evaluated at the midpoint.
++                // Absorption over the step, evaluated at the midpoint. In vacuum
++                // n_e = 0 there, so there is nothing to absorb and nothing to
++                // deposit -- `deposit` would return on its first line.
+                 amrex::Real c_mid[AMREX_SPACEDIM];
+                 for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                     c_mid[d] = 0.5_rt * (c_old[d] + c[d]);
+                 }
+-                amrex::Real ne_m, nref_m, gm[AMREX_SPACEDIM];
+-                sample(c_mid, ne_m, nref_m, gm);
+-                if (ne_m > 0._rt) {
+-                    // A_loc is the coefficient at c_mid, from the sample above.
+-                    const amrex::Real K =
+-                        A_loc * ne_m * ne_m * inv_n_cr / nref_m;
+-                    const amrex::Real absorbed = P * (1._rt - std::exp(-K * h));
+-                    deposit(c_mid, ne_m, absorbed);
+-                    P -= absorbed;
++                if (!vac) {
++                    amrex::Real ne_m, nref_m, A_mid, gm[AMREX_SPACEDIM];
++                    sample(c_mid, ne_m, nref_m, gm, A_mid);
++                    if (ne_m > 0._rt) {
++                        // A_mid is the coefficient at c_mid, from the sample above.
++                        const amrex::Real K =
++                            A_mid * ne_m * ne_m * inv_n_cr / nref_m;
++                        const amrex::Real absorbed =
++                            P * (1._rt - std::exp(-K * h));
++                        deposit(c_mid, ne_m, absorbed, H_acc, P_sum);
++                        P -= absorbed;
++                    }
+                 }
+ 
+-                // Refractive index at the new position.
+-                sample(c, n_e, n_ref, g);
++                // Refractive index at the new position. This also becomes RK4
++                // stage 1 of the next step, which is at this same point. In
++                // vacuum it is (0, 1, 0), which is what `sample` returns there.
++                if (vac) {
++                    n_e = 0._rt;
++                    n_ref = 1._rt;
++                    for (int d = 0; d < AMREX_SPACEDIM; ++d) { g[d] = 0._rt; }
++                } else {
++                    sample(c, n_e, n_ref, g, A_cur);
++                }
++                s_valid = true;
+                 const amrex::Real r_cur = n_e * inv_n_cr;
+                 const amrex::Real drds = (r_cur - r_prev) / h;
+ 
+@@ -893,10 +1068,11 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                         // where the last `sample` above was taken. T_e varies
+                         // smoothly there -- the singularity is in n_e.
+                         const amrex::Real tau =
+-                            A_loc * m_n_cr * L_eff * integ; // one way
++                            A_cur * m_n_cr * L_eff * integ; // one way
+                         const amrex::Real absorbed =
+                             P * (1._rt - std::exp(-2._rt * tau));
+-                        deposit(c, ne_prev > 0._rt ? ne_prev : n_e, absorbed);
++                        deposit(c, ne_prev > 0._rt ? ne_prev : n_e, absorbed,
++                                H_acc, P_sum);
+                         P -= absorbed;
+                     }
+                     // Specular reflection about the critical surface normal.
+@@ -919,10 +1095,13 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                         }
+                     }
+                     // Nudge back into the underdense region to avoid being
+-                    // re-trapped at the same point on the next step.
++                    // re-trapped at the same point on the next step. This moves `c`
++                    // away from where (n_ref, g) were sampled, so the next RK4 stage 1
++                    // must take its own sample.
+                     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                         c[d] = c_old[d];
+                     }
++                    s_valid = false;
+                 }
+ 
+                 if (n_e > 0._rt) { r_prev = r_cur; ne_prev = n_e; }
+@@ -955,10 +1134,54 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+         const amrex::Real inv_rpc =
+             1._rt / static_cast<amrex::Real>(m_rays_per_cell);
+ 
+-        for (int it0 = t0lo; it0 <= t0hi; ++it0) {
+-        for (int is0 = 0; is0 <= s0hi; ++is0) {
+-        for (int it1 = t1lo; it1 <= t1hi; ++it1) {
+-        for (int is1 = 0; is1 <= s1hi; ++is1) {
++        // The ray bundle as one index space, so it can be split across
++        // accumulators. `iray` runs in exactly the order the four nested loops
++        // did (it0 outermost, is1 innermost), which is what makes a single
++        // accumulator reproduce the serial march bit for bit.
++        const long nr_t0 = static_cast<long>(t0hi - t0lo + 1);
++        const long nr_s0 = static_cast<long>(s0hi + 1);
++        const long nr_t1 = static_cast<long>(t1hi - t1lo + 1);
++        const long nr_s1 = static_cast<long>(s1hi + 1);
++        const long n_rays = nr_t0 * nr_s0 * nr_t1 * nr_s1;
++
++        // One deposition accumulator per bucket, each owned by one thread for
++        // the whole march: ray `i` goes to bucket `i % n_acc`, and the buckets
++        // are summed into H in bucket order below. Parallelising over BUCKETS
++        // rather than over rays is what makes that ownership hold for any thread
++        // count -- with a ray-level `parallel for` two rays sharing a bucket
++        // could run on two threads, and both the race and the summation order
++        // would come back.
++        const int n_acc = static_cast<int>(
++            amrex::min(static_cast<long>(m_n_acc), amrex::max(n_rays, 1L)));
++        amrex::Vector<amrex::FArrayBox> acc(n_acc);
++        std::vector<amrex::Real> P_acc(static_cast<std::size_t>(n_acc), 0._rt);
++        for (int b = 0; b < n_acc; ++b) {
++            // Pinned rather than the default arena: this is host code, and on a
++            // GPU build the default FArrayBox arena is device memory.
++            acc[b].resize(bx, 1, amrex::The_Pinned_Arena());
++            acc[b].setVal<amrex::RunOn::Host>(0._rt);
++        }
++
++#ifdef _OPENMP
++        // Guarded on _OPENMP, not AMREX_USE_OMP: the march is host code whose
++        // cost is independent of the AMReX backend, and a CUDA build (where
++        // AMREX_USE_OMP is off) is exactly the case where this loop is the
++        // serial bottleneck holding up an otherwise busy device.
++        const int n_thr = (m_ray_threads > 0)
++            ? amrex::min(m_ray_threads, n_acc)
++            : amrex::min(omp_get_max_threads(), n_acc);
++#pragma omp parallel for schedule(dynamic, 1) num_threads(n_thr)
++#endif
++        for (int b = 0; b < n_acc; ++b) {
++        const auto H_acc = acc[b].array();
++        amrex::Real P_sum = 0._rt;
++        for (long iray = b; iray < n_rays; iray += n_acc) {
++            long q = iray;
++            const int is1 = static_cast<int>(q % nr_s1); q /= nr_s1;
++            const int it1 = static_cast<int>(q % nr_t1) + t1lo; q /= nr_t1;
++            const int is0 = static_cast<int>(q % nr_s0); q /= nr_s0;
++            const int it0 = static_cast<int>(q) + t0lo;
++
+             amrex::Real c0[AMREX_SPACEDIM];
+             c0[m_axis] = m_inject_hi ? phi[m_axis] : plo[m_axis];
+             if (n_t >= 1) {
+@@ -1001,8 +1224,25 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+             // Power = incident flux through the entry face = I * area * |u_axis|.
+             const amrex::Real P0_ray =
+                 I_local * sub_area * std::abs(u[m_axis]);
+-            if (P0_ray > 0._rt) { trace_ray(c0, u, P0_ray); }
+-        }}}}
++            if (P0_ray > 0._rt) { trace_ray(c0, u, P0_ray, H_acc, P_sum); }
++        }
++        P_acc[static_cast<std::size_t>(b)] = P_sum;
++        }
++
++        // Reduce the accumulators in bucket order, then cells in index order:
++        // a fixed order, independent of how many threads ran the march.
++        const auto blo3 = amrex::lbound(bx);
++        const auto bhi3 = amrex::ubound(bx);
++        for (int b = 0; b < n_acc; ++b) {
++            const auto a = acc[b].const_array();
++            for (int k = blo3.z; k <= bhi3.z; ++k) {
++            for (int j = blo3.y; j <= bhi3.y; ++j) {
++            for (int i = blo3.x; i <= bhi3.x; ++i) {
++                H_arr(i, j, k) += a(i, j, k);
++            }}}
++            absorbed_power_total += P_acc[static_cast<std::size_t>(b)];
++        }
++        vacuum_skip_frac = skip_frac;
+     }
+ 
+     // Optional per-cell profile dump, before the field leaves host memory.
+@@ -1085,7 +1325,8 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+            << " Pabs " << absorbed_power_total
+            << " Eabs " << m_absorbed_energy
+            << " Tlocalfrac "
+-           << ((w_total > 0._rt) ? (w_local / w_total) : 0._rt);
++           << ((w_total > 0._rt) ? (w_local / w_total) : 0._rt)
++           << " Vskip " << vacuum_skip_frac;
+         amrex::Print() << os.str() << "\n";
+     }
+ }

@@ -980,6 +980,30 @@ lit ones, because the halo crosses the 160 `d_e` transverse box in ~4 ps and fil
 the error — a clear knee. The 10⁻⁴ originally assumed here is over-conservative by 0.44× in speedup
 for no measurable accuracy gain.
 
+> **FALSIFIED 2026-07-30, on implementation. There is no threshold, and this whole sweep asked
+> the wrong question.** Built as specified, `n_th` = 3×10⁻² moved the 1D ramp CI deck's absorbed
+> fraction by **+6.13 %** — from 1.2 % below the closed form to 4.9 % above it, against a 0.48 %
+> tolerance. The discarded τ was never the only error available to a skip:
+>
+> - Below the threshold the medium still **refracts**, so the discrete march does not advance by
+>   `h` per step. Measured on the ramp deck, it **lags the straight line by 1.6×10⁻³ h over 16
+>   steps** — so an analytic jump of a whole number of steps lands the ray *ahead* of where the
+>   march would have been.
+> - That lead flips the discrete near-critical trigger `n_ref ≤ n_floor && drds > 0`. Pre-change
+>   the trigger never fires on this deck (the ray turns by refraction alone); after the jump it
+>   fires and the analytic layer deposits 4.6 % of the beam. **Discrete**, which is why skipping
+>   one cell and skipping four gave the identical +6.13 %.
+> - Not general fragility: perturbing `ray_cfl` by 1 part in 10⁷ moves the same total by 9×10⁻⁶.
+>
+> **A cheap approximation upstream of a discrete trigger is not bounded by its own smallness.**
+> O2 as shipped is the no-op removal this section's first sentence claimed: it skips the five
+> `sample()` calls of steps lying wholly in *exactly* empty field, keeping the arithmetic and its
+> order, and is bit-identical on every deck tested. It gives up nothing where it was supposed to
+> pay — `Vskip` on `P1_vac_2d_spot` at t = 0 is **0.47**, matching the 0.471 measured here with a
+> 10⁻⁴ `n_cr` contour, because a vacuum gap is empty to the bit. Measured 1.53× on the march
+> (a vacuum step still costs φ = 0.26 of a full one) against the 2.10× the threshold would have
+> bought. See `studies/ray_march_perf/README.md`.
+
 This is still the cost side of the rule that the launch plane must sit outside the plasma — but the
 gap is only expensive **early**, and a long run pays the full march regardless.
 
@@ -1099,6 +1123,16 @@ O2 **2.00× at `n_th` = 3×10⁻² on the spot at 8 ps, decaying to ~1.0× on a 
 2026-07-29 — not the ~9× first assumed) — multiplicative on the same phase, so **~10× combined at
 best and ~7× on a long run**, not ~15×, and the
 driven step lands within ~6 % of the laser-off control.
+
+**MEASURED 2026-07-30** on the `P1_vac_2d_spot` geometry, march only, non-march floor subtracted:
+O3 **1.26×**, O2 **1.53×** (the exact version, not the falsified threshold), O1 **6.2×** at 12
+threads — **11.9× combined**, ahead of the ~10× allowed for. But the cost target below is *not*
+met on CPU, and for a reason the plan did not anticipate: what is left is not the march.
+`intensity=0` measures the rest of `applyDeposition` at **0.250 s per application, unthreaded**,
+so the march is now 19 % of the operator and the per-application target of ≤ 60 ms is bounded by
+grid machinery (the 6-component `n_meas` + `SumBoundary`, the full-domain `ParallelCopy`, the
+pinned copies, the redistribute). That measurement is at ppc = 1 and mostly device-side on CUDA,
+so it does not transfer to the GPU runs without being re-measured there.
 
 ### 7.5.6 Deliverables
 
@@ -1323,16 +1357,29 @@ boundaries, is the project's headline output.
       0.75 ps)
 
 **Phase 1.5 — the ray march (a CODE phase, §7.5)**
-- [ ] O3: cache the redundant end-of-step `sample()` (6 -> 5 per step, bit-identical)
-- [ ] O1: OMP over rays, fixed `N_ACC` accumulators so the result is thread-count invariant
-- [ ] O2: skip the vacuum by one reduction + an analytic jump to the entry plane
-- [ ] `launch.sh --gpu` no longer forces `OMP_NUM_THREADS=1` for driven runs; benchmarked
-- [ ] Tier 1: the five CI decks; 1D bit-identical, 2D oblique still 12.50 % / max-min 1.000
-- [ ] Tier 2: step-0 per-COLUMN profiles on `P1_vac_1d_thick` and `P1_vac_2d_spot`
-- [ ] Tier 3: `E_abs` within 0.5 % on 1-3 ps slices of the same two runs
-- [ ] Tier 4: bit-identical across repeats AND across `OMP_NUM_THREADS` 1/2/4/8/12
-- [ ] `studies/ray_march_perf/` benchmark ladder; measured factors in `RESULTS.md`
-- [ ] `CLAUDE.md` performance bullets updated (the "GPU idles during the march" note retires)
+- [x] O3: cache the redundant end-of-step `sample()` (6 -> 5 per step, bit-identical) — **1.26×**
+- [x] O1: OMP over rays, fixed `N_ACC` accumulators so the result is thread-count invariant —
+      **6.2× at 12 threads**; parallel over BUCKETS, not rays (§7.5.1's `static,1` schedule would
+      have raced whenever the thread count does not divide `N_ACC`), and `A_loc` retired as a
+      shared side channel
+- [x] O2: skip the vacuum — **but not by a threshold or a jump**: `n_th` = 3×10⁻² is FALSIFIED
+      (+6.13 % on the ramp CI deck, §7.5.2). Empty steps keep their arithmetic and drop their
+      samples; bit-identical, **1.53×**, and `Vskip` = 0.47 on the spot deck at t = 0
+- [x] Tier 1: the five CI decks — **285/285 bit-identical** at `n_accumulators=1`; oblique 1/8
+      exact; at the default 16 only the oblique `EP.txt` moves, by 1.3×10⁻¹⁵
+- [x] Tier 2: `P1_vac_2d_spot` step-0 dump **byte-identical** with O2 active
+- [x] Tier 4: every `LASERDEP` line byte-identical across `OMP_NUM_THREADS` 1/2/4/8/12. The
+      residual 2–5×10⁻¹⁵ `EP.txt` thread-dependence is **pre-existing** — the pre-change binary
+      gives the identical numbers — so `EP` is not a valid criterion for this claim
+- [x] `studies/ray_march_perf/` benchmark ladder (`bench.sh`); measured factors in `RESULTS.md`
+- [x] `CLAUDE.md` performance bullets updated (the "GPU idles during the march" note retires)
+- [ ] Tier 3: `E_abs` within 0.5 % on 1-3 ps slices — not run, and largely retired by Tier 1/2
+      bit-identity (there is no drift to integrate when the dumps are byte-equal). Worth one run
+      on the GPU build, which is genuinely different code
+- [ ] `build_cuda_omp` benchmarked, and `launch.sh --gpu` taught to pass `ray_threads`
+      (`OMP_NUM_THREADS=1` stays right for the push; the march is host code and now threads)
+- [ ] **NEW, and now the binding cost**: `applyDeposition` minus the march is 0.250 s per
+      application and does not thread (§7.5.5) — the grid machinery, not the ray tracer
 
 **Phase 2 — ambient**
 - [ ] `scripts/tune_shock.py`, `make_figures.py`, `phase_space.py`, `make_movies.py`

@@ -209,6 +209,14 @@ def validate(cfg: dict) -> list[str]:
     rc = float(las.get("ray_cfl", 0.25))
     if not (0.0 < rc <= 1.0):
         raise ValueError("laser.ray_cfl must be in (0, 1]")
+    # Ray-march performance knobs (Phase 1.5). None of these may change the
+    # answer, and n_accumulators only fixes the summation ORDER -- but a run that
+    # is to be compared bit for bit with another must declare the same value, so
+    # they are validated here rather than left to WarpX to reject at launch.
+    if las.get("ray_threads") is not None and int(las["ray_threads"]) < 0:
+        raise ValueError("laser.ray_threads must be >= 0 (0 = whatever OpenMP offers)")
+    if las.get("n_accumulators") is not None and int(las["n_accumulators"]) < 1:
+        raise ValueError("laser.n_accumulators must be >= 1")
 
     # --- geometry sanity vs the target ---
     # --- does the target fit, and does it touch the injection face? ---

@@ -14,9 +14,14 @@ profile dump at every step**, not the analysis scripts' verdicts.
 ```
 capture.sh       run the 5 upstream CI decks with a given build; capture every dump
 compare.py       Tier 1: byte-compare two captures, and re-check the oblique deck's 1/8
+bench.sh         the benchmark ladder: march cost per application, from the TinyProfiler
 baseline_bin/    the pre-optimisation WarpX CPU binaries, preserved (gitignored, 45 MB)
 scratch/         captures (gitignored)
 ```
+
+`capture.sh` takes ParmParse overrides after the output directory and honours `THREADS`, which
+is what Tier 1's exact mode (`laser_deposition.n_accumulators=1`) and Tier 4's thread ladder
+use.
 
 `tests/test_acceptance_harness.py` pins `compare.py`'s **sensitivity**: it must fail on one
 cell perturbed by one ULP, and it must say which file. A comparator that only ever passes
@@ -47,6 +52,101 @@ Everything is `nice -n 19`, because a driven physics run on this box is latency-
 host thread (`CLAUDE.md`) and is easily starved.
 
 ## Status
+
+**2026-07-30 — O1 + O2 + O3 built, accepted and measured. The march is 11.9× faster and it
+threads; the operator is no longer march-dominated on CPU.**
+
+Acceptance (all on the CPU build, `nice`-d, box otherwise loaded at ~18):
+
+| test | result |
+|---|---|
+| Tier 1, exact mode (`n_accumulators=1`) | **285/285 files bit-identical** to the pre-change binary, all five decks; oblique still exactly 1/8 |
+| Tier 1, production defaults (`n_accumulators=16`) | every per-cell profile dump bit-identical; **only `EP.txt` on the oblique deck moves, by 1.3×10⁻¹⁵** — the accumulator reordering, 6 ULP |
+| Tier 2, `P1_vac_2d_spot` step-0 dump | **byte-identical**, with O2 active (`Vskip 0.47`); `Pabs` 5.94085×10¹² unchanged |
+| Tier 4, thread invariance 1/2/4/8/12 | every `LASERDEP` line **byte-identical**; every profile dump bit-identical |
+
+The one caveat, stated because it looks like a failure and is not: at 2/4/8/12 threads `EP.txt`
+differs from the 1-thread capture by 2–5×10⁻¹⁵ on the three 2D decks. **The pre-change binary
+produces the identical differences** (1.946, 3.918, 4.628 ×10⁻¹⁵ — the same numbers), so this is
+WarpX's own OMP particle path, not O1. It is also why Tier 4's criterion is the operator's
+output, not the particle energy: `EP` cannot resolve a thread-invariance claim about the march.
+
+### The benchmark ladder
+
+`bench.sh`, on the real `P1_vac_2d_spot` geometry (320 rays, 704 k cells, the t = 0 vacuum gap)
+with `ppc = 1` so that the particle push does not swamp the timer. Numbers are
+`LaserDeposition::applyDeposition` per application, and the **march** column subtracts the
+measured non-march floor (see below).
+
+| build | threads | per application | march only | march speedup |
+|---|---|---|---|---|
+| pre-change | 1 | 0.912 s | 0.678 s | 1.00× |
+| O3 | 1 | 0.788 s | 0.538 s | **1.26×** |
+| O3 + O2 | 1 | 0.602 s | 0.351 s | **1.93×** |
+| O3 + O2 + O1 | 2 | 0.452 s | 0.201 s | 3.37× |
+| O3 + O2 + O1 | 4 | 0.360 s | 0.110 s | 6.16× |
+| O3 + O2 + O1 | 8 | 0.312 s | 0.062 s | 10.9× |
+| O3 + O2 + O1 | 12 | 0.307 s | 0.057 s | **11.9×** |
+
+O3 measured 1.26× against 1.17× predicted; O1 6.2× on top, inside the predicted 6–8×; O2 1.53×
+against the 1.89× its `f_vac` = 0.47 would give if a vacuum step were free. It is not free — it
+keeps its RK4 arithmetic, its midpoint construction and its escape test — and back-solving
+`1/((1−f) + fφ) = 1.53` puts a vacuum step at **φ = 0.26** of a full one. That is the price of
+being bit-identical instead of jumping, and it is worth paying (below).
+
+### The new bottleneck: the march is no longer the cost
+
+Measured by running the same benchmark with `laser_deposition.intensity=0`, which executes the
+whole operator except the ray march: **0.250 s per application, and it does not thread at all**
+(0.248 s at 12 threads). So of the 0.307 s an application now costs, **81 % is not the march**.
+Decomposed the same way: the 16 accumulators cost 17 ms, the per-cell `A_host` build with its
+`pow(kT, 1.5)` costs 14 ms, and the remaining ~0.22 s is the grid machinery — the 6-component
+`n_meas` allocation and `SumBoundary`, the `ParallelCopy` onto a single full-domain box, the
+pinned-host copies, and the redistribute back.
+
+Two caveats before anyone optimises that: it was measured at **ppc = 1**, so the particle CIC
+and the kicks are at their cheapest here and will grow with ppc; and most of it is device work
+on a CUDA build, where this profile does not apply. It is recorded because it is what the next
+person will hit, not because it is in scope for Phase 1.5.
+
+### O2's threshold: PROPOSED 3×10⁻² n_cr, MEASURED unacceptable, replaced by exactness
+
+`TEST_PLAN` §7.5.2 chose `n_th` = 3×10⁻² `n_cr` from a sweep of the **discarded optical depth**
+(τ_disc = 3.5×10⁻⁴, 300× under the seed noise) and had the ray jump analytically from the
+injection face to the entry plane. Implemented exactly as specified, that **moved the 1D ramp CI
+deck's absorbed fraction by +6.13 %** — from 1.2 % *below* the closed form to 4.9 % *above* it,
+i.e. an order of magnitude outside the deck's 0.48 % tolerance. The 2D oblique deck moved 1.4 %.
+
+The diagnosis, by replicating the march in Python against the same density field the operator
+had used:
+
+* The skipped region is **not vacuum** in that deck — the ramp starts at zero and rises, so the
+  first 4 cells hold sub-threshold *plasma*. Light refracts there.
+* Because it refracts, the discrete march does **not** advance by `h` in `z` per step. Measured:
+  it lags the straight line by **1.6×10⁻³ h over 16 steps**. An analytic jump of a whole number
+  of steps therefore lands the ray slightly *ahead* of where the march would have put it.
+* That tiny lead changes which step first satisfies the near-critical trigger
+  `n_ref ≤ n_floor && drds > 0`. In the pre-change run the trigger **never fires** and the ray
+  turns by refraction alone; with the jump it fires, and the analytic layer adds 4.6 % of the
+  beam in one deposit. A discrete flip, not a gradual error — which is why skipping **one** cell
+  and skipping **four** gave the same +6.13 %.
+* It is genuinely a phase effect and not a general fragility: perturbing `ray_cfl` by 1 part in
+  10⁷ moves the same total by only 9×10⁻⁶.
+
+**So τ_discarded was never the only error a skip could make, and the sweep that chose 3×10⁻²
+could not see the one that mattered.** The threshold is gone. O2 now skips only steps whose
+whole extent lies in field that is **exactly** empty, where `sample` returns `(n_ref, ∇n_ref) =
+(1, 0)` exactly and the four RK4 stages provably reduce to the same derivative — and rather than
+jumping it takes the steps with the same arithmetic, in the same order, minus the samples. The
+result is bit-identical on every deck tested, including the production spot geometry.
+
+**The exactness is free in the only place it was supposed to pay.** `Vskip` on
+`P1_vac_2d_spot` at t = 0 reads **0.47** — the same 0.471 the plan measured with a 10⁻⁴ `n_cr`
+contour. The forward vacuum gap of a vacuum-ablation run is empty *to the bit*, so a strict test
+finds all of it. The threshold would have bought 1.93× → 2.10× on the march (§7.5.2's own table)
+in exchange for an unbounded phase error near a turning point.
+
+---
 
 **2026-07-29 — baseline captured; O3 written and syntax-checked; builds deferred.**
 
@@ -140,7 +240,13 @@ criterion. It now demands agreement with `1/(1−f_vac)` measured on the same du
 
 ### Still to do
 
-* build and run Tier 1 for O3; then O1, then O2, re-running Tier 1 after each
-* Tiers 2–4 (§7.5.4), including thread invariance across `OMP_NUM_THREADS` 1/2/4/8/12
-* the benchmark ladder itself — threads × O1/O2/O3 on/off — which needs an **idle** box to
-  mean anything, so it waits for the GPU run to land
+* **the GPU build.** `build_cuda` is configured `AMReX_OMP=OFF` with no `-fopenmp`, so
+  `_OPENMP` is undefined and O1 is inert there — the production 2D runs get O2 + O3 (1.93×)
+  and nothing else. `build_cuda_omp/` is being built with `-DAMReX_OMP=ON` (which puts
+  `-Xcompiler=-fopenmp` in the CUDA flags) to fix that, deliberately as a **separate tree** so
+  `build_cuda/bin/warpx.2d` stays valid.
+* Tier 3 (time-integrated `E_abs` over a 1–3 ps slice) — not run, and arguably retired by the
+  Tier-1/Tier-2 bit-identity: there is no drift to integrate when the dumps are byte-equal.
+  Worth running once on the GPU build, where the comparison is genuinely different code.
+* re-benchmark on an **idle** box. Everything above was measured at load ~18 on a shared
+  32-core host, so the thread scaling is a lower bound.
