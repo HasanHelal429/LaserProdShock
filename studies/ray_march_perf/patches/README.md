@@ -48,5 +48,20 @@ overrides the thread count for the march alone, so a GPU run can keep `OMP_NUM_T
 `sample()` calls and keep their arithmetic, so they are bit-identical rather than approximate.
 Not a density threshold — see the finding in `../README.md`.
 
+**O4 — form the IB coefficient where the data is.** Not in the plan; it came out of decomposing
+what was left once the march was fast. The per-cell coefficient was built in a serial host loop
+with a `pow(kT, 1.5)` per cell, on data that lives on the device, and it forced the full-domain
+gather to move all six components to the host because the temperature moments were consumed only
+there. A device kernel over the particle decomposition now writes the coefficient into component
+1 of the measured field (over the momentum moments, dead afterwards) and a "measured T_e" flag
+into component 2, so the gather moves **3 components instead of 6** and the pinned `A_host`
+MultiFab is gone. The two `Tlocalfrac` sums stay on the host over the gathered box in their
+original index order, so even that diagnostic is unchanged.
+
+**Per-phase profiler regions.** `density | coeff | gather | tlocal | rayTrace | scatter | kick`,
+which **tile** `applyDeposition` rather than nest — so anything appearing in its *exclusive*
+column is work outside every phase, which is how the 74 MB step-0 dump that was corrupting the
+benchmark was found. Keep them tiling if you add one.
+
 **Before applying any of these, capture the Tier-1 baseline** — the binaries are the only record
 of pre-change behaviour and a rebuild destroys them. See `../README.md`.

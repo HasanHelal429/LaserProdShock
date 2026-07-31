@@ -49,7 +49,7 @@ index 025bf264c..f8771a092 100644
      // m_beam_profile: 0 = uniform (default), 1 = (super-)Gaussian
      //   I(r_perp) = I0 exp( -( |r_perp - center|^2 / w0^2 )^m ).
 diff --git a/Source/Particles/LaserDeposition/LaserDeposition.cpp b/Source/Particles/LaserDeposition/LaserDeposition.cpp
-index 431ba31de..166e68313 100644
+index 431ba31de..6215fc530 100644
 --- a/Source/Particles/LaserDeposition/LaserDeposition.cpp
 +++ b/Source/Particles/LaserDeposition/LaserDeposition.cpp
 @@ -18,9 +18,11 @@
@@ -81,7 +81,33 @@ index 431ba31de..166e68313 100644
  #include <fstream>
  #include <iomanip>
  #include <limits>
-@@ -327,6 +335,15 @@ LaserDeposition::LaserDeposition ()
+@@ -165,7 +173,6 @@ namespace
+                             amrex::Real cur_time, amrex::Real dt_dep,
+                             const amrex::MultiFab &n_host,
+                             const amrex::MultiFab &H_host,
+-                            const amrex::MultiFab &A_host,
+                             amrex::Real K_coeff_C,
+                             const amrex::Geometry &geom)
+     {
+@@ -182,7 +189,6 @@ namespace
+             const amrex::Box &bx = mfi.validbox();
+             const auto n_arr = n_host.const_array(mfi);
+             const auto H_arr = H_host.const_array(mfi);
+-            const auto A_arr = A_host.const_array(mfi);
+             const amrex::Real inv_mec2 =
+                 1._rt / (PhysConst::m_e * PhysConst::c * PhysConst::c);
+ 
+@@ -221,7 +227,8 @@ namespace
+                 }
+                 const amrex::Real ne = n_arr(i, j, k);
+                 const amrex::Real H = H_arr(i, j, k);
+-                const amrex::Real A = A_arr(i, j, k);
++                // Component 1 of the gathered field is the IB coefficient.
++                const amrex::Real A = n_arr(i, j, k, 1);
+                 // A = C/(kB T_e)^{3/2}  ->  theta_e = (C/A)^{2/3}/(m_e c^2)
+                 const amrex::Real theta = (A > 0._rt)
+                     ? std::pow(K_coeff_C / A, 2._rt / 3._rt) * inv_mec2 : 0._rt;
+@@ -327,6 +334,15 @@ LaserDeposition::LaserDeposition ()
          m_ray_cfl > 0._rt && m_ray_cfl <= 1._rt,
          "laser_deposition: 'ray_cfl' must be in (0, 1]");
  
@@ -97,7 +123,7 @@ index 431ba31de..166e68313 100644
      // Transverse beam profile and ray-bundle sampling.
      pp.query("rays_per_cell", m_rays_per_cell);
      WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-@@ -455,6 +472,13 @@ LaserDeposition::LaserDeposition ()
+@@ -455,6 +471,13 @@ LaserDeposition::LaserDeposition ()
          (four_pi_eps0 * four_pi_eps0 * std::sqrt(PhysConst::m_e) *
           PhysConst::c);
  
@@ -111,7 +137,206 @@ index 431ba31de..166e68313 100644
      m_defined = true;
  }
  
-@@ -680,6 +704,11 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -502,18 +525,98 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+     // In local-temperature mode the same CIC pass also accumulates the momentum
+     // moments of the whole heated group, so the group temperature is exact
+     // rather than an average of per-species temperatures.
+-    const int n_comp = m_temperature_local ? 6 : 1;
++    // Components of the measured field: 0 is n_e, and 1 is the IB coefficient A,
++    // which is formed IN PLACE below over components 1-5's momentum moments. In
++    // local-temperature mode 2 then carries "this cell got a measured T_e", which
++    // only the Tlocalfrac diagnostic reads. Everything past `n_gath` is scratch for
++    // the moments and is never gathered -- which is the point: the ray march needs
++    // n_e and A, and moving 6 components to the host instead of 3 was two thirds of
++    // the gather's cost for nothing.
++    const int n_comp = m_temperature_local ? 6 : 2;
++    const int n_gath = m_temperature_local ? 3 : 2;
+     const auto& ba = pcs[0]->ParticleBoxArray(0);
+     const auto& dm = pcs[0]->ParticleDistributionMap(0);
++    ABLASTR_PROFILE_VAR("LaserDeposition::density", laserdep_density);
+     amrex::MultiFab n_meas(ba, dm, n_comp, 1);
+-    n_meas.setVal(0._rt);
+-    for (auto* pc : pcs) {
+-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+-            pc->ParticleBoxArray(0) == ba,
+-            "laser_deposition: heated species must share one box array");
+-        depositNumberDensity(*pc, n_meas, geom, m_temperature_local);
++    {
++        n_meas.setVal(0._rt);
++        for (auto* pc : pcs) {
++            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
++                pc->ParticleBoxArray(0) == ba,
++                "laser_deposition: heated species must share one box array");
++            depositNumberDensity(*pc, n_meas, geom, m_temperature_local);
++        }
++        n_meas.SumBoundary(geom.periodicity());
+     }
+-    n_meas.SumBoundary(geom.periodicity());
++    ABLASTR_PROFILE_VAR_STOP(laserdep_density);
++
++    // ------------------------------------------------------------------
++    // Per-cell IB coefficient A, so that K = (A/n_cr) n_e^2/sqrt(1-n_e/n_cr).
++    // In fixed mode this is the constant m_K_coeff; in local mode it is formed
++    // from the measured temperature of the heated group,
++    //     kB T_e = m_e ( <|u|^2> - |<u>|^2 ) / 3 ,
++    // with the drift subtracted (u = gamma v, so this is the non-relativistic
++    // temperature -- consistent with the non-relativistic nu_ei it feeds).
++    // Cells that are too sparsely sampled, or colder than the floor, fall back
++    // to m_K_coeff: T^{-3/2} is convex, so noise in a thinly-sampled cell would
++    // bias the absorption coefficient high.
++    //
++    // This runs where the data already is -- on the device in a GPU build, over
++    // the particle decomposition -- instead of on the gathered host copy. It was
++    // the last O(cells) SERIAL HOST loop in the operator, and it carried a
++    // `pow(kT, 1.5)` per cell: 7.9 ms of an 80 ms application at 36 ppc, and it
++    // would have scaled with the grid on an H5-scale spot. Cell-independent, so
++    // the answer does not depend on the loop order; the two diagnostic SUMS stay
++    // on the host below, in their original order, so Tlocalfrac is unchanged too.
++    ABLASTR_PROFILE_VAR("LaserDeposition::coeff", laserdep_coeff);
++    {
++        const amrex::Real kT_floor =
++            m_theta_floor * PhysConst::m_e * PhysConst::c * PhysConst::c;
++        const amrex::Real third = 1._rt / 3._rt;
++        // Members cannot be captured by a device lambda; take value copies.
++        const amrex::Real K_coeff = m_K_coeff;
++        const amrex::Real K_coeff_C = m_K_coeff_C;
++        const amrex::Real min_macro = m_min_macroparticles;
++        const bool local_T = m_temperature_local;
++#ifdef AMREX_USE_OMP
++#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
++#endif
++        for (amrex::MFIter mfi(n_meas, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
++            const amrex::Box& bx = mfi.tilebox();
++            const auto m = n_meas.array(mfi);
++            amrex::ParallelFor(bx,
++                [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
++            {
++                if (!local_T) { m(i, j, k, 1) = K_coeff; return; }
++                // Read the moments before overwriting components 1 and 2 with the
++                // coefficient and the flag.
++                const amrex::Real ne = m(i, j, k, 0);
++                const amrex::Real mx = m(i, j, k, 1);
++                const amrex::Real my = m(i, j, k, 2);
++                const amrex::Real mz = m(i, j, k, 3);
++                const amrex::Real m2 = m(i, j, k, 4);
++                const amrex::Real cnt = m(i, j, k, 5);
++                amrex::Real A = K_coeff;
++                amrex::Real measured = 0._rt;
++                if (ne > 0._rt && cnt >= min_macro) {
++                    const amrex::Real inv_ne = 1._rt / ne;
++                    const amrex::Real ux = mx * inv_ne;
++                    const amrex::Real uy = my * inv_ne;
++                    const amrex::Real uz = mz * inv_ne;
++                    const amrex::Real u2 = m2 * inv_ne;
++                    const amrex::Real kT = PhysConst::m_e * third *
++                        (u2 - (ux * ux + uy * uy + uz * uz));
++                    if (kT > kT_floor) {
++                        A = K_coeff_C / std::pow(kT, 1.5_rt);
++                        measured = 1._rt;
++                    }
++                }
++                m(i, j, k, 1) = A;
++                m(i, j, k, 2) = measured;
++            });
++        }
++    }
++    ABLASTR_PROFILE_VAR_STOP(laserdep_coeff);
+ 
+     // ------------------------------------------------------------------
+     // Gather the full-domain density onto a single box so each ray can be
+@@ -521,48 +624,38 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+     // decomposition, then copy it to pinned host memory so the (serial) ray
+     // integration is portable across CPU/GPU builds. Phase-1/2 validation
+     // problems are small; the trace is cheap.
++    ABLASTR_PROFILE_VAR("LaserDeposition::gather", laserdep_gather);
+     const amrex::Box domain = geom.Domain();
+     const amrex::BoxArray ba_full(domain);
+     const amrex::DistributionMapping dm_full(ba_full);
+-    amrex::MultiFab n_full(ba_full, dm_full, n_comp, 0);
+-    n_full.setVal(0._rt);
+-    n_full.ParallelCopy(n_meas, 0, 0, n_comp, amrex::IntVect{0},
+-                        amrex::IntVect{0}, geom.periodicity());
+-
+-    amrex::MultiFab n_host(ba_full, dm_full, n_comp, 0,
++    amrex::MultiFab n_host(ba_full, dm_full, n_gath, 0,
+                            amrex::MFInfo().SetArena(amrex::The_Pinned_Arena()));
+-    amrex::dtoh_memcpy(n_host, n_full);
++    {
++        amrex::MultiFab n_full(ba_full, dm_full, n_gath, 0);
++        n_full.setVal(0._rt);
++        n_full.ParallelCopy(n_meas, 0, 0, n_gath, amrex::IntVect{0},
++                            amrex::IntVect{0}, geom.periodicity());
++        amrex::dtoh_memcpy(n_host, n_full);
++    }
++    ABLASTR_PROFILE_VAR_STOP(laserdep_gather);
+ 
+     // Heating-rate field (host, pinned); written by the ray trace.
++    ABLASTR_PROFILE_VAR("LaserDeposition::tlocal", laserdep_tlocal);
+     amrex::MultiFab H_host(ba_full, dm_full, 1, 0,
+                            amrex::MFInfo().SetArena(amrex::The_Pinned_Arena()));
+     H_host.setVal(0._rt);
+ 
+-    // ------------------------------------------------------------------
+-    // Per-cell IB coefficient A, so that K = (A/n_cr) n_e^2/sqrt(1-n_e/n_cr).
+-    // In fixed mode this is the constant m_K_coeff; in local mode it is formed
+-    // from the measured temperature of the heated group,
+-    //     kB T_e = m_e ( <|u|^2> - |<u>|^2 ) / 3 ,
+-    // with the drift subtracted (u = gamma v, so this is the non-relativistic
+-    // temperature -- consistent with the non-relativistic nu_ei it feeds).
+-    // Cells that are too sparsely sampled, or colder than the floor, fall back
+-    // to m_K_coeff: T^{-3/2} is convex, so noise in a thinly-sampled cell would
+-    // bias the absorption coefficient high.
+-    amrex::MultiFab A_host(ba_full, dm_full, 1, 0,
+-                           amrex::MFInfo().SetArena(amrex::The_Pinned_Arena()));
+-    A_host.setVal(m_K_coeff);
+     // Diagnostics: how much of the absorbing plasma actually got a local
+-    // temperature, weighted by n_e^2 (which is what drives absorption).
++    // temperature, weighted by n_e^2 (which is what drives absorption). Summed
++    // over the GATHERED box in index order, which is what it always was -- so
++    // moving the coefficient itself onto the device does not move Tlocalfrac's
++    // last digits. Component 2 is the "measured" flag that kernel wrote.
+     amrex::Real w_local = 0._rt;
+     amrex::Real w_total = 0._rt;
+     if (m_temperature_local) {
+-        const amrex::Real kT_floor =
+-            m_theta_floor * PhysConst::m_e * PhysConst::c * PhysConst::c;
+-        const amrex::Real third = 1._rt / 3._rt;
+-        for (amrex::MFIter mfi(A_host); mfi.isValid(); ++mfi) {
++        for (amrex::MFIter mfi(n_host); mfi.isValid(); ++mfi) {
+             const amrex::Box& bx = mfi.validbox();
+             const auto m = n_host.const_array(mfi);
+-            const auto A = A_host.array(mfi);
+             const auto lo = amrex::lbound(bx);
+             const auto hi = amrex::ubound(bx);
+             for (int k = lo.z; k <= hi.z; ++k) {
+@@ -571,24 +664,13 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+                 const amrex::Real ne = m(i, j, k, 0);
+                 const amrex::Real wt = ne * ne;
+                 w_total += wt;
+-                if (ne <= 0._rt || m(i, j, k, 5) < m_min_macroparticles) {
+-                    continue;
+-                }
+-                const amrex::Real inv_ne = 1._rt / ne;
+-                const amrex::Real ux = m(i, j, k, 1) * inv_ne;
+-                const amrex::Real uy = m(i, j, k, 2) * inv_ne;
+-                const amrex::Real uz = m(i, j, k, 3) * inv_ne;
+-                const amrex::Real u2 = m(i, j, k, 4) * inv_ne;
+-                const amrex::Real kT = PhysConst::m_e * third *
+-                    (u2 - (ux * ux + uy * uy + uz * uz));
+-                if (kT <= kT_floor) { continue; }
+-                A(i, j, k) = m_K_coeff_C / std::pow(kT, 1.5_rt);
+-                w_local += wt;
++                if (m(i, j, k, 2) > 0._rt) { w_local += wt; }
+             }}}
+         }
+         amrex::ParallelDescriptor::ReduceRealSum(w_local);
+         amrex::ParallelDescriptor::ReduceRealSum(w_total);
+     }
++    ABLASTR_PROFILE_VAR_STOP(laserdep_tlocal);
+ 
+     // ------------------------------------------------------------------
+     // Ray-trace on the rank that owns the full-domain box (others have an
+@@ -680,10 +762,16 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
      // the invariant direction), accumulated across all rays for diagnostics.
      amrex::Real absorbed_power_total = 0._rt;
  
@@ -120,10 +345,16 @@ index 431ba31de..166e68313 100644
 +    // it falls during a run as the corona fills the gap.
 +    amrex::Real vacuum_skip_frac = 0._rt;
 +
++    {
++    ABLASTR_PROFILE("LaserDeposition::rayTrace");
      for (amrex::MFIter mfi(n_host); mfi.isValid(); ++mfi) {
          const amrex::Box& bx = mfi.validbox();
          const auto n_arr = n_host.const_array(mfi);
-@@ -709,18 +738,72 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+-        const auto A_arr = A_host.const_array(mfi);
+         const auto H_arr = H_host.array(mfi);
+         const auto blo = amrex::lbound(bx);
+         const auto bhi = amrex::ubound(bx);
+@@ -709,18 +797,72 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
              return amrex::min(amrex::max(ii, lo3[d]), hi3[d]);
          };
  
@@ -203,7 +434,7 @@ index 431ba31de..166e68313 100644
          {
              int i0[AMREX_SPACEDIM];
              amrex::Real fr[AMREX_SPACEDIM];
-@@ -731,7 +814,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -731,7 +873,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
              }
              amrex::Real ne = 0._rt;
              amrex::Real gne[AMREX_SPACEDIM] = {};
@@ -212,16 +443,16 @@ index 431ba31de..166e68313 100644
              for (int corner = 0; corner < (1 << AMREX_SPACEDIM); ++corner) {
                  int idx[3] = {0, 0, 0};
                  amrex::Real wprod = 1._rt;
-@@ -744,7 +827,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -744,7 +886,7 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
                  ne += val * wprod;
                  // Interpolate A itself rather than T_e: A is what enters K
                  // linearly, so this keeps K multilinear between cell centres.
 -                A_loc += A_arr(idx[0], idx[1], idx[2]) * wprod;
-+                A_out += A_arr(idx[0], idx[1], idx[2]) * wprod;
++                A_out += n_arr(idx[0], idx[1], idx[2], 1) * wprod;
                  for (int d = 0; d < AMREX_SPACEDIM; ++d) {
                      const int bit = (corner >> d) & 1;
                      amrex::Real wd = 1._rt;
-@@ -766,8 +849,20 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -766,8 +908,20 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
          };
  
          // Deposit `absorbed` (power, W) into the cell holding position c.
@@ -243,7 +474,7 @@ index 431ba31de..166e68313 100644
          {
              if (n_e <= 0._rt || absorbed <= 0._rt) { return; }
              int idx[3] = {0, 0, 0};
-@@ -777,42 +872,76 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -777,42 +931,76 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
                  idx[d] = map_index(ii, d);
              }
              // H = P_abs / (n_e m_e), P_abs = absorbed / V_cell  [m^2/s^3].
@@ -328,7 +559,7 @@ index 431ba31de..166e68313 100644
              for (int d = 0; d < AMREX_SPACEDIM; ++d) {
                  dc4[d] = Tt[d] / nref; dT4[d] = g[d];
                  c[d] += (h / 6._rt) * (dc1[d] + 2._rt * dc2[d]
-@@ -829,16 +958,36 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -829,16 +1017,36 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
  
          // Trace a single ray launched at c0 along unit direction u0 carrying
          // power P0_ray (W): refract via RK4 of the eikonal equation, absorbing
@@ -369,7 +600,7 @@ index 431ba31de..166e68313 100644
              amrex::Real T[AMREX_SPACEDIM];
              for (int d = 0; d < AMREX_SPACEDIM; ++d) { T[d] = n_ref * u0[d]; }
  
-@@ -847,30 +996,56 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -847,30 +1055,56 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
              amrex::Real r_prev = n_e * inv_n_cr;
              amrex::Real ne_prev = n_e;
  
@@ -439,7 +670,7 @@ index 431ba31de..166e68313 100644
                  const amrex::Real r_cur = n_e * inv_n_cr;
                  const amrex::Real drds = (r_cur - r_prev) / h;
  
-@@ -893,10 +1068,11 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -893,10 +1127,11 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
                          // where the last `sample` above was taken. T_e varies
                          // smoothly there -- the singularity is in n_e.
                          const amrex::Real tau =
@@ -453,7 +684,7 @@ index 431ba31de..166e68313 100644
                          P -= absorbed;
                      }
                      // Specular reflection about the critical surface normal.
-@@ -919,10 +1095,13 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -919,10 +1154,13 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
                          }
                      }
                      // Nudge back into the underdense region to avoid being
@@ -468,7 +699,7 @@ index 431ba31de..166e68313 100644
                  }
  
                  if (n_e > 0._rt) { r_prev = r_cur; ne_prev = n_e; }
-@@ -955,10 +1134,54 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -955,10 +1193,54 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
          const amrex::Real inv_rpc =
              1._rt / static_cast<amrex::Real>(m_rays_per_cell);
  
@@ -527,7 +758,7 @@ index 431ba31de..166e68313 100644
              amrex::Real c0[AMREX_SPACEDIM];
              c0[m_axis] = m_inject_hi ? phi[m_axis] : plo[m_axis];
              if (n_t >= 1) {
-@@ -1001,8 +1224,25 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+@@ -1001,29 +1283,51 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
              // Power = incident flux through the entry face = I * area * |u_axis|.
              const amrex::Real P0_ray =
                  I_local * sub_area * std::abs(u[m_axis]);
@@ -552,10 +783,51 @@ index 431ba31de..166e68313 100644
 +            absorbed_power_total += P_acc[static_cast<std::size_t>(b)];
 +        }
 +        vacuum_skip_frac = skip_frac;
++    }
      }
  
      // Optional per-cell profile dump, before the field leaves host memory.
-@@ -1085,7 +1325,8 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+     if (m_profile_on && m_profile_intervals.contains(step)) {
+         writeProfileTable(m_profile_prefix, step, cur_time, dt_dep,
+-                          n_host, H_host, A_host, m_K_coeff_C, geom);
++                          n_host, H_host, m_K_coeff_C, geom);
+     }
+ 
+     // Distribute the heating rate back to the particle decomposition.
+-    amrex::MultiFab H_full(ba_full, dm_full, 1, 0);
+-    amrex::htod_memcpy(H_full, H_host);
+     amrex::MultiFab H_dep(ba, dm, 1, 0);
+-    H_dep.setVal(0._rt);
+-    H_dep.ParallelCopy(H_full, 0, 0, 1, amrex::IntVect{0}, amrex::IntVect{0},
+-                       geom.periodicity());
++    {
++        ABLASTR_PROFILE("LaserDeposition::scatter");
++        amrex::MultiFab H_full(ba_full, dm_full, 1, 0);
++        amrex::htod_memcpy(H_full, H_host);
++        H_dep.setVal(0._rt);
++        H_dep.ParallelCopy(H_full, 0, 0, 1, amrex::IntVect{0}, amrex::IntVect{0},
++                           geom.periodicity());
++    }
+ 
+     // ------------------------------------------------------------------
+     // Apply the isotropic Gaussian momentum kicks to the heated electrons,
+     // sampling H at the cell containing each particle (nearest grid point).
+     const amrex::Real dth = dt_dep;
+ 
++    ABLASTR_PROFILE_VAR("LaserDeposition::kick", laserdep_kick);
+     for (auto* pc : pcs) {
+         for (WarpXParIter pti(*pc, 0); pti.isValid(); ++pti) {
+             const long np = pti.numParticles();
+@@ -1070,6 +1374,8 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
+         }
+     }
+ 
++    ABLASTR_PROFILE_VAR_STOP(laserdep_kick);
++
+     // Reduce the absorbed power (only the tracing rank accumulated it) and
+     // update the running absorbed energy.
+     amrex::ParallelDescriptor::ReduceRealSum(absorbed_power_total);
+@@ -1085,7 +1391,9 @@ void LaserDeposition::applyDeposition (MultiParticleContainer &mpc,
             << " Pabs " << absorbed_power_total
             << " Eabs " << m_absorbed_energy
             << " Tlocalfrac "
@@ -564,4 +836,5 @@ index 431ba31de..166e68313 100644
 +           << " Vskip " << vacuum_skip_frac;
          amrex::Print() << os.str() << "\n";
      }
++
  }

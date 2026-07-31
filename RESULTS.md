@@ -1223,3 +1223,83 @@ build, so it is a signpost rather than a result.
 on the production 2D binary** — it gets O2 + O3, 1.93×. `build_cuda_omp/` was configured with
 `-DAMReX_OMP=ON` (which puts `-Xcompiler=-fopenmp` in the CUDA flags) as a **separate tree**, so
 `build_cuda/bin/warpx.2d` stays valid whatever happens.
+
+---
+
+## 2026-07-30 (later) — Phase 1.5 finished on the GPU: a driven 2D step is 1.96× faster
+
+Continuation of the entry above, after benchmarking the CUDA build and decomposing what the
+operator spends its time on. Detail in `studies/ray_march_perf/README.md`.
+
+### The headline, measured end to end on the real deck and real config
+
+40 steps of `P1_vac_2d_spot` (36 ppc, `intervals` = 10, diagnostics off), GPU:
+
+| | s/step | vs the laser-off control |
+|---|---|---|
+| `build_cuda`, pre-Phase-1.5 | 0.1453 | +108 % |
+| `build_cuda_omp`, `ray_threads = 8` | **0.0743** | **+6.4 %** |
+| laser-off control | 0.0698 | — |
+
+The 0.1453 reproduces the 0.140 s/step measured before any of this, so the comparison is sound.
+**The operator is now 6.1 % of a driven step against §7.5.5's ≤ 10 % target, and the step is
+under its ≤ 0.080 s target.** `P1_vac_2d_spot` would take ~2.9 h instead of 5.6 h.
+
+O1 needs a binary compiled with `-fopenmp`. `build_cuda` is `AMReX_OMP=OFF`, so
+`build_cuda_omp/` was configured `-DAMReX_OMP=ON` as a **separate tree**, leaving the production
+binary intact. Per application, paired back to back at load ~18: ppc = 1, **0.797 → 0.084 s
+(9.4×)**; ppc = 36, **0.624 → 0.100 s (6.2×)**.
+
+### O4, which the plan did not anticipate: the coefficient was built in the wrong place
+
+Decomposing the operator into profiler phases that tile it showed the per-cell IB coefficient
+being formed in a **serial host loop with a `pow(kT, 1.5)` per cell** — 7.9 ms of an 80 ms
+application at 36 ppc — on data that lives on the device. It also forced the full-domain gather
+to move all **six** components to the host, because the temperature moments were consumed only
+there.
+
+Forming it on the device instead, into the measured field over the momentum moments (dead
+afterwards) plus a "measured" flag, makes the gather move **3 components instead of 6** and
+retires the pinned `A_host` allocation entirely. Worth **−18 % of the whole operator on CPU**
+(0.1167 → 0.0953 s per application) and ~10 ms per application on GPU. It matters more with grid
+size than these runs show: it was the last O(cells) serial host work in the operator, so it
+would have grown ×10 on an H5-scale spot while the march grew but stayed threaded.
+
+Bit-identical, and the check had to be built to reach it: all five CI decks use
+`temperature_mode = local` but are cold enough that `Tlocalfrac` = 0, so **Tier 1 never
+exercises the measured-`T_e` path at all**. The real check is `P1_vac_2d_spot` at 36 ppc
+(`Tlocalfrac` = 0.430289, three dumps byte-identical) plus the two 1D decks re-run with
+`temperature_mode = fixed` (160/160 identical), a path no Tier-1 deck covers.
+
+### What is left, and what was deliberately not done
+
+Per application at 36 ppc on GPU: **march 79 ms, density deposit 12, kicks 3.4, gather 2.4.**
+The density deposit is a standard WarpX CIC pass — 6 components × 4 corners of atomics per
+macroparticle — so making it cheaper means changing how WarpX deposits, for 15 % of an operator
+that is now 6 % of a step. Not worth the bit-identity burden. Raising `P_min` from 10⁻⁸ would
+cut march steps but has no bit-identical version. **The operator is done.**
+
+### Two benchmarking mistakes, both of which produced confident wrong numbers
+
+**Retracting the "0.250 s unthreaded floor, 81 % of the operator" from the entry above.** It was
+an artifact of my own harness: `profile_intervals = 1000000` does not disable the per-cell dump,
+because an `IntervalsParser` period contains step 0, so every benchmark run wrote a 74 MB table
+from *inside* `applyDeposition` and it was amortised into the per-application cost as 0.118 s.
+Only `intervals = 0` disables a diagnostic. The corrected floor is 0.057 s at ppc = 1 on CPU and
+**0.009 s on GPU**. The march speedups in that entry are unaffected — the spurious time sat in
+both the total and the subtracted floor and cancelled — and are now confirmed by direct
+`rayTrace` timers rather than by subtraction.
+
+**And TinyProfiler prints the exclusive table first.** Reading the first match of a region name
+gives time-minus-children, which for an instrumented `applyDeposition` is ~0.0002 s. That is
+what made the harness report an application as taking no time at all. Read after `Incl. Min`.
+
+### A reproducibility trap worth knowing about
+
+Checking O4 on `P1_vac_2d_spot` at 36 ppc with `OMP_NUM_THREADS=4` showed 365 k of 704 k cells
+differing in **n_e**, a field the change does not touch. The same binary run twice, same deck,
+same thread count, differs the same way (`Tlocalfrac` 0.43034 vs 0.430789): the thermal momenta
+are drawn through `ParallelForRNG` and the draws follow the thread scheduling. At
+`OMP_NUM_THREADS=1` the deck is exact. Production is unaffected (`--gpu` forces 1 thread), but
+**any bit-level comparison of CPU runs must pin the thread count** — including a run against its
+`_off` control, where this would land inside the G3 subtraction.

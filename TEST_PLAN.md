@@ -1109,14 +1109,23 @@ the point of writing them here.
 
 ### 7.5.5 Cost target, and what it unlocks
 
-| quantity | now | target |
-|---|---|---|
-| `applyDeposition` share of a driven 2D step | 54 % (65.6 % of the planar run) | **≤ 10 %** |
-| driven 2D step, spot deck | 0.140 s | **≤ 0.080 s** (control is 0.0702) |
-| per application, 320 rays | 771 ms | **≤ 60 ms** |
-| `P1_vac_2d_spot` (9.96 ps) | 5.6 h | ~2.8 h |
-| a 40 ps 2D run to the formation time | ~22 h fixed-domain | ~11 h |
-| H5-scale spot, `w₀` = 214 `d_e,cr` (~3 400 columns) | unaffordable | expensive but reachable |
+| quantity | now | target | **ACHIEVED 2026-07-30** |
+|---|---|---|---|
+| `applyDeposition` share of a driven 2D step | 54 % (65.6 % of the planar run) | **≤ 10 %** | **6.1 %** ✓ |
+| driven 2D step, spot deck | 0.140 s | **≤ 0.080 s** (control is 0.0702) | **0.0743 s** ✓ (control 0.0698, so +6.4 %) |
+| per application, 320 rays | 771 ms | **≤ 60 ms** | ~100 ms at 36 ppc ✗ — but see below |
+| `P1_vac_2d_spot` (9.96 ps) | 5.6 h | ~2.8 h | **~2.9 h** ✓ |
+| a 40 ps 2D run to the formation time | ~22 h fixed-domain | ~11 h | ~11 h ✓ |
+| H5-scale spot, `w₀` = 214 `d_e,cr` (~3 400 columns) | unaffordable | expensive but reachable | reachable; the march threads, and the last O(cells) serial host loop is gone |
+
+Measured end to end on the real deck and real config (36 ppc, `intervals` = 10, GPU, 40 steps):
+**0.1453 s/step before, 0.0743 s/step after** — the 0.1453 reproduces the 0.140 s this table was
+written from. A driven 2D run is **1.96× faster**, and the laser now costs 6 % of a step.
+
+The per-application row is the one miss, and it is a mis-specified target rather than a
+shortfall: it was written when the march *was* the application, and 60 ms was the march's
+budget. The march is now ~79 ms of a ~100 ms application on a **shared box at load 18**, where
+`ray_threads` = 8 beats 16; the step-level target the row exists to serve is met with room.
 
 Expected factors, partly replaced by measurements: O3 ~1.17×, O1 6–8× (still an estimate),
 O2 **2.00× at `n_th` = 3×10⁻² on the spot at 8 ps, decaying to ~1.0× on a long run** (measured,
@@ -1124,15 +1133,27 @@ O2 **2.00× at `n_th` = 3×10⁻² on the spot at 8 ps, decaying to ~1.0× on a 
 best and ~7× on a long run**, not ~15×, and the
 driven step lands within ~6 % of the laser-off control.
 
-**MEASURED 2026-07-30** on the `P1_vac_2d_spot` geometry, march only, non-march floor subtracted:
-O3 **1.26×**, O2 **1.53×** (the exact version, not the falsified threshold), O1 **6.2×** at 12
-threads — **11.9× combined**, ahead of the ~10× allowed for. But the cost target below is *not*
-met on CPU, and for a reason the plan did not anticipate: what is left is not the march.
-`intensity=0` measures the rest of `applyDeposition` at **0.250 s per application, unthreaded**,
-so the march is now 19 % of the operator and the per-application target of ≤ 60 ms is bounded by
-grid machinery (the 6-component `n_meas` + `SumBoundary`, the full-domain `ParallelCopy`, the
-pinned copies, the redistribute). That measurement is at ppc = 1 and mostly device-side on CUDA,
-so it does not transfer to the GPU runs without being re-measured there.
+**MEASURED 2026-07-30** on the `P1_vac_2d_spot` geometry, `rayTrace` timed directly by a
+per-phase profiler region: O3 **1.27×**, O2 **1.92×** (the exact version, not the falsified
+threshold), O1 **6.2×** — **10.9× combined** on the march, in line with the ~10× allowed for.
+
+A fourth optimisation, which this section did not anticipate, came out of decomposing what was
+left. The per-cell IB coefficient was built in a **serial host loop with a `pow(kT, 1.5)` per
+cell**, on data that lives on the device, and it forced the full-domain gather to move all six
+components to the host because the temperature moments were consumed only there. Forming the
+coefficient on the device instead — into the measured field, over the momentum moments, which
+are dead afterwards — makes the gather move 3 components instead of 6 and retires the pinned
+`A_host` allocation. Bit-identical, `Tlocalfrac` included. Worth **−18 %** of the whole
+operator on CPU and ~10 ms per application on GPU, and it matters more with grid size than the
+current runs show: it was the last O(cells) serial host work in the operator.
+
+**A correction to an earlier version of this paragraph.** It reported that everything except the
+march cost "0.250 s per application, unthreaded", i.e. 81 % of the operator. That was a
+benchmark artifact: `profile_intervals = 1000000` does **not** disable the per-cell dump — an
+`IntervalsParser` period contains step 0 — so every benchmark run wrote a 74 MB table from
+inside `applyDeposition` and charged it to the operator. Only `intervals = 0` disables a
+diagnostic. The corrected floor is 0.057 s at ppc = 1 on CPU and **0.009 s on GPU**. The march
+speedups were unaffected (the spurious time was in both the total and the subtracted floor).
 
 ### 7.5.6 Deliverables
 
@@ -1376,10 +1397,12 @@ boundaries, is the project's headline output.
 - [ ] Tier 3: `E_abs` within 0.5 % on 1-3 ps slices — not run, and largely retired by Tier 1/2
       bit-identity (there is no drift to integrate when the dumps are byte-equal). Worth one run
       on the GPU build, which is genuinely different code
-- [ ] `build_cuda_omp` benchmarked, and `launch.sh --gpu` taught to pass `ray_threads`
-      (`OMP_NUM_THREADS=1` stays right for the push; the march is host code and now threads)
-- [ ] **NEW, and now the binding cost**: `applyDeposition` minus the march is 0.250 s per
-      application and does not thread (§7.5.5) — the grid machinery, not the ray tracer
+- [x] `build_cuda_omp` built and benchmarked: **0.1453 → 0.0743 s/step** end to end on the real
+      deck, the operator down to 6.1 % of a driven step. `launch.sh --gpu` now warns when a
+      driven deck sets no `ray_threads` (`OMP_NUM_THREADS=1` stays right for the push)
+- [x] **O4, unplanned**: form the IB coefficient on the device and gather 3 components instead
+      of 6 — the last O(cells) serial host loop, −18 % of the operator on CPU, bit-identical
+- [ ] launch a physics run on `build_cuda_omp` — nothing has been run in anger with it yet
 
 **Phase 2 — ambient**
 - [ ] `scripts/tune_shock.py`, `make_figures.py`, `phase_space.py`, `make_movies.py`

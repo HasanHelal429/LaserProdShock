@@ -53,8 +53,9 @@ host thread (`CLAUDE.md`) and is easily starved.
 
 ## Status
 
-**2026-07-30 — O1 + O2 + O3 built, accepted and measured. The march is 11.9× faster and it
-threads; the operator is no longer march-dominated on CPU.**
+**2026-07-30 — O1 + O2 + O3 built, accepted and measured, plus one optimisation the plan did
+not anticipate. The march is ~11× faster and it threads; the whole operator is ~7.6× faster on
+CPU and ~10× on GPU, and every result is bit-identical.**
 
 Acceptance (all on the CPU build, `nice`-d, box otherwise loaded at ~18):
 
@@ -63,6 +64,9 @@ Acceptance (all on the CPU build, `nice`-d, box otherwise loaded at ~18):
 | Tier 1, exact mode (`n_accumulators=1`) | **285/285 files bit-identical** to the pre-change binary, all five decks; oblique still exactly 1/8 |
 | Tier 1, production defaults (`n_accumulators=16`) | every per-cell profile dump bit-identical; **only `EP.txt` on the oblique deck moves, by 1.3×10⁻¹⁵** — the accumulator reordering, 6 ULP |
 | Tier 2, `P1_vac_2d_spot` step-0 dump | **byte-identical**, with O2 active (`Vskip 0.47`); `Pabs` 5.94085×10¹² unchanged |
+| Tier 2, `P1_vac_2d_spot` at 36 ppc, 3 dumps | **byte-identical** including `Tlocalfrac` — the check that covers the measured-`T_e` path and the coefficient move |
+| the two 1D CI decks with `temperature_mode=fixed` | 160/160 dumps identical — a path **no** Tier-1 deck exercises, since all five default to `local` |
+| Tier 4, same binary and deck run twice | **285/285 bit-identical**, `EP.txt` included |
 | Tier 4, thread invariance 1/2/4/8/12 | every `LASERDEP` line **byte-identical**; every profile dump bit-identical |
 
 The one caveat, stated because it looks like a failure and is not: at 2/4/8/12 threads `EP.txt`
@@ -74,40 +78,141 @@ output, not the particle energy: `EP` cannot resolve a thread-invariance claim a
 ### The benchmark ladder
 
 `bench.sh`, on the real `P1_vac_2d_spot` geometry (320 rays, 704 k cells, the t = 0 vacuum gap)
-with `ppc = 1` so that the particle push does not swamp the timer. Numbers are
-`LaserDeposition::applyDeposition` per application, and the **march** column subtracts the
-measured non-march floor (see below).
+at `ppc = 1` unless stated. The operator is instrumented with per-phase profiler regions that
+**tile** it, so `rayTrace` is now measured directly rather than inferred by subtracting a floor.
 
-| build | threads | per application | march only | march speedup |
+| build | threads | per application | `rayTrace` | march speedup |
 |---|---|---|---|---|
-| pre-change | 1 | 0.912 s | 0.678 s | 1.00× |
-| O3 | 1 | 0.788 s | 0.538 s | **1.26×** |
-| O3 + O2 | 1 | 0.602 s | 0.351 s | **1.93×** |
-| O3 + O2 + O1 | 2 | 0.452 s | 0.201 s | 3.37× |
-| O3 + O2 + O1 | 4 | 0.360 s | 0.110 s | 6.16× |
-| O3 + O2 + O1 | 8 | 0.312 s | 0.062 s | 10.9× |
-| O3 + O2 + O1 | 12 | 0.307 s | 0.057 s | **11.9×** |
+| pre-change | 1 | 0.729 s | 0.673 s (inferred) | 1.00× |
+| O3 | 1 | 0.590 s | 0.531 s | **1.27×** |
+| O3 + O2 | 1 | 0.409 s | 0.350 s | **1.92×** |
+| O3 + O2 + O1 | 4 | 0.159 s | 0.104 s | 6.48× |
+| O3 + O2 + O1 | 8 | 0.117 s | 0.062 s | **10.8×** |
+| O3 + O2 + O1 | 12 | 0.120 s | 0.062 s | 10.9× |
+| + the coefficient move (below) | 8 | **0.095 s** | 0.061 s | 10.9× |
 
-O3 measured 1.26× against 1.17× predicted; O1 6.2× on top, inside the predicted 6–8×; O2 1.53×
-against the 1.89× its `f_vac` = 0.47 would give if a vacuum step were free. It is not free — it
-keeps its RK4 arithmetic, its midpoint construction and its escape test — and back-solving
-`1/((1−f) + fφ) = 1.53` puts a vacuum step at **φ = 0.26** of a full one. That is the price of
-being bit-identical instead of jumping, and it is worth paying (below).
+O3 measured 1.27× against 1.17× predicted; O1 6.2× on top, inside the predicted 6–8×; O2 1.92×
+against the 1.89× its `f_vac` = 0.47 predicts if a vacuum step were free. It is not free — it
+keeps its RK4 arithmetic, its midpoint construction and its escape test — so the agreement is
+partly luck; back-solving `1/((1−f) + fφ)` puts a vacuum step at φ ≈ 0.25 of a full one.
 
-### The new bottleneck: the march is no longer the cost
+### On the GPU, which is where the runs happen
 
-Measured by running the same benchmark with `laser_deposition.intensity=0`, which executes the
-whole operator except the ray march: **0.250 s per application, and it does not thread at all**
-(0.248 s at 12 threads). So of the 0.307 s an application now costs, **81 % is not the march**.
-Decomposed the same way: the 16 accumulators cost 17 ms, the per-cell `A_host` build with its
-`pow(kT, 1.5)` costs 14 ms, and the remaining ~0.22 s is the grid machinery — the 6-component
-`n_meas` allocation and `SumBoundary`, the `ParallelCopy` onto a single full-domain box, the
-pinned-host copies, and the redistribute back.
+`build_cuda` is configured `AMReX_OMP=OFF` with no `-fopenmp`, so `_OPENMP` is undefined and O1
+is **inert** in the production binary. `build_cuda_omp/` is the same tree configured
+`-DAMReX_OMP=ON`, which puts `-Xcompiler=-fopenmp` in the CUDA flags; it was built separately so
+that `build_cuda/bin/warpx.2d` stays valid. Paired runs, back to back, on a box at load ~18:
 
-Two caveats before anyone optimises that: it was measured at **ppc = 1**, so the particle CIC
-and the kicks are at their cheapest here and will grow with ppc; and most of it is device work
-on a CUDA build, where this profile does not apply. It is recorded because it is what the next
-person will hit, not because it is in scope for Phase 1.5.
+| | per application, ppc = 1 | per application, ppc = 36 |
+|---|---|---|
+| `build_cuda` (pre-Phase-1.5) | 0.797 s | 0.624 s |
+| `build_cuda_omp`, `ray_threads = 8` | **0.084 s** | **0.100 s** |
+| | **9.4×** | **6.2×** |
+
+At 36 ppc the 0.100 s is `rayTrace` 79.5 ms, `density` 11.9, `kick` 3.4, `gather` 2.4, `tlocal`
+1.8, `coeff` 0.0. Do not compare the two ppc columns to each other: the density field differs,
+so the rays extinguish at different depths and the marches are not the same length.
+
+**End to end, which is the number that decides run cost.** The real deck, real config
+(36 ppc, `intervals = 10`), 40 steps, diagnostics off:
+
+| | s/step | vs the laser-off control |
+|---|---|---|
+| `build_cuda`, pre-Phase-1.5 | 0.1453 | +108 % |
+| `build_cuda_omp`, `ray_threads = 8` | **0.0743** | **+6.4 %** |
+| laser-off control | 0.0698 | — |
+
+The 0.1453 reproduces the 0.140 s/step the plan measured before any of this. A driven 2D run is
+**1.96× faster end to end**, and the operator is now **6.1 % of a driven step** against §7.5.5's
+≤ 10 % target and its ≤ 0.080 s/step target. `P1_vac_2d_spot` would take ~2.9 h instead of 5.6 h.
+
+The per-application target (≤ 60 ms) is *not* met at 36 ppc — it is ~100 ms — but that target
+was written when the march was the whole cost, and the step target it was meant to serve is met
+with room. Note also that thread scaling here is bounded by a shared box: `ray_threads = 16`
+beat `8` when the machine was quieter and lost to it at load 18.
+
+### CORRECTION 2026-07-30: the "0.250 s unthreaded floor" was an artifact of this harness
+
+An earlier version of this file reported that everything except the march cost **0.250 s per
+application and did not thread**, i.e. 81 % of the operator. **That was wrong, and the mistake
+was in `bench.sh`, not in WarpX.**
+
+The benchmark set `laser_deposition.profile_intervals=1000000` (and the same for the plotfile
+diagnostics) intending to disable them. `SliceParser::contains` is
+`(n - start) % period == 0 && n >= start`, which for period 10⁶ **contains step 0**. So every
+benchmark run wrote a **74 MB, 704 000-row `laserdep_profile_000000.txt`** — from *inside*
+`applyDeposition`, so it landed in the operator's own timer and was amortised over 6
+applications as 0.118 s each. `intervals = 0` is the only value that disables a diagnostic
+(`m_period <= 0` returns false).
+
+Two things made it findable, and both are worth keeping: the per-phase regions were added to
+decompose the floor, and they showed the missing time sitting in `applyDeposition`'s *exclusive*
+column — inside the function but outside every phase. That is a signature no ordinary phase can
+produce. The corrected floor at `ppc = 1` is **0.057 s (48 % of the operator), and 0.009 s on
+GPU (13 %)**.
+
+The march speedups were **not** affected: the spurious 0.118 s was in both the total and the
+subtracted floor, so it cancelled. The direct `rayTrace` measurements above confirm it.
+
+### Where the rest of the time goes, and what was done about it
+
+Measured per phase (GPU, `ray_threads` = 16/24, the real 36 ppc), before the change below:
+
+| phase | GPU, ppc = 36 | what it is |
+|---|---|---|
+| `rayTrace` | 52 ms | the eikonal march (O1/O2/O3) |
+| `density` | 11.9 ms | CIC deposit of n_e + 5 momentum moments, 50 M macroparticles |
+| `coeff` | 7.9 ms | **a serial HOST loop with a `pow(kT, 1.5)` per cell** |
+| `gather` | 4.5 ms | `ParallelCopy` onto one full-domain box + `dtoh` of 6 components |
+| `kick` | 3.4 ms | the isotropic momentum kicks |
+
+`coeff` was the anomaly: a per-cell loop on the host, on data that lives on the device, whose
+cost scales with the **grid** — so it would have grown ×10 on an H5-scale spot while the march
+grew but stayed threaded. It also forced the gather to move all six components to the host,
+because the temperature moments were only consumed there.
+
+**The fix: form the coefficient where the data already is.** A device kernel over the particle
+decomposition writes the IB coefficient A into component 1 of the measured field (over the
+momentum moments, which are dead after it) and a "this cell got a measured T_e" flag into
+component 2. The gather then moves **3 components instead of 6**, and `A_host` — a pinned
+full-domain MultiFab allocated per application — disappears entirely. The two `Tlocalfrac` sums
+stay on the host over the gathered box, in their original index order, so even that diagnostic
+is unchanged to every digit.
+
+Measured: CPU ppc = 1, 8 threads **0.1167 → 0.0953 s per application (−18 %)**, with `gather`
+24.3 → 6.0 ms and `coeff` + the sums 2.7 → 1.0 ms.
+
+Verified bit-identical, and the check had to be built carefully — see the reproducibility note
+below: all three per-cell dumps byte-identical against the pre-change binary on
+`P1_vac_2d_spot` **at 36 ppc**, which is the configuration that actually exercises the measured
+`T_e` path (`Tlocalfrac` = 0.430289 → identical), plus the two 1D CI decks re-run with
+`temperature_mode=fixed` (160/160 dumps identical), which Tier 1 never covers because all five
+CI decks use the default `local`.
+
+### What was NOT done, and why
+
+* **`density` (11.9 ms, the largest remaining non-march phase).** It is a standard WarpX CIC
+  deposit — 6 components × 4 corners of atomics per macroparticle — and it scales with
+  ppc × cells. Making it cheaper means changing how WarpX deposits, not how the laser operator
+  works, and it would carry the same bit-identity burden for a phase that is 15 % of the
+  operator and ~1.5 % of a driven step. Out of scope, recorded so the next person can price it.
+* **`kick` (3.4 ms).** Already exits per particle on `H <= 0`, which is one field read.
+* **Raising `P_min`** (rays currently march until 10⁻⁸ of their launch power). Would cut march
+  steps, but it is an approximation with no bit-identical version, for a phase that is already
+  10.8× faster.
+
+### A reproducibility trap this uncovered: the P1 decks are NOT deterministic under OMP
+
+Checking the coefficient change on `P1_vac_2d_spot` at 36 ppc with `OMP_NUM_THREADS=4` showed
+365 000 of 704 000 cells differing in **n_e** — a field the change does not touch. The same
+binary run twice, same deck, same thread count, differs the same way: `Tlocalfrac` 0.43034 vs
+0.430789. The particle initialisation draws thermal momenta through `ParallelForRNG`, and with
+OMP the draws depend on how work lands on threads. At `OMP_NUM_THREADS=1` the deck is exactly
+reproducible, which is what the check above used.
+
+This does not affect the production runs — `launch.sh --gpu` sets `OMP_NUM_THREADS=1` — but
+**any bit-level comparison of two CPU runs must pin the thread count**, and a G3-style
+subtraction between a run and its `_off` control inherits this if the two ran threaded.
 
 ### O2's threshold: PROPOSED 3×10⁻² n_cr, MEASURED unacceptable, replaced by exactness
 
@@ -240,13 +345,12 @@ criterion. It now demands agreement with `1/(1−f_vac)` measured on the same du
 
 ### Still to do
 
-* **the GPU build.** `build_cuda` is configured `AMReX_OMP=OFF` with no `-fopenmp`, so
-  `_OPENMP` is undefined and O1 is inert there — the production 2D runs get O2 + O3 (1.93×)
-  and nothing else. `build_cuda_omp/` is being built with `-DAMReX_OMP=ON` (which puts
-  `-Xcompiler=-fopenmp` in the CUDA flags) to fix that, deliberately as a **separate tree** so
-  `build_cuda/bin/warpx.2d` stays valid.
+* **decide what production uses.** Everything here argues for `build_cuda_omp` +
+  `laser.ray_threads` in the config, but no physics run has been launched with it yet. The
+  first one should be a re-run of something whose answer is already known.
 * Tier 3 (time-integrated `E_abs` over a 1–3 ps slice) — not run, and arguably retired by the
   Tier-1/Tier-2 bit-identity: there is no drift to integrate when the dumps are byte-equal.
   Worth running once on the GPU build, where the comparison is genuinely different code.
 * re-benchmark on an **idle** box. Everything above was measured at load ~18 on a shared
-  32-core host, so the thread scaling is a lower bound.
+  32-core host, so the thread scaling is a lower bound — and `ray_threads` = 8 vs 16 swaps
+  places depending on the load, so the right value is machine state, not a constant.

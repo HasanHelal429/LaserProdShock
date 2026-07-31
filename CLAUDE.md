@@ -264,21 +264,40 @@ not, and work while a run is still going.
   disturbance fronts: 269 of 400 d_e (67 %) undisturbed there. Also, **truncating costs the
   energy budget** — 6.13 % weight loss at 30 ps vs 1.14 % at 100 ps untruncated — so **G6 cannot
   be closed tightly on a truncated run**; take strict closure from untruncated ones.
-- **The ray march is FIXED (Phase 1.5, 2026-07-30): 11.9× faster and it threads.** It *was* ~65 %
-  of a driven 2D step and plain serial host code — the driven run's GPU oscillated
-  **0 % → 61 % → 0 %** while its control held 82 %. Three changes, one patch
-  (`studies/ray_march_perf/patches/o123-ray-march.patch`): **O3** reuses the end-of-step sample
-  as RK4 stage 1 (1.26×), **O2** drops the field samples of steps lying wholly in empty field
-  (1.53×), **O1** threads the ray loop over `n_accumulators` buckets (6.2× at 12 threads). All
-  bit-identical: Tier 1 is 285/285 byte-equal at `n_accumulators=1`, and every `LASERDEP` line is
-  byte-equal across 1/2/4/8/12 threads. **Do not re-derive the old cost model** — but note the
-  new one: what remains of `applyDeposition` is **0.250 s per application that does not thread**
-  (grid machinery, not the march), so the operator is no longer march-dominated on CPU.
+- **The laser operator is FIXED (Phase 1.5, 2026-07-30): a driven 2D step went 0.1453 → 0.0743 s,
+  and the laser is now 6 % of a step instead of 52 %.** It *was* ~65 % of the step and plain
+  serial host code — the driven run's GPU oscillated **0 % → 61 % → 0 %** while its control held
+  82 %. One patch (`studies/ray_march_perf/patches/o123-ray-march.patch`): **O3** reuses the
+  end-of-step sample as RK4 stage 1 (1.27×), **O2** drops the field samples of steps lying wholly
+  in empty field (1.92×), **O1** threads the ray loop over `n_accumulators` buckets (6.2×) —
+  10.9× on the march — and **O4** forms the IB coefficient on the device instead of in a serial
+  host `pow` loop, gathering 3 components instead of 6 (−18 % of the whole operator). All
+  bit-identical: Tier 1 is 285/285 byte-equal at `n_accumulators=1`, `Tlocalfrac` included, and
+  every `LASERDEP` line is byte-equal across 1/2/4/8/12 threads. **Do not re-derive the old cost
+  model.** What is left, per application at 36 ppc on GPU: march 79 ms, density deposit 12,
+  kicks 3.4, gather 2.4.
 - **`laser_deposition.ray_threads` exists because `--gpu` still wants `OMP_NUM_THREADS=1`.** The
-  push belongs on the device; the march is host code and now threads. Set `ray_threads` in the
-  deck rather than raising `OMP_NUM_THREADS`, and note that O1 is **inert unless the binary was
-  compiled with `-fopenmp`**: `build_cuda` is `AMReX_OMP=OFF`, so the production 2D binary gets
-  O2 + O3 only. `build_cuda_omp/` is the CUDA tree configured `-DAMReX_OMP=ON` for the rest.
+  push belongs on the device; the march is host code and now threads. Set `laser.ray_threads` in
+  `config.yaml` rather than raising `OMP_NUM_THREADS`, and note that O1 is **inert unless the
+  binary was compiled with `-fopenmp`**: `build_cuda` is `AMReX_OMP=OFF`, so that binary gets
+  O2 + O3 + O4 only. **Use `build_cuda_omp/bin/warpx.2d`** — the same tree configured
+  `-DAMReX_OMP=ON`, which puts `-Xcompiler=-fopenmp` in the CUDA flags. `launch.sh --gpu` warns
+  when a driven deck sets no `ray_threads`. The best value is **machine state, not a constant**:
+  8 beat 16 at load 18 and lost to it on a quiet box.
+- **Two benchmarking traps, both of which produced confident wrong numbers here.**
+  (1) `profile_intervals = 1000000` does **not** disable the per-cell dump — an
+  `IntervalsParser` period contains step 0 — so a "diagnostics off" benchmark wrote a 74 MB
+  table from *inside* `applyDeposition` and inflated the operator's cost by 0.118 s per
+  application. **Only `intervals = 0` disables a diagnostic** (`m_period <= 0`). (2) TinyProfiler
+  prints the **exclusive** table first; reading the first match of a region name gives
+  time-minus-children, which for an instrumented `applyDeposition` is nearly zero. Read the
+  table after `Incl. Min`.
+- **The P1 decks are NOT reproducible run-to-run under OMP threading.** Same binary, same deck,
+  `OMP_NUM_THREADS=4`, 36 ppc: `Tlocalfrac` 0.43034 vs 0.430789, and 365 k of 704 k cells differ
+  in `n_e` — the thermal momenta are drawn through `ParallelForRNG` and the draws follow the
+  thread scheduling. At `OMP_NUM_THREADS=1` it is exact. Production is unaffected (`--gpu` forces
+  1), but **pin the thread count for any bit-level comparison**, including a run against its
+  `_off` control.
 - **A forward vacuum gap is now cheap for the ray trace too, but only because it is EMPTY.** The
   march costs `path/(ray_cfl·dz)` RK4 steps *per ray*, and rays = transverse cells ×
   `rays_per_cell`: in `P1_vac_2d` that is 9 168 steps × 64 rays = 5.9×10⁵ steps per application,
