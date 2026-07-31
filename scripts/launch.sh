@@ -102,7 +102,12 @@ if [[ -z "$WARPX" ]]; then
      (add it, or pass --warpx / set \$LPS_WARPX)"
     if [[ -n "$GPU" ]]; then
         # WarpX_DIMS is compile-time, so the CUDA build is one tree per dimensionality.
+        # `build_cuda_omp` comes FIRST for 2D: it is the same source configured
+        # -DAMReX_OMP=ON, which is the only way `_OPENMP` is defined and therefore the
+        # only way the threaded ray march (Phase 1.5) is anything but inert. It is a
+        # separate tree so that build_cuda stays a valid fallback.
         for d in "${LPS_WARPX_DIR_CUDA:-}" \
+                 "$WARPX_ROOT/build_cuda${DIMS}d_omp/bin" "$WARPX_ROOT/build_cuda_omp/bin" \
                  "$WARPX_ROOT/build_cuda${DIMS}d/bin" "$WARPX_ROOT/build_cuda/bin"; do
             [[ -n "$d" && -x "$d/warpx.${DIMS}d" ]] && { WARPX="$d/warpx.${DIMS}d"; break; }
         done
@@ -174,7 +179,11 @@ if [[ -n "$GPU" ]]; then
         echo "launch:      config.yaml (and use a CUDA build compiled with OpenMP)."
     fi
 fi
-echo "launch: $(basename "$RUN_DIR")  deck=$DECK  warpx=$(basename "$WARPX")  threads=$THREADS"
+# The build tree, not just the basename: build_cuda and build_cuda_omp both produce a
+# file called warpx.2d, and which one ran is the difference between the threaded ray
+# march and an inert one. This line is the run's provenance.
+echo "launch: $(basename "$RUN_DIR")  deck=$DECK  threads=$THREADS"
+echo "launch: warpx=$WARPX"
 echo "launch: cwd=$RUN_DIR  (so diags/ lands here, not in the repo root)"
 echo "launch: $WARPX $DECK ${EXTRA[*]:-} > run.log 2>&1"
 if [[ $DRYRUN -eq 1 ]]; then
