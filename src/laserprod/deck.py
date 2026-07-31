@@ -465,6 +465,18 @@ def render(cfg: dict) -> str:
         a("# dumps drift as the kicks move electrons.")
         a(f"laser_deposition.profile_intervals    = {str(las['profile_intervals'])}")
         a("laser_deposition.profile_prefix       = diags/laserdep_profile")
+    if las.get("ray_intervals") is not None:
+        a("# ray PATH dump -- the trajectories, not their footprint. Read with")
+        a("# scripts/plot_rays.py --dump. A full dump is (transverse cells x")
+        a("# rays_per_cell) x (path/(ray_cfl dz)) rows PER APPLICATION (~6e5 for a 2D")
+        a("# P1 deck), so thin it with ray_stride / ray_step_stride, and note that")
+        a("# `intervals = 0` is the only thing that disables a diagnostic.")
+        a(f"laser_deposition.ray_intervals        = {str(las['ray_intervals'])}")
+        a("laser_deposition.ray_prefix           = diags/laserdep_rays")
+        a(f"laser_deposition.ray_stride           = "
+          f"{int(las.get('ray_stride', 1))}")
+        a(f"laser_deposition.ray_step_stride      = "
+          f"{int(las.get('ray_step_stride', 1))}")
     a("")
 
     # --- diagnostics -----------------------------------------------------

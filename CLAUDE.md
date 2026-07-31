@@ -326,6 +326,17 @@ not, and work while a run is still going.
   thread scheduling. At `OMP_NUM_THREADS=1` it is exact. Production is unaffected (`--gpu` forces
   1), but **pin the thread count for any bit-level comparison**, including a run against its
   `_off` control.
+- **The CUDA build is not run-to-run reproducible AT ALL, so no bit-level check may be run on
+  it.** The bullet above is a CPU statement. On `build_cuda_omp`, two runs of one
+  configuration — same binary, same deck, `OMP_NUM_THREADS=1` — differ by up to **1e-3
+  relative in `Pabs`**, and that holds even on the static-plasma `laser_deposition` CI decks,
+  which evolve no particles at all. The cause is atomic ordering in the GPU density deposit,
+  amplified by `K ∝ n_e²/√(1−n_e/n_cr)` near critical. This produced a wrong conclusion once
+  already: an old-vs-new binary comparison "failed", and the control — the old binary against
+  *itself* — failed identically, so the test had no power. **Always run that control.** Take
+  bit-identity acceptance from `build/` (OMP/CPU), where the same three CI decks are
+  byte-identical run to run and to the pre-change binary. Whatever produced the "Tier 1
+  285/285 byte-equal" figure, it was not the CUDA build.
 - **A forward vacuum gap is now cheap for the ray trace too, but only because it is EMPTY.** The
   march costs `path/(ray_cfl·dz)` RK4 steps *per ray*, and rays = transverse cells ×
   `rays_per_cell`: in `P1_vac_2d` that is 9 168 steps × 64 rays = 5.9×10⁵ steps per application,

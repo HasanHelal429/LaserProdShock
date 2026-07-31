@@ -188,6 +188,23 @@ def trace(field, c0, u0, h, max_steps):
     return paths, turns
 
 
+def read_dump(path):
+    """Parse a `laserdep_rays_<step>.txt` written by the operator itself.
+
+    Columns are `iray istep x z P ne turned` in 2D (the header names them). Returns
+    `{iray: (M, 5) array of x, z, P, ne, turned}` with rows in march order, which is the
+    order the file is written in.
+    """
+    rows = np.loadtxt(path, comments="#")
+    if rows.ndim == 1:
+        rows = rows[None, :]
+    out = {}
+    for r in np.unique(rows[:, 0]).astype(int):
+        sel = rows[rows[:, 0] == r]
+        out[int(r)] = sel[:, 2:]
+    return out
+
+
 def turning_points(tracks, axis=1):
     """Indices where each ray reverses along the axis — the real turning points.
 
@@ -246,6 +263,10 @@ def main() -> int:
                     help="rays to draw, spread over the launch face (0 = every ray)")
     ap.add_argument("--max-steps", type=int, default=0,
                     help="cap the march (0 = the operator's own 6*L/h + 100)")
+    ap.add_argument("--dump", default=None,
+                    help="a laserdep_rays_<step>.txt written by the operator "
+                         "(laser_deposition.ray_intervals): overlay it on the "
+                         "reconstruction and report where the two disagree")
     args = ap.parse_args()
 
     import matplotlib.pyplot as plt
@@ -385,6 +406,38 @@ def main() -> int:
                        edgecolors="none")
             leg_handles.append(Line2D([], [], color=lpp.INK, marker="o", ls="none",
                                       ms=4, label=f"turning point ({len(tx)})"))
+
+        # The operator's own paths, if we were given them. This is the whole point of
+        # having both: the reconstruction says what the equations imply on this density
+        # field, the dump says what the march actually did, and a gap between them is a
+        # bug in one of the two.
+        if args.dump:
+            dump = read_dump(args.dump)
+            dxs, dzs = [], []
+            for r, arr in dump.items():
+                xr = arr[:, 0] / sc.de_ref
+                zr = arr[:, 1] / sc.de_ref
+                if t_periodic:
+                    xr = wrap_for_plot(xr[:, None], plo[0] / sc.de_ref,
+                                       phi[0] / sc.de_ref)[:, 0]
+                ax.plot(xr, zr, color="#b5179e", lw=0.9, alpha=0.8, zorder=4)
+                dzs.append(np.nanmin(zr))
+                dxs.append(xr[0])
+            leg_handles.append(Line2D([], [], color="#b5179e", lw=1.4,
+                                      label=f"operator dump ({len(dump)})"))
+            # Compare the one number both sides agree on the meaning of: how deep each
+            # ray got. Match by launch position, which is where the bundles coincide.
+            rec_deep = {float(c0[k, 0] / sc.de_ref): np.nanmin(Z[:, k])
+                        for k in range(tracks.shape[1])}
+            if rec_deep and dzs:
+                keys = np.array(list(rec_deep.keys()))
+                dev = []
+                for x0, zd in zip(dxs, dzs):
+                    kk = keys[np.argmin(np.abs(keys - x0))]
+                    dev.append(abs(rec_deep[kk] - zd))
+                print(f"    vs operator dump: {len(dump)} rays, deepest-z "
+                      f"|reconstruction - operator| max {max(dev):.3g} d_e, "
+                      f"median {np.median(dev):.3g} d_e")
 
         n_turned = sum(1 for s in geo if s)
         n_spec = sum(1 for s in turns if s)

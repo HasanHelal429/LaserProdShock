@@ -1457,6 +1457,85 @@ grid and ppc, `intensity = 0`) before any G3, G6 or `dark/lit` figure from it is
 then the run supports the `n_cr`-crossing time and the axial-sizing result, and nothing that
 requires separating laser heating from grid heating.
 
+---
+
+## 2026-07-31 (later) — Ray paths become visible, and the CUDA build turns out not to be run-to-run reproducible
+
+Two deliverables, and the second one is the more important finding.
+
+### `scripts/plot_rays.py` and `laser_deposition.ray_intervals`
+
+Nothing in the campaign drew a ray. Every laser diagnostic reports where energy *landed* —
+which is why both operator bugs found so far, the transverse index clamp and the exit-boundary
+overshoot, had to be inferred from spatial deposition profiles. There are now two independent
+views of the paths themselves:
+
+- **`scripts/plot_rays.py`** re-integrates the eikonal equation offline on the `n_e` a plotfile
+  dumped, using the operator's own RK4 marcher, multilinear sampling, `n_floor` threshold and
+  wrap/clamp index mapping. Works retroactively on every 2D run on disk.
+- **`laser_deposition.ray_intervals`** (warpx-cda `7429eb276`) dumps the operator's actual
+  marched positions, with `ray_stride` / `ray_step_stride` to thin what would otherwise be
+  ~6e5 rows per application. Off by default, free when off, one buffer per bucket written in
+  bucket order.
+
+**They agree to 0.0047 `d_e` median, 0.0137 `d_e` max** on deepest penetration at step 0 of
+`P1_vac_2d_spot_omp` — a hundredth of a cell, a tenth of a march step. That is a real
+cross-check: the reconstruction says what the equations imply, the dump says what the march
+did, and they are the same thing. Compare with `plot_rays.py --dump`.
+
+Read at `ray_step_stride = 20` the same comparison gives 0.86 `d_e`; the whole of that is the
+dump's own sampling coarseness. **Quote a path comparison only at `ray_step_stride = 1`.**
+
+Two things the figures show that were previously only numbers: the outbound legs **fan out at
+wide angles** while the inbound bundle is dead vertical, which is the ray wander `spot_report`
+reports as a scalar; and in `P1_vac_2d_spot_long` at 30 ps there are **79 turning points for 25
+rays**, i.e. rays bouncing ~3 times each inside the enlarged corona, against a clean
+single-turn fan at 10 ps.
+
+A caveat the script enforces in its own docstring: it carries **no absorption**, because the IB
+coefficient needs the per-cell `T_e` the operator builds from the momentum moments and that is
+not in the plotfiles. The outbound leg is the path a ray *would* fly. At `tau` = 1411 through
+the flat top essentially none does. **Never read an `f_abs` off it.**
+
+### The CUDA build is not run-to-run reproducible, and a control caught it
+
+Accepting the dump meant showing the operator was unchanged. On `build_cuda_omp` the
+old-vs-new comparison **failed** — and then the control failed identically: the pre-change
+binary does not reproduce **itself**.
+
+| gaussian CI deck, max rel `ΔPabs` | |
+|---|---|
+| old vs old (first pair) | 1.9e-5 |
+| dump OFF vs dump OFF, same binary | **5.3e-4** |
+| dump ON vs dump ON, same binary | **1.2e-3** |
+| any old vs new comparison | 5.3e-4 – 1.2e-3 |
+
+The within-configuration spread is as large as any between-configuration difference, so the
+measurement has **no power at all** on this platform — and the tempting first reading, that
+1.9e-5 was the noise floor and 5.3e-4 was my change perturbing the march, was wrong. It was one
+lucky draw. This holds on the static-plasma CI decks, which evolve no particles, so it is not
+the `ParallelForRNG` thread-scheduling effect already on record: it is atomic ordering in the
+GPU density deposit, amplified by `K ∝ n_e²/√(1−n_e/n_cr)` near critical.
+
+On `build/` (OMP/CPU) the same three 2D CI decks are byte-identical run to run, byte-identical
+to the pre-change binary with the dump both off and on, and the dump file itself is
+byte-identical across `ray_threads` 1/2/4/8. That is the acceptance.
+
+**Consequences beyond this diagnostic.** Any bit-level claim in this campaign must be taken
+from the CPU build; whatever produced "Tier 1 285/285 byte-equal" was not the CUDA build. And
+`P_abs` from a GPU run carries a ~1e-3 run-to-run irreducible spread on top of the 10.4 % seed
+noise on `f_abs(0)` — small next to the seed noise, but it is not zero, and it is not
+reducible by re-running.
+
+### Housekeeping
+
+The Phase 1.5 operator work was **uncommitted** in `warpx-cda` — 779 insertions across 10
+files, including the 512-line `LaserDeposition.cpp` diff that `build_cuda_omp/bin/warpx.2d`
+was built from, i.e. the binary behind every result in the two entries above. Now committed as
+`d1f007e90` (O1–O4), `9f981dea2` (a ParticleHeater CUDA build fix) and `b4e0cf57a` (ACCURACY
+finding 4 and the `run_laser_shock` retune), verified byte-identical to the source that
+produced the binary.
+
 ## 2026-08-02 — The PSC ray-trace module read against ours: **same physics to 0.46 %**, three defects in the PSC file, and PSC's unit map settles the `n_cr` question
 
 Reference read, no runs. Sources: `psc-raytrace-master.zip` (the PSC Fortran original,
