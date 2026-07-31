@@ -1389,6 +1389,74 @@ column ratio 1.00010, column-to-column spread 2.537 %. The operator deposits whe
 now need the `physics` env too. CLAUDE.md and `scripts/README.md` both still say the config/log
 tools do not — that is now wrong for every script that draws a figure.
 
+---
+
+## 2026-07-31 (later) — `P1_vac_2d_spot_long` completes: the AXIAL resize worked, the transverse box was never fixed, and the run is planar for ~93 % of its length
+
+432 000 steps in 44 602 s (12.39 h) on `build_cuda_omp`, clean finalize, no error signatures.
+30 ps at an axial box of 2000 `d_e` against `P1_vac_2d_spot`'s 700. Suite run except `g3_spot`
+and `spot_isolation` — see the last section for why those two cannot be run on it.
+
+### The axial extension did what it was for
+
+| t [ps] | ion front, 99.9th pct |
+|---|---|
+| 0.00 | 3.11 `C_s` |
+| 8.97 | 18.00 |
+| 19.42 | 36.77 |
+| 29.88 | **47.46 `C_s` = 0.0475 c** |
+
+**Monotonic** — against `P1_vac_2d_omp`'s 51.35 `C_s` at 19.42 ps falling to 37.04 at 29.88 ps on
+a 700 `d_e` box. A falling percentile front means the fast tail was absorbed at the wall, so the
+2000 `d_e` axial box is what a 30 ps vacuum run needs, and confirms the sizing rule from the
+`P1_vac_1d_long` entry rather than the 10 ps extrapolation.
+
+### The transverse box was NOT changed, and 30 ps makes that worse, not better
+
+`geometry.transverse` is still ±80 `d_e` — the identical extent that lost contrast after 1.99 ps.
+By the campaign's own rule `L_t/2 ≳ v_th,e·t_end + w0`, at v_th,e ≈ 38 `d_e`/ps a 30 ps run needs
+**≈ 1160 `d_e`** against the 80 used: **14.5× too small**, where the 10 ps run was 5× too small.
+**Tripling the duration on an unchanged transverse box triples the violation.**
+
+`spot_report` shows it directly, and needs no control to do so:
+
+| t [ps] | `w_eff/w0` | `leak>2.5w0` | `core<w0` | `f_ax` | `n_e,ax` [`n_cr`] |
+|---|---|---|---|---|---|
+| 0.00 | 1.000 | 0.0004 | 0.843 | 1.000 | 1.4931 |
+| 8.97 | 2.315 | 0.145 | 0.476 | 0.261 | 1.4399 |
+| 17.93 | 2.956 | 0.276 | 0.263 | 0.144 | 1.2170 |
+| 26.90 | **3.147** | **0.344** | **0.258** | 0.177 | **0.9987** |
+
+The second moment of the absorbed power reaches **3.15 `w0`** inside a box whose half-width is
+4 `w0`, with **34 % of absorption beyond 2.5 `w0`**. The deposition profile has filled the box.
+**Nothing past ~2 ps in this run is finite-spot physics**, which is ~93 % of its 30 ps.
+
+Two things it does establish, both of which needed the duration:
+
+- **On-axis `n_e` crosses `n_cr` at ~27 ps** (1.4931 → 0.9987), independently reproducing the
+  28.8 ps crossing `P1_vac_1d_long` measured — the hydrodynamic end of the drive, not a
+  temperature shutoff.
+- Whole-beam `f_abs` *rises* late (0.49 at 3 ps → 0.67 at 26.9 ps) while `f_ax` *falls*
+  (0.32 → 0.18). The beam is increasingly absorbed in the spreading plume rather than on axis,
+  which is the same `f_ax ≠ f_abs` warning as before, now with the two moving in opposite
+  directions. `E_abs` = 102 J per absent dim at 30 ps against 30.95 J at 9.96 ps.
+
+The clamp regression test passes: wall/interior column ratio 0.02 at t = 0 → **0.62 at 26.90 ps**
+(the bug drove it to 20–25); step-0 mean column ratio 1.00008, spread 3.267 %.
+
+### G3 and `spot_isolation` CANNOT be run on this run as configured
+
+Its declared `controls.laser_off` is `P1_vac_2d_spot_off` — **700 `d_e` axial and 144 000 steps,
+against this run's 2000 and 432 000.** Grid heating accumulates with step count and depends on the
+grid, so that subtraction is meaningless, by exactly the argument `P1_vac_2d_spot_off`'s own README
+makes for why it could not be inherited from `P1_vac_2d_off`. Running it anyway would produce a
+confident number with nothing behind it.
+
+**`P1_vac_2d_spot_long` needs its own matched `_off` control** (2000 `d_e`, 432 000 steps, same
+grid and ppc, `intensity = 0`) before any G3, G6 or `dark/lit` figure from it is quotable. Until
+then the run supports the `n_cr`-crossing time and the axial-sizing result, and nothing that
+requires separating laser heating from grid heating.
+
 ## 2026-08-02 — The PSC ray-trace module read against ours: **same physics to 0.46 %**, three defects in the PSC file, and PSC's unit map settles the `n_cr` question
 
 Reference read, no runs. Sources: `psc-raytrace-master.zip` (the PSC Fortran original,
