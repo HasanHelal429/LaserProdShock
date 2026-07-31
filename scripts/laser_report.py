@@ -292,6 +292,14 @@ def main() -> int:
         print(f"  Tlocalfrac            {tf[0]:.3f} -> {tf[-1]:.3f} "
               "(fraction with a measured, not floored, T_e)")
 
+    # O2's reach, reported by the operator itself. It decays as the corona crosses the
+    # forward gap -- at v_th,e, not c_s -- so a driven run gets MORE expensive with time,
+    # and this is the number that says by how much. Absent from pre-Phase-1.5 logs.
+    if any(v == v for v in hist.Vskip):
+        vs = [v for v in hist.Vskip if v == v]
+        print(f"  Vskip                 {vs[0]:.3f} -> {vs[-1]:.3f} "
+              "(fraction of the axial domain the march skipped as empty)")
+
     tables = lpio.profile_tables(rd)
     print(f"  profile dumps         {len(tables)}"
           + (f"  ({', '.join(os.path.basename(t) for t in tables[:4])}"

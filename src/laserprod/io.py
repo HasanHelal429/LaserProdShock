@@ -3,7 +3,7 @@
 The most important reader here is :func:`laserdep_history`. With ``warpx.verbose = 1``
 the operator prints one line per application::
 
-    LASERDEP step <n> t <s> Pabs <W> Eabs <J> [Tlocalfrac <f>]
+    LASERDEP step <n> t <s> Pabs <W> Eabs <J> [Tlocalfrac <f>] [Vskip <f>]
 
 ``Pabs``/``Eabs`` are accumulated across all rays and reduced over ranks, and are
 **measured directly from the ray tracer**, so they are immune to any grid heating of
@@ -22,12 +22,13 @@ from __future__ import annotations
 import glob
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 LASERDEP_RE = re.compile(
     r"LASERDEP\s+step\s+(\d+)\s+t\s+([0-9.eE+-]+)\s+"
     r"Pabs\s+([0-9.eE+-]+)\s+Eabs\s+([0-9.eE+-]+)"
-    r"(?:\s+Tlocalfrac\s+([0-9.eE+-]+))?")
+    r"(?:\s+Tlocalfrac\s+([0-9.eE+-]+))?"
+    r"(?:\s+Vskip\s+([0-9.eE+-]+))?")
 STEP_RE = re.compile(r"STEP (\d+) ends")
 
 
@@ -42,6 +43,12 @@ class LaserHistory:
     Pabs: list          # instantaneous absorbed power [W, per absent dim]
     Eabs: list          # cumulative absorbed energy [J, per absent dim]
     Tlocalfrac: list    # n_e^2-weighted fraction with a measured (not floored) T_e
+    # Fraction of the axial domain the ray march skipped as empty (O2). Falls during a
+    # run as the corona fills the forward gap, which is exactly when a driven step gets
+    # more expensive -- so this is the operator reporting its own cost, per application,
+    # instead of it having to be reconstructed from dumps afterwards. NaN on a run made
+    # before the optimisation, since the field is absent from those logs.
+    Vskip: list = field(default_factory=list)
 
     def __len__(self):
         return len(self.step)
@@ -79,9 +86,9 @@ class LaserHistory:
 def laserdep_history(run_dir: str, log: str = "run.log") -> LaserHistory:
     """Parse ``<run_dir>/run.log`` for the operator's LASERDEP lines."""
     path = log if os.path.isabs(log) else os.path.join(run_dir, log)
-    step, t, P, E, Tf = [], [], [], [], []
+    step, t, P, E, Tf, Vs = [], [], [], [], [], []
     if not os.path.isfile(path):
-        return LaserHistory(step, t, P, E, Tf)
+        return LaserHistory(step, t, P, E, Tf, Vs)
     with open(path, errors="replace") as fh:
         for line in fh:
             if "LASERDEP" not in line:
@@ -94,7 +101,8 @@ def laserdep_history(run_dir: str, log: str = "run.log") -> LaserHistory:
             P.append(float(m.group(3)))
             E.append(float(m.group(4)))
             Tf.append(float(m.group(5)) if m.group(5) else float("nan"))
-    return LaserHistory(step, t, P, E, Tf)
+            Vs.append(float(m.group(6)) if m.group(6) else float("nan"))
+    return LaserHistory(step, t, P, E, Tf, Vs)
 
 
 def incident_power(scales, cfg: dict) -> float:

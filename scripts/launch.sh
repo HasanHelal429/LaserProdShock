@@ -156,6 +156,23 @@ if [[ -n "$GPU" ]]; then
     THREADS=1                   # the push is on the device; host threads only contend
     echo "launch: GPU mode -- device $GPU ($(nvidia-smi --query-gpu=name \
         --format=csv,noheader -i "$GPU" 2>/dev/null)), OMP_NUM_THREADS forced to 1"
+    # The push belongs on the device, but since Phase 1.5 the ray march is threaded HOST
+    # code, and it is ~65 % of a driven 2D step. OMP_NUM_THREADS=1 leaves it serial unless
+    # the deck asks for threads by itself, which is what laser_deposition.ray_threads is
+    # for (config key `laser.ray_threads`). Say so rather than let a driven run quietly
+    # give up the 6x -- and note it needs a binary built with OpenMP: build_cuda is not.
+    # Read the value and compare it numerically -- a pattern like `= *[^0]` matches the
+    # SPACE in `= 0.` (the ` *` happily matches zero spaces), which would fire this note
+    # on every laser-off control.
+    I0="$(awk -F= '/^laser_deposition\.intensity[[:space:]]*=/ {gsub(/[[:space:]]/,"",$2);
+                                                                print $2; exit}' \
+          "${DECKS[0]}" 2>/dev/null)"
+    if awk -v v="${I0:-0}" 'BEGIN{exit !(v+0 > 0)}' \
+       && ! grep -q "^laser_deposition\.ray_threads" "${DECKS[0]}" 2>/dev/null; then
+        echo "launch: NOTE this is a DRIVEN run and the deck sets no laser_deposition.ray_threads,"
+        echo "launch:      so the ray march stays single-threaded. Set laser.ray_threads in"
+        echo "launch:      config.yaml (and use a CUDA build compiled with OpenMP)."
+    fi
 fi
 echo "launch: $(basename "$RUN_DIR")  deck=$DECK  warpx=$(basename "$WARPX")  threads=$THREADS"
 echo "launch: cwd=$RUN_DIR  (so diags/ lands here, not in the repo root)"
