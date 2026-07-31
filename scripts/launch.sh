@@ -202,7 +202,19 @@ start_logger() {   # after WarpX, so run.log exists (the logger waits for it any
     [[ $LOGGER -eq 1 ]] || return 0
     nohup python "$ROOT/scripts/run_progress_logger.py" "$RUN_DIR" \
         > "$RUN_DIR/logger.out" 2>&1 &
-    echo "launch: progress logger pid $! -> $(basename "$RUN_DIR")/progress.log"
+    local lpid=$!
+    # The logger refuses to start when another one already holds this run (they
+    # would append to the same progress.log, each timing the run from its own
+    # start). It exits immediately in that case, and its complaint goes to
+    # logger.out where nobody looks -- so surface it here instead.
+    sleep 1
+    if ! kill -0 "$lpid" 2>/dev/null; then
+        echo "launch: WARNING the progress logger exited immediately:"
+        sed 's/^/launch:          /' "$RUN_DIR/logger.out"
+        echo "launch:          WarpX itself is unaffected and still running."
+        return 0
+    fi
+    echo "launch: progress logger pid $lpid -> $(basename "$RUN_DIR")/progress.log"
 }
 
 if [[ $BACKGROUND -eq 1 ]]; then

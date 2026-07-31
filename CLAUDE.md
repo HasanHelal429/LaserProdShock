@@ -173,6 +173,16 @@ not, and work while a run is still going.
   (`--force` to override). `-b` detaches, `-L` also starts the progress logger, `-n`
   dry-runs, and anything after `--` becomes ParmParse overrides (smoke tests only — they
   will trip `--verify`).
+- **Kill runs BY PID. `pkill -f` matches the shell you type it in.** Its own command line
+  contains the pattern, so `pkill -f "warpx.2d inputs_P1_vac_2d_spot_omp"` killed the invoking
+  shell (exit 144) and **everything chained after it never ran** — including the second `pkill`
+  that was supposed to stop the progress logger. The orphaned logger then kept appending to the
+  same `progress.log` as the relaunched run's logger, and because each logger times the run from
+  *its own* start, the file grew two "10.1 %" lines one second apart reporting 0h18m vs 0h26m
+  elapsed and ETA 2h43m vs 3h51m. Only `warpx_rate` agreed — it is read from WarpX's output
+  rather than timed by the logger. **`ps -eo pid,lstart,args | grep <thing>` then `kill <pid>`**,
+  and check what is left afterwards rather than trusting the kill. The logger now refuses to
+  start when another holds the run (`.logger.pid`), but that only helps the next time.
 - **Shock kinematics come from `runs/<phase>/<ID>/shock_fit.yaml`, fit BY EYE** — the convention
   `KinShock2020` arrived at after automatic `v_sh` drifted between scripts. One speed and
   front per run, shared by every diagnostic.

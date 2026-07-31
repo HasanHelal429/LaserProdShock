@@ -32,6 +32,7 @@ the run reaches max_step, prints its end marker, or goes stale.
 from __future__ import annotations
 
 import argparse
+import atexit
 import glob
 import os
 import re
@@ -93,6 +94,20 @@ def fmt_dur(sec: float) -> str:
     return f"{sec // 3600}h{(sec % 3600) // 60:02d}m"
 
 
+def _release_pidfile(path: str, mine: int) -> None:
+    """Remove the PID file only if it is still ours.
+
+    A logger that is killed and immediately relaunched must not have its
+    successor's claim deleted by its own atexit handler.
+    """
+    try:
+        with open(path) as fh:
+            if int(fh.read().split()[0]) == mine:
+                os.remove(path)
+    except (OSError, ValueError, IndexError):
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -111,6 +126,39 @@ def main():
     total = args.total or detect_total(args.run_dir)
     if not total:
         raise SystemExit(f"could not determine total steps; pass --total (looked in {args.run_dir})")
+
+    # ------------------------------------------------------------------ #
+    # One logger per run directory.
+    #
+    # Two loggers on one run append to the same progress.log, and the result is
+    # not obviously wrong -- it is *subtly* wrong. Each computes wall_elapsed,
+    # wall_rate, ETA and contention from ITS OWN start time, so a stale logger
+    # left over from a killed run reports the live run's step count against its
+    # own clock. That happened on 2026-07-30 (P1_vac_2d_spot_omp): two "10.1%"
+    # lines one second apart, 0h18m vs 0h26m elapsed, ETA 2h43m vs 3h51m, and a
+    # fabricated x1.41 contention factor. Only warpx_rate agreed, because that
+    # one is read out of WarpX's own output instead of being timed here.
+    #
+    # The claim is a PID file rather than a lock, so a logger killed with -9
+    # leaves a stale file that the next one reclaims (the recorded PID is dead).
+    pid_path = os.path.join(args.run_dir, ".logger.pid")
+    try:
+        with open(pid_path) as fh:
+            other = int(fh.read().split()[0])
+        os.kill(other, 0)                      # signal 0 = "does it exist?"
+    except (OSError, ValueError, IndexError):
+        pass                                   # no file, junk, or a dead PID
+    else:
+        raise SystemExit(
+            f"a progress logger (pid {other}) is already running for {args.run_dir}.\n"
+            f"  Two loggers append to the same {args.out} and each times the run from its\n"
+            f"  own start, so the wall-clock columns of both become wrong.\n"
+            f"  Kill it BY PID -- `kill {other}` -- not with `pkill -f`, which also matches\n"
+            f"  the shell you type it in. Or pass --out to write somewhere else.")
+    with open(pid_path, "w") as fh:
+        fh.write(f"{os.getpid()}\n")
+    atexit.register(lambda: os.path.exists(pid_path)
+                    and _release_pidfile(pid_path, os.getpid()))
 
     def loadavg() -> float:
         try:

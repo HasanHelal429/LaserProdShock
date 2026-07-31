@@ -1,0 +1,7 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P1/P1_vac_2d_omp
+# logging_started 2026-07-30T22:34:27  total_steps=432000  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-07-30T22:34:57 | 1660/432000 ( 0.4%) | 0h00m | 0.0181 s/step(wall) | 0.0173 s/step(warpx) | ETA ~2h09m | x1.05 | load 20.1 | laser 0.775 of peak, Eabs 0.5563 J
+2026-07-30T22:47:27 | 44364/432000 (10.3%) | 0h13m | 0.0176 s/step(wall) | 0.0175 s/step(warpx) | ETA ~1h53m | x1.00 | load 20.3 | laser 0.289 of peak, Eabs 6.183 J
+2026-07-30T23:00:30 | 87623/432000 (20.3%) | 0h26m | 0.0181 s/step(wall) | 0.0178 s/step(warpx) | ETA ~1h43m | x1.02 | load 20.7 | laser 0.303 of peak, Eabs 10.62 J
+2026-07-30T23:13:33 | 129812/432000 (30.0%) | 0h39m | 0.0186 s/step(wall) | 0.0180 s/step(warpx) | ETA ~1h33m | x1.03 | load 21.1 | laser 0.307 of peak, Eabs 15.08 J
