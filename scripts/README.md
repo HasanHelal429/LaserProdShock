@@ -26,6 +26,7 @@ python scripts/<script>.py <run_dir> [options]
 | `g3_spot.py` | works; validated | G3 restricted to the illuminated columns, from plotfiles. Whole-box column reproduces `ParticleEnergy` to 0.000 % |
 | `spot_isolation.py` | works; **should become a gate** | is a finite-spot run still a finite spot? `dark/lit` of the net absorbed energy, plus the box a valid run would need |
 | `plot_fields.py` | (z,t) streaks of `n_e`/`B_y`/`E_z`, lineouts, 2D x–z map | `config.yaml`, plotfiles | `media/<ID>/fields_*.png` | **built** |
+| `plot_rays.py` | **Ray paths** — refraction, the turning point, the outbound leg. Offline reconstruction, geometry only | `config.yaml`, plotfiles | `media/<ID>/rays.png` | **built** |
 | `phase_space.py` | **The arbiter** — ion (z, u_z), reflected-ion population | `config.yaml`, plotfiles | `media/<ID>/phase_space.png` | **built** |
 | `make_movies.py` | Movies: evolving lineouts + laser cursor, phase space, 2D map | `config.yaml`, plotfiles | `media/<ID>/movie_*.mp4` | **built** |
 | `compare_runs.py` | Cross-run overlay — the controlled-comparison evidence | several run dirs | `media/<name>/compare.png` | **built** |
@@ -100,6 +101,41 @@ python scripts/run_progress_logger.py runs/P1/P1_vac_1d --every-pct 5 --poll 20
 
 
 ---
+
+## `plot_rays.py`
+
+**The only view of where the beam goes**, as opposed to where its energy landed. Both
+operator bugs found so far were ray-path bugs — the transverse index clamp and the
+exit-boundary overshoot — and both had to be inferred from spatial deposition profiles
+because nothing drew the paths.
+
+```bash
+/opt/anaconda3/envs/physics/bin/python scripts/plot_rays.py runs/P1/P1_vac_2d_spot
+... scripts/plot_rays.py runs/P1/P1_vac_2d_spot --time 5.0 --rays 40
+```
+
+2D only (in 1D the path is the z axis). Inbound legs are green, outbound dashed blue,
+turning points marked on the critical contour, cropped to the interaction region.
+
+Two things to hold onto when reading it:
+
+1. **It is a reconstruction, not the operator's output.** It re-integrates the same eikonal
+   equation with the same RK4 marcher, multilinear sampling, `n_floor` threshold and
+   wrap/clamp index mapping as `LaserDeposition.cpp`, on the `n_e` a plotfile dumped. That
+   makes agreement with the operator's own ray dump a real cross-check, and a disagreement a
+   bug in one of the two — not automatically this one.
+2. **No absorption is carried**, because the IB coefficient needs the per-cell `T_e` the
+   operator builds from the momentum moments and that is not in the plotfiles. So no ray is
+   extinguished, and the outbound leg is *the path a ray would fly*, not evidence that power
+   came back out. At `tau` = 1411 through the flat top of the P1 target, essentially none
+   does. **Never read an absorbed fraction off this figure.**
+
+A detail worth knowing, because it produced a wrong figure first time round: the operator's
+explicit specular branch fires only at `n_ref <= n_floor`, i.e. within 1e-4 of critical, and
+at normal incidence a ray is turned by ordinary refraction *before* it gets that close. In
+`P1_vac_2d_spot_omp` exactly 1 ray of 25 enters that branch while all 25 turn around.
+Counting the branch as "the turning point" reports 1/25 for a bundle in which every ray
+turns; the script marks the axial sign change instead and reports the branch separately.
 
 ## `spot_report.py`
 
