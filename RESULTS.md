@@ -1307,6 +1307,88 @@ are drawn through `ParallelForRNG` and the draws follow the thread scheduling. A
 **any bit-level comparison of CPU runs must pin the thread count** — including a run against its
 `_off` control, where this would land inside the G3 subtraction.
 
+---
+
+## 2026-07-31 — Phase 1.5 validation re-runs: the spot result reproduces on the optimised operator; the planar comparison is VOID because its parent predates the clamp fix
+
+`P1_vac_2d_omp` and `P1_vac_2d_spot_omp` are `P1_vac_2d` and `P1_vac_2d_spot` re-run on
+`build_cuda_omp` with `laser_deposition.ray_threads = 8` — the same `config.yaml` but for that one
+knob, which cannot change the answer. The question is not a new physics question: **does a 1.96×
+faster operator reproduce a result the campaign already has?** Full suite on both (`run_checks`,
+`laser_report`, `plot_fields`, `phase_space`, `make_movies`, plus `spot_report`, `g3_spot`,
+`spot_isolation` on the spot run). Gates unchanged: G1 = 0.214, G4 = 0.25, G5 = 36 ppc, all PASS.
+
+### The spot pair reproduces on every number that is allowed to be compared
+
+| | `P1_vac_2d_spot` | `_omp` | |
+|---|---|---|---|
+| `E_abs` final, J per absent dim | 31.01 | 30.95 | **0.19 %** |
+| `Tlocalfrac` end | 0.860 | 0.860 | — |
+| G3, illuminated columns | −12.93 % | −12.86 % | 0.07 pp |
+| G3, whole box | −13.17 % | −13.20 % | 0.03 pp |
+| restriction changes the verdict by | ×0.98 | ×0.97 | — |
+| `dark/lit` at ~1 ps | 0.135 | 0.136 | — |
+| `dark/lit` at ~10 ps | 0.946 | 0.939 | — |
+| contrast lost after | 1.99 ps | 1.99 ps | — |
+
+`g3_spot`'s whole-box column reproduces `ParticleEnergy` to **0.000 %** on the re-run as well,
+which is what makes the restricted number quotable at all.
+
+`f_abs` final moved 0.5193 → 0.5284, and the planar pair's 0.5400 → 0.5848. **Neither is a
+discrepancy and neither may be quoted as one** — that is the instantaneous fraction, which carries
+10.4 % 1σ across RNG seed alone. `E_abs` is the comparison, and it holds.
+
+So both of `P1_vac_2d_spot`'s findings survive the operator change intact: the run stops
+representing a finite spot after ~2 ps, and its G3 is −13 %, 4× the planar run's −3.09 %.
+
+### End-to-end speedup, measured on the real runs rather than a 40-step slice
+
+| | parent | `_omp` | |
+|---|---|---|---|
+| `P1_vac_2d_spot` | 20 308 s (5.64 h) | 11 311 s (3.14 h) | **1.80×** |
+| `P1_vac_2d` | 18 418 s (5.12 h) | 8 483 s (2.36 h) | 2.17× |
+
+The spot number is the honest one: its parent ran post-clamp-fix on `build_cuda`, so 1.80× isolates
+Phase 1.5. Against the 40-step benchmark's 1.96× and its "~2.9 h instead of 5.6 h" forecast — the
+5.64 h was right and the 3.14 h is 8 % over, which is what a shared box costs. **The planar 2.17×
+conflates Phase 1.5 with the clamp fix and should not be quoted.**
+
+### The planar comparison is VOID, and `E_abs` is exactly the check that cannot see why
+
+`P1_vac_2d` ran 00:49:56–05:56:54 and `P1_vac_2d_off` 01:11:56–03:08:42 on 2026-07-29. The
+transverse-clamp fix is `c817b6342`, **2026-07-29 11:12:30**, and `build_cuda/bin/warpx.2d` was
+rebuilt at 11:13:39. Both parents therefore ran to completion **entirely on the clamped binary** —
+they are the two runs already marked invalid. `media/omp_vs_parent_planar/compare.png` is a
+comparison against an invalid run and is evidence of nothing.
+
+The trap is worth stating plainly, because it looked like a pass: `E_abs` agreed to **0.03 %**
+(66.81 vs 66.79 J). It cannot be a reproduction result. **The clamp relocated energy without
+creating or destroying it** — step-0 total `P_abs` agreed to 7 digits across the fix — so an energy
+budget is precisely the quantity blind to this bug, exactly as all five CI tests passed throughout
+it. A matching `E_abs` across the clamp fix is the expected outcome whether or not the physics
+matches.
+
+`P1_vac_2d_omp`'s declared G3 control is `P1_vac_2d_off`, also pre-fix, so its G3 is not usable
+either — `run_checks`' G3 [PASS] only asserts that a control has been *declared*.
+
+**But `P1_vac_2d_omp` itself is valid** (fixed binary, 2026-07-31), which makes it the only sound
+planar 2D driven run on disk. What is missing is not the driven run — it is a matched control. The
+cheap path to closing planar Phase 1.5 is therefore to **re-run `P1_vac_2d_off` alone on
+`build_cuda_omp`** (~2 h) rather than re-running both; the driven half already exists. Backend
+matching is the reason it must be `build_cuda_omp` and not `build_cuda`.
+
+### The clamp regression test passes on the re-run
+
+`spot_report`'s wall/interior column ratio — the check that is *not* an energy budget — goes 0.02
+at t = 0 to **0.68 at 8.97 ps**, against the 20–25 the index clamp produced. Step-0 profile: mean
+column ratio 1.00010, column-to-column spread 2.537 %. The operator deposits where it should.
+
+### Tooling note
+
+**Base anaconda no longer has `matplotlib`**, so `run_checks`, `laser_report` and `spot_report`
+now need the `physics` env too. CLAUDE.md and `scripts/README.md` both still say the config/log
+tools do not — that is now wrong for every script that draws a figure.
+
 ## 2026-08-02 — The PSC ray-trace module read against ours: **same physics to 0.46 %**, three defects in the PSC file, and PSC's unit map settles the `n_cr` question
 
 Reference read, no runs. Sources: `psc-raytrace-master.zip` (the PSC Fortran original,
@@ -2072,3 +2154,4 @@ and PSC is not available as a referee.
 `warpx-cda/laser_deposition/run_psc_oblique/` + `scripts/compare_psc_refraction.py`
 (figure: `media/psc_refraction/psc_oblique_xcheck.png`). The PSC-linked reference drivers
 stay outside both repositories, with the PSC tree.
+
