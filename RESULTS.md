@@ -1705,3 +1705,86 @@ the module carries `! CHANGED:` markers, and `get_lnlambda` computes lnΛ **per 
 the paper states a single value. Those FLASH-profile paths also identify it as Lezhnin's own
 working copy. Nothing from this code should be attributed to the paper's results without
 checking with the authors.
+
+## 2026-08-03 (later) — Test C closed: a matched PSC PIC run says our absorption operator is right to 0.017 %, and it found a 27 % bug of ours on sharp density edges
+
+The earlier entry today settled the *operator* against PSC (coefficient and march) by
+calling PSC's compiled routines. This closes the **coupled** case — a real PIC-to-PIC
+comparison, which is the part with no closed form and the only reason a matched PSC run was
+needed. Upstream: `warpx-cda/laser_deposition/run_testC_match/`,
+`scripts/compare_testC.py`, figure in `media/testC/`.
+
+### Scored as a three-way, deliberately
+
+Diffing two independent PIC codes' absorbed fraction conflates *do the operators agree*
+with *did the particle loading produce the same plasma*. Running PSC's compiled march on
+WarpX's **own measured profile** separates them:
+
+| | |
+|---|---|
+| WarpX's march vs its own coefficient field | τ 0.428390 vs ∫K dz 0.427948 — ratio **1.00103** |
+| **PSC's march on WarpX's own profile** | τ 0.429887 — ratio **1.00453** vs predicted **1.00470** → **0.017 %** |
+| end to end, each code's own run at t≈0 | f_abs PSC 0.354490, WarpX 0.348443 — **+1.74 %** |
+| — operators account for | **+0.28 %** |
+
+So the operators agree to 0.017 % of the independently predicted coefficient offset, and
+the remaining ~1.45 % is the two codes realizing slightly different plasma from the same
+prescription — not different physics. Both show the expected `K ∝ T_e^{-3/2}` self-limiting
+decay (PSC 0.3545 → 0.3515, WarpX 0.3484 → 0.3386 over ~320 fs).
+
+### Test C found a real bug in OUR operator: 27 % over-absorption on a sharp edge
+
+On a **top-hat** slab the operator reported **τ = 0.615 where its own per-cell coefficient
+field integrates to 0.449** — the excess sitting at *both* slab edges (+56 %, +70 %) with
+the interior slightly low — and recovered to **≤0.2 %** as soon as thermal motion smoothed
+the edge over a few cells. Every later application in that run agreed to 0.2 %.
+
+Ruled out, each by re-running and getting a **bit-identical** `Pabs`: `vacuum_skip`
+(`=0` changes nothing) and the boundary condition (periodic → pec/absorbing changes
+nothing). So it is the density discontinuity itself. A real target always has a finite
+scale length, but a sharp-edged foil deck would hit this, and it should be fixed or
+documented before any upstream PR. It is why the Test C profile is a tanh taper.
+
+### Only t ≈ 0 is matchable, and the reason is the reduced parameters
+
+PSC's code velocity unit is `K_length/K_time` = 2.397e7 m/s = **c/12.51**, and its mass
+unit is `m_p/100` = **18.4 real electron masses** — together giving m_e c² = 60 keV. Two
+consequences, both structural:
+
+1. **`algo.maxwell_solver = none` is forced.** PSC's dt is **6.63× the real 1D Courant
+   limit** (stable there only because its own c is 12.5× smaller), so a WarpX run at the
+   matched cadence cannot also solve Maxwell. Test C as scored is a test of the
+   absorption-and-deposition coupling, not of EM propagation.
+2. **Only the first application is an exactly matched state.** PSC's electrons move 4.3×
+   slower at the same 300 eV, so the profile evolves on a different clock. Both codes
+   therefore heat *every* step so the first application lands on the prescribed initial
+   condition; the later history is a trend comparison. The visible gap in the history is
+   that mass ratio, not an absorption disagreement.
+
+Matching absolute `n_e` in cm⁻³ and `T_e` in eV *does* match K, because PSC's absorption
+routine works in real physical units internally even though its dynamics do not. This is
+the reduced-parameter caveat of §II made concrete, and it is the same one that bites
+`R1_coll` in KinShock2020: **the knob that buys both is µ_p = 1836, not a reduced c.**
+
+### Particle noise had to be controlled before any of this meant anything
+
+`K ∝ T_e^{-3/2}` is convex, so per-cell temperature noise biases K **upward** by
+≈(15/8)σ². At the smoke test's 20 electrons/cell that is ~6 % on K and ~5 % on f_abs — an
+order of magnitude larger than the effect being measured — and it moved PSC's own answer
+visibly: **f_abs 0.3809 at 20 e/cell vs 0.3688 at 400.** Both codes now run 400
+electrons/cell, so the residual bias is common to both rather than a difference between
+them. Worth remembering for any absorbed-fraction number quoted from a thinly-sampled run.
+
+### Practical notes on running PSC
+
+Configured entirely at **compile time** (no runtime deck): `INIT_param.f` for grid, ranks,
+`NNpart`, target density/temperature and `heating_every`; `CASE_nVT.f` for the profile.
+`VLI` is the fresh-start program, `VLA` the restart path. Output goes to `./data`. `znpe`
+must divide the z cell count (1250 = 2·5⁴, so 10 works and 8 does not). The reference
+configuration targets **768 MPI ranks**; the workstation values are a deliberate reduction.
+27 s for 100 steps with 3.4 M particles on 10 ranks.
+
+PSC-side patches (including a reporting-only absorbed-fraction diagnostic that emits
+`LASERDEP` lines in WarpX's format) live with the PSC tree outside both repositories, since
+the module is unreleased — see the sensitivity rules in
+`warpx-cda/laser_deposition/psc_reference/.gitignore`.
