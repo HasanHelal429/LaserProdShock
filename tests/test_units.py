@@ -213,3 +213,102 @@ def test_field_scales_match_the_known_good_deck():
     assert sc.rho_i0 / sc.de_ref == pytest.approx(65.3, rel=1e-2)
     assert sc.de_ref * 1e6 == pytest.approx(0.684, rel=2e-3)
     assert sc.di_amb * 1e6 == pytest.approx(6.84, rel=2e-3)
+
+
+# --------------------------------------------------------------------------- #
+# per-cell Coulomb logarithm (laser_deposition.coulomb_log_mode)
+# --------------------------------------------------------------------------- #
+# Values READ OUT of an actual WarpX run: the `run_profile_ramp` accuracy deck
+# (lambda0 = 1.053 um, Z_eff = 1, theta_e = 2e-3 fixed) re-run once per mode, taking
+# lnLambda straight from the per-cell `laserdep_profile` dump. These therefore pin the
+# Python mirror against the C++ operator, not against itself. Two densities each,
+# because one point cannot distinguish the modes' density dependence -- which is the
+# whole difference between them.
+_LAM = 1.053e-6
+_NCR = u.critical_density(_LAM)
+_LNL_FROM_RUN = {
+    #                n_e            theta    lnLambda from the dump
+    "nrl":   [(1.0050291900e27, 2.0e-3, 6.7498629500),
+              (2.0128637700e26, 2.0e-3, 7.5538845500)],
+    "flash": [(1.0050291900e27, 2.0e-3, 7.3156904500),
+              (2.0128637700e26, 2.0e-3, 8.1197120600)],
+    "ib":    [(1.0050291900e27, 2.0e-3, 7.3154801600),
+              (2.0128637700e26, 2.0e-3, 7.3154801600)],
+}
+
+
+@pytest.mark.parametrize("mode", ["nrl", "flash", "ib"])
+def test_coulomb_log_matches_the_operator(mode):
+    for n_e, theta, expect in _LNL_FROM_RUN[mode]:
+        got = u.coulomb_log_for(mode, n_e, theta, 1.0, _LAM)
+        # abs=1e-6 rather than exact: this module's ME/EPS0 differ from WarpX's
+        # PhysConst in the 9th digit, which a logarithm barely propagates at all.
+        assert got == pytest.approx(expect, abs=1e-6)
+
+
+def test_ib_saturates_below_critical_and_flash_does_not():
+    """The one physical difference between the two b_max cutoffs.
+
+    Below critical omega > omega_pe, so mode ``ib`` cuts off at v_th/omega -- a length
+    with NO density dependence. lnLambda therefore freezes at its critical-surface
+    value all the way out into the corona, while ``flash`` (b_max = Debye) keeps
+    growing as n_e falls. That growth is the unphysical part: an encounter lasting
+    longer than 1/omega cannot absorb from the wave.
+    """
+    at_cr = u.coulomb_log_for("ib", _NCR, 2e-3, 1.0, _LAM)
+    for frac in (0.5, 0.1, 1e-3, 1e-6):
+        assert u.coulomb_log_for("ib", frac * _NCR, 2e-3, 1.0, _LAM) == \
+            pytest.approx(at_cr, rel=1e-12)
+        assert u.coulomb_log_for("flash", frac * _NCR, 2e-3, 1.0, _LAM) > at_cr
+    # ... and where the plasma is OVERDENSE the two agree exactly, because there
+    # omega_pe is the faster clock.
+    for frac in (1.01, 2.0, 10.0):
+        assert u.coulomb_log_for("ib", frac * _NCR, 2e-3, 1.0, _LAM) == \
+            pytest.approx(u.coulomb_log_for("flash", frac * _NCR, 2e-3, 1.0, _LAM),
+                          rel=1e-12)
+    # flash grows like ln(1/sqrt(n)), i.e. 0.5*ln(10) per decade of density
+    d1 = u.coulomb_log_for("flash", 1e-2 * _NCR, 2e-3, 1.0, _LAM)
+    d2 = u.coulomb_log_for("flash", 1e-3 * _NCR, 2e-3, 1.0, _LAM)
+    assert d2 - d1 == pytest.approx(0.5 * math.log(10.0), rel=1e-9)
+
+
+def test_constant_mode_ignores_the_local_state():
+    """`constant` is the knob: nothing about the cell may move it."""
+    for n_e in (1e24, _NCR, 5 * _NCR):
+        for theta in (1e-5, 1e-2):
+            assert u.coulomb_log_for("constant", n_e, theta, 3.0, _LAM,
+                                     coulomb_log=7.5) == 7.5
+
+
+def test_coulomb_log_is_floored_and_vacuum_safe():
+    # No plasma -> 1, as in PSC's get_lnlambda. A cell like this contributes nothing
+    # to K (which goes as n_e^2) and is reached only via edge interpolation.
+    for mode in ("nrl", "flash", "ib"):
+        assert u.coulomb_log_for(mode, 0.0, 2e-3, 1.0, _LAM) == 1.0
+        assert u.coulomb_log_for(mode, 1e26, 0.0, 1.0, _LAM) == 1.0
+        # Dense and cold enough that the raw formula goes negative -> floored at 1.
+        assert u.coulomb_log_for(mode, 1e32, 1e-8, 1.0, _LAM) == 1.0
+
+
+def test_unknown_coulomb_log_mode_raises():
+    with pytest.raises(ValueError):
+        u.coulomb_log_for("debye", 1e26, 2e-3, 1.0, _LAM)
+
+
+def test_K_ib_takes_the_mode_and_derive_reports_the_logarithm():
+    """K must scale linearly in lnLambda, and Scales must say which one it used."""
+    n_e, theta = 0.5 * _NCR, 2e-3
+    K_const = u.K_ib(n_e, theta, _NCR, 1.0, 2.0)
+    K_ib_ = u.K_ib(n_e, theta, _NCR, 1.0, 2.0, "ib")
+    lnL_ib = u.coulomb_log_for("ib", n_e, theta, 1.0, _LAM)
+    assert K_ib_ / K_const == pytest.approx(lnL_ib / 2.0, rel=1e-12)
+    # K_ib needs no wavelength argument: omega_laser IS omega_pe(n_cr).
+    assert u.omega_pe(_NCR) == pytest.approx(u.omega_of_lambda(_LAM), rel=1e-12)
+
+    cfg = _cfg()
+    assert u.derive(cfg).coulomb_log_targ == 5.0        # constant, from the config
+    cfg["laser"]["coulomb_log_mode"] = "ib"
+    sc = u.derive(cfg)
+    assert sc.coulomb_log_targ > 5.0                   # a keV-ish corona sits near 7-8
+    assert sc.K_targ / u.derive(_cfg()).K_targ == \
+        pytest.approx(sc.coulomb_log_targ / 5.0, rel=1e-12)

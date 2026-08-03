@@ -31,6 +31,7 @@ C = 299792458.0            # speed of light [m/s]
 EPS0 = 8.8541878128e-12    # vacuum permittivity [F/m]
 MU0 = 1.25663706212e-6     # vacuum permeability [H/m]
 KB = 1.380649e-23          # Boltzmann constant [J/K]
+HBAR = 1.0545718176461565e-34  # reduced Planck constant [J s] (de Broglie b_min)
 ME_C2_J = ME * C * C       # electron rest energy [J]
 ME_C2_EV = ME_C2_J / QE    # electron rest energy [eV] (~511 keV)
 
@@ -67,6 +68,65 @@ def debye_length(n_e: float, theta: float) -> float:
 def sound_speed(theta_e: float, mass_ratio: float, Z: float = 1.0) -> float:
     """Ion-acoustic speed sqrt(Z k_B T_e/m_i) [m/s] from theta_e and m_i/m_e."""
     return math.sqrt(Z * theta_e / mass_ratio) * C
+
+
+# lnLambda modes the operator accepts (`laser_deposition.coulomb_log_mode`), in its
+# order. Mirrored by config.COULOMB_LOG_MODES so validate() can reject a typo.
+COULOMB_LOG_MODES = ("constant", "nrl", "flash", "ib")
+
+
+def coulomb_log_for(mode: str, n_e: float, theta_e: float, Z_eff: float,
+                    wavelength: float, coulomb_log: float = 2.0) -> float:
+    """lnLambda for IB absorption -- the mirror of the operator's ``coulombLog``.
+
+    This has to agree with ``LaserDeposition.cpp``'s ``coulombLog`` to round-off,
+    because every prediction here (the gates, ``absorption_panel``, ``Scales``) is
+    compared against what the operator measures. ``tests/test_units.py`` pins all four
+    modes against values read back out of an actual run's profile dump.
+
+    ``constant``
+        ``coulomb_log`` everywhere. A deliberate knob, not merely a fallback: lnLambda
+        is how a reduced-parameter run dials collisionality to a target, and pinning it
+        is the only way to hold that fixed while something else varies.
+    ``nrl``
+        NRL formulary electron-ion, two branches split at ``T_e = 10 Z_eff^2`` eV. This
+        is the **transport** logarithm, not the absorption one -- it is here to
+        cross-validate against PSC's ray-trace module, which uses it for IB.
+    ``flash``
+        ``ln(b_max/b_min)``, ``b_max`` the electron Debye length and ``b_min`` the larger
+        of the classical turning radius and the de Broglie length: Eqs. (11)-(13) of
+        Lezhnin et al., Phys. Plasmas 32, 022701 (2025), i.e. FLASH's IB logarithm.
+    ``ib``
+        the same with ``b_max = v_th/max(omega_pe, omega_laser)``. Below critical the
+        laser frequency wins, so lnLambda SATURATES at its critical-surface value
+        instead of growing logarithmically out into the tenuous corona -- an encounter
+        lasting longer than ``1/omega`` is adiabatic and absorbs nothing. This is the
+        physically correct cutoff for IB, and correction (I) that Lezhnin et al.
+        recommend over the FLASH operator they were constrained to use. Identical to
+        ``flash`` wherever the plasma is overdense.
+
+    Floored at 1, and 1 where there is no plasma (as PSC's ``get_lnlambda`` does).
+    """
+    if mode == "constant":
+        return coulomb_log
+    if mode not in COULOMB_LOG_MODES:
+        raise ValueError(f"coulomb_log_mode must be one of "
+                         f"{'|'.join(COULOMB_LOG_MODES)} (got {mode!r})")
+    kT = theta_e * ME_C2_J
+    if n_e <= 0.0 or kT <= 0.0:
+        return 1.0
+    if mode == "nrl":
+        Te_eV = kT / QE
+        ne_cm = n_e * 1e-6
+        v = (23.0 - math.log(math.sqrt(ne_cm) * Z_eff / Te_eV ** 1.5)
+             if Te_eV <= 10.0 * Z_eff ** 2
+             else 24.0 - math.log(math.sqrt(ne_cm) / Te_eV))
+        return max(v, 1.0)
+    b_min = max(Z_eff * QE ** 2 / (12.0 * math.pi * EPS0 * kT),
+                HBAR / math.sqrt(3.0 * kT * ME))
+    w_pe = omega_pe(n_e)
+    w_cut = max(w_pe, omega_of_lambda(wavelength)) if mode == "ib" else w_pe
+    return max(math.log(math.sqrt(kT / ME) / w_cut / b_min), 1.0)
 
 
 def nu_ei_ib(n_e: float, theta_e: float, Z_eff: float, coulomb_log: float) -> float:
@@ -114,7 +174,7 @@ def theta_group(n_targ: float, theta_targ: float,
 
 
 def K_ib(n_e: float, theta_e: float, n_cr: float, Z_eff: float,
-         coulomb_log: float) -> float:
+         coulomb_log: float, mode: str = "constant") -> float:
     """Inverse-bremsstrahlung absorption coefficient K [1/m].
 
         K = (nu_ei/c) (n_e/n_cr) / sqrt(1 - n_e/n_cr)
@@ -122,11 +182,18 @@ def K_ib(n_e: float, theta_e: float, n_cr: float, Z_eff: float,
     so K ~ Z_eff lnLambda n_e^2 T_e^{-3/2}, singular at the critical surface (the
     operator integrates that singularity analytically over a locally linear ramp).
     Returns ``inf`` at or above critical density.
+
+    ``mode`` selects how lnLambda is obtained (see :func:`coulomb_log_for`); the
+    default ``constant`` uses ``coulomb_log`` and leaves every existing caller
+    unchanged. No wavelength argument is needed even for mode ``ib``, because the
+    laser frequency IS ``omega_pe(n_cr)`` -- that is what critical density means.
     """
     x = n_e / n_cr
     if x >= 1.0:
         return float("inf")
-    return (nu_ei_ib(n_e, theta_e, Z_eff, coulomb_log) / C) * x / math.sqrt(1.0 - x)
+    lnL = coulomb_log_for(mode, n_e, theta_e, Z_eff,
+                          2.0 * math.pi * C / omega_pe(n_cr), coulomb_log)
+    return (nu_ei_ib(n_e, theta_e, Z_eff, lnL) / C) * x / math.sqrt(1.0 - x)
 
 
 # --------------------------------------------------------------------------- #
@@ -189,6 +256,10 @@ class Scales:
     abs_depth_targ: float     # 1/K [m]
     tau_est: float            # optical depth through the flat top (one pass)
     f_abs_est: float          # 1 - exp(-2 tau): double pass w/ critical reflection
+    # The lnLambda that actually went into K_targ. Worth carrying explicitly: in a
+    # per-cell mode it is nothing the config states, and it is the single largest
+    # multiplier on K -- 2 vs 7 is a 3.6x change in absorption.
+    coulomb_log_targ: float = 2.0
 
     # --- ambient (None for a vacuum run) ---
     n_amb: float | None = None
@@ -267,8 +338,8 @@ class Scales:
                       "intensity_W_cm2"])
         add("target", ["n_targ_over_ncr", "Te_targ_eV", "theta_e_group",
                        "Cs_targ_over_c",
-                       "areal_ne", "K_targ", "abs_depth_targ", "tau_est",
-                       "f_abs_est"])
+                       "areal_ne", "coulomb_log_targ", "K_targ",
+                       "abs_depth_targ", "tau_est", "f_abs_est"])
         add("ambient", ["n_amb_over_ncr", "de_amb", "di_amb_um", "tau_amb",
                         "f_abs_amb"])
         add("field", ["B0", "vA_over_c", "wci0_inv_ps", "v_ms", "beta_amb",
@@ -404,12 +475,15 @@ def derive(cfg: dict) -> Scales:
     # --- absorption estimate (pre-run sanity: will this target even absorb?) ---
     Z_eff = float(las.get("Z_eff", 1.0))
     lnL = float(las.get("coulomb_log", 2.0))
+    # lnLambda may be per-cell; every K below must use the same mode the deck will,
+    # or the predicted absorption is a prediction of a different operator.
+    lnL_mode = str(las.get("coulomb_log_mode", "constant"))
     # Evaluate K at the GROUP temperature the operator will actually measure, not at the
     # target's cold theta: with an ambient in the heated species list the group theta in
     # the corona is far hotter and K falls by 1-2 orders of magnitude (see theta_group).
     th_grp_targ = theta_group(n_targ, theta_e_targ, n_amb, theta_e_amb)
-    K_targ = K_ib(min(n_targ + (n_amb or 0.0), 0.999 * n_cr), th_grp_targ, n_cr,
-                  Z_eff, lnL)
+    n_at_targ = min(n_targ + (n_amb or 0.0), 0.999 * n_cr)
+    K_targ = K_ib(n_at_targ, th_grp_targ, n_cr, Z_eff, lnL, lnL_mode)
     abs_depth = 1.0 / K_targ if K_targ > 0 else float("inf")
     tau_est = K_targ * thickness
     f_abs_est = 1.0 - math.exp(-2.0 * min(tau_est, 500.0))
@@ -419,7 +493,7 @@ def derive(cfg: dict) -> Scales:
         # the beam crosses the ambient from the injection face to the target
         z_t = float(tgt.get("center_de", 0.0)) * de_ref
         path = abs((z_hi if str(las.get("inject_side", "lo")) == "hi" else z_lo) - z_t)
-        tau_amb = K_ib(n_amb, theta_e_amb, n_cr, Z_eff, lnL) * path
+        tau_amb = K_ib(n_amb, theta_e_amb, n_cr, Z_eff, lnL, lnL_mode) * path
         f_abs_amb = 1.0 - math.exp(-min(tau_amb, 500.0))
 
     Cs_targ = sound_speed(theta_e_targ, mass_ratio, Z)
@@ -465,6 +539,9 @@ def derive(cfg: dict) -> Scales:
         dz_over_lD_targ=dz_over_lD_targ, dz_over_lD_amb=dz_over_lD_amb,
         K_targ=K_targ, abs_depth_targ=abs_depth, tau_est=tau_est,
         f_abs_est=f_abs_est,
+        coulomb_log_targ=coulomb_log_for(
+            lnL_mode, n_at_targ, th_grp_targ, Z_eff,
+            2.0 * math.pi * C / omega_pe(n_cr), lnL),
         n_amb=n_amb, n_amb_over_ncr=(n_amb / n_cr) if n_amb else None,
         de_amb=de_amb, di_amb=di_amb, theta_e_amb=theta_e_amb, Cs_amb=Cs_amb,
         tau_amb=tau_amb, f_abs_amb=f_abs_amb,

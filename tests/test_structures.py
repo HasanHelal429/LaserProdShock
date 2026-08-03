@@ -217,3 +217,83 @@ def test_vacuum_runs_have_only_target_species():
         else:
             assert names == ["targ_electrons", "targ_ions",
                              "amb_electrons", "amb_ions"], os.path.basename(run_dir)
+
+
+def test_coulomb_log_mode_reaches_the_deck_and_is_verified():
+    """lnLambda multiplies K directly, so `coulomb_log_mode` must survive
+    config -> deck -> --verify in BOTH directions.
+
+    A mode that renders but is not verified would let a deck absorb a factor of a few
+    differently from what its config says, with nothing failing -- the same failure
+    shape the ray-march knobs above guard against, but on the physics rather than on
+    the summation order.
+    """
+    import copy
+    import tempfile
+
+    cfg = copy.deepcopy(lpconfig.load(RUN_DIRS[0]))
+    for mode in lpconfig.COULOMB_LOG_MODES:
+        cfg["laser"]["coulomb_log_mode"] = mode
+        d = lpdeck.parse_inputs_str(lpdeck.render(cfg))
+        assert d["laser_deposition.coulomb_log_mode"].strip() == mode
+
+    cfg["laser"]["coulomb_log_mode"] = "ib"
+    with tempfile.NamedTemporaryFile("w", suffix=".inputs", delete=False) as fh:
+        fh.write(lpdeck.render(cfg))
+        p = fh.name
+    try:
+        assert lpdeck.verify(cfg, p) == []
+        cfg["laser"]["coulomb_log_mode"] = "constant"   # the deck now disagrees
+        assert lpdeck.verify(cfg, p), (
+            "verify() ignores coulomb_log_mode, so a deck could use a per-cell "
+            "Coulomb logarithm while its config claims a constant one")
+    finally:
+        os.unlink(p)
+
+    # A config that never mentions it emits NOTHING, so every deck written before this
+    # option existed still matches its config byte for byte -- the operator's default is
+    # `constant` and bit-identical to having no such option at all.
+    cfg2 = copy.deepcopy(lpconfig.load(RUN_DIRS[0]))
+    cfg2["laser"].pop("coulomb_log_mode", None)
+    assert "coulomb_log_mode" not in lpdeck.render(cfg2)
+
+
+def test_profile_table_columns_come_from_the_header():
+    """`read_profile_table` must name columns from the dump's own header row.
+
+    Appending `lnLambda` made the old column-count heuristic AMBIGUOUS: 7 trailing
+    columns is 1D-with-lnLambda or 2D-without, and 8 is 2D-with or 3D-without. Reading
+    the header settles it, and keeps dumps written before the column existed readable.
+    """
+    import tempfile
+
+    from laserprod import io as lpio
+
+    new_1d = ("# laser_deposition per-cell profile\n"
+              "# P_abs = H * n_e * m_e [W/m^3]\n"
+              "# z n_e H P_abs theta_e A lnLambda\n"
+              "1e-6 2e26 3e16 4e10 2e-3 2.1e-24 7.3\n"
+              "2e-6 4e26 5e16 6e10 2e-3 2.2e-24 7.2\n")
+    old_2d = ("# laser_deposition per-cell profile\n"
+              "# x z n_e H P_abs theta_e A\n"
+              "0.0 1e-6 2e26 3e16 4e10 2e-3 2.1e-24\n")
+    for text, want in ((new_1d, ["z", "n_e", "H", "P_abs", "theta_e", "A", "lnLambda"]),
+                       (old_2d, ["x", "z", "n_e", "H", "P_abs", "theta_e", "A"])):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+            fh.write(text)
+            p = fh.name
+        try:
+            got = lpio.read_profile_table(p)
+        finally:
+            os.unlink(p)
+        assert list(got) == want, "both files have 7 columns; only the header tells them apart"
+    # and the values land on the right keys, not shifted by one
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as fh:
+        fh.write(new_1d)
+        p = fh.name
+    try:
+        t = lpio.read_profile_table(p)
+    finally:
+        os.unlink(p)
+    assert t["lnLambda"] == [7.3, 7.2]
+    assert t["theta_e"] == [2e-3, 2e-3]

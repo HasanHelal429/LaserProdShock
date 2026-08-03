@@ -29,19 +29,24 @@ COMPARE = os.path.join(ROOT, "studies", "ray_march_perf", "compare.py")
 #
 # The layout MUST resemble a real dump, and `test_fixture_layout_matches_the_real_dump_format`
 # pins it to `lpio.PROFILE_TAIL` so it cannot drift. The tail is
-# ["n_e", "H", "P_abs", "theta_e", "A"] -- DENSITY FIRST -- so in 2D `P_abs` is column 4 and
+# ["n_e", "H", "P_abs", "theta_e", "A", "lnLambda"] -- DENSITY FIRST -- so in 2D `P_abs` is
+# column 4 and
 # column 2 is `n_e`. The first version of this fixture wrote six columns with the varying
 # value in position 2, which is `n_e`. The comparator then compared the per-column DENSITY
 # share, and because the oblique deck's density is uniform in x BY CONSTRUCTION, its 1/8 check
 # passed regardless of what the ray march did. A fixture that does not match reality hides
 # precisely the bug the test exists to catch.
+# The last '#' line is a COLUMN-NAME row, exactly as the operator writes it -- that is what
+# `lpio.read_profile_table` names columns from, so a fixture without it would exercise only
+# the fall-back path.
 HEADER = ("# laser_deposition per-cell profile\n"
           "# step 0 time 0.00000000e+00 dt_dep 1.00000000e-15\n"
-          "# P_abs = H * n_e * m_e [W/m^3]; H [m^2/s^3]; n_e [m^-3]; coordinates [m]\n")
+          "# P_abs = H * n_e * m_e [W/m^3]; H [m^2/s^3]; n_e [m^-3]; coordinates [m]\n"
+          "# x z n_e H P_abs theta_e A lnLambda\n")
 DX, DZ = 1.0e-6, 2.0e-6
 P_CELL = 1.0854e18                  # a P_abs magnitude, as in the real oblique dump
 NE_CELL = 2.5601878200000002e24     # an n_e magnitude, as in the real oblique dump
-TAIL = ["n_e", "H", "P_abs", "theta_e", "A"]
+TAIL = ["n_e", "H", "P_abs", "theta_e", "A", "lnLambda"]
 
 
 def test_fixture_layout_matches_the_real_dump_format():
@@ -62,9 +67,9 @@ def _dump(path, bump=None):
             p = P_CELL
             if bump is not None and bump[0] == len(rows):
                 p = bump[1]
-            #        x            z            n_e        H  P_abs   theta_e  A
+            #        x            z            n_e        H  P_abs   theta_e  A     lnL
             rows.append(f"{ix*DX:.17g} {iz*DZ:.17g} {NE_CELL:.17g} 1.0 {p:.17g} "
-                        f"2.0e-3 5.9344e-25")
+                        f"2.0e-3 5.9344e-25 7.3")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
         fh.write(HEADER + "\n".join(rows) + "\n")

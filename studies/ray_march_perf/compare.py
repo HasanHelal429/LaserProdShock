@@ -36,19 +36,21 @@ OBLIQUE_COLS = 8
 def columns(path):
     """Per-column absorbed power from a profile dump (2D only).
 
-    Columns are resolved BY NAME through `lpio.PROFILE_TAIL`, never by a hardcoded index.
-    The tail is `["n_e", "H", "P_abs", "theta_e", "A"]` -- density FIRST -- so in 2D
-    `P_abs` is column 4 and column 2 is `n_e`. Reading index 2 gives the per-column
-    DENSITY share, which in the oblique deck is uniform in x by construction and therefore
-    passes the 1/8 test no matter what the ray march does.
+    Columns are resolved BY NAME, never by a hardcoded index: the tail starts
+    `["n_e", "H", "P_abs", ...]` -- density FIRST -- so in 2D `P_abs` is column 4 and
+    column 2 is `n_e`. Reading index 2 gives the per-column DENSITY share, which in the
+    oblique deck is uniform in x by construction and therefore passes the 1/8 test no
+    matter what the ray march does.
+
+    The naming is delegated to `lpio.read_profile_table`, which takes it from the dump's
+    own header row. It used to be re-derived here from the column COUNT, which stopped
+    being decidable once `lnLambda` was appended: 8 columns is 2D-with or 3D-without.
     """
-    a = np.loadtxt(path)
-    ncoord = max(a.shape[1] - len(lpio.PROFILE_TAIL), 0)
-    names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}[ncoord]
-    cols = names + lpio.PROFILE_TAIL[:a.shape[1] - ncoord]
-    if "x" not in cols or "P_abs" not in cols:
-        raise SystemExit(f"{path}: no transverse coordinate or no P_abs in {cols}")
-    x, P = a[:, cols.index("x")], a[:, cols.index("P_abs")]
+    t = lpio.read_profile_table(path)
+    if "x" not in t or "P_abs" not in t:
+        raise SystemExit(
+            f"{path}: no transverse coordinate or no P_abs in {list(t)}")
+    x, P = np.asarray(t["x"]), np.asarray(t["P_abs"])
     xs = np.unique(x)
     return xs, np.array([P[x == v].sum() for v in xs])
 

@@ -35,3 +35,20 @@ tmp/
 
 # --- progress-logger stdout (the findings live in progress.log / RESULTS.md) ---
 runs/**/*.out
+
+# --- PSC laser module ---
+psc-raytrace-master.zip
+*.pdf
+# --- PSC laser module: unreleased/sensitive. Never commit its source, an archive of
+# it, an extracted tree, or code derived from it. See
+# warpx-cda/laser_deposition/psc_reference/README.md for where PSC-coupled code lives.
+psc-raytrace*
+PIC_*.f
+PIC_*.F90
+VLA*.f
+VLI*.f
+INIT_*.f
+studies/psc_absorption_xcheck.py
+
+# --- session worktrees (embedded git repos, not submodules) ---
+.claude/worktrees/

@@ -32,6 +32,10 @@ from . import units
 # tokens). Kept here so validate() can check names before deck.render() runs.
 BOUNDARY_NAMES = ("periodic", "reflecting", "open", "absorbing")
 
+# lnLambda modes the operator accepts, mirrored from units.coulomb_log_for so
+# validate() can reject a typo before WarpX aborts on it.
+COULOMB_LOG_MODES = units.COULOMB_LOG_MODES
+
 REQUIRED_SECTIONS = ["meta", "laser", "reference", "plasma", "geometry", "numerics"]
 
 
@@ -204,6 +208,12 @@ def validate(cfg: dict) -> list[str]:
         raise ValueError("laser.inject_side must be 'lo' or 'hi'")
     if str(las.get("temperature_mode", "local")) not in ("local", "fixed"):
         raise ValueError("laser.temperature_mode must be 'local' or 'fixed'")
+    # lnLambda: a constant knob, or evaluated per cell from the local (n_e, T_e).
+    # See units.coulomb_log_for for what each mode is and which one is physical.
+    if str(las.get("coulomb_log_mode", "constant")) not in COULOMB_LOG_MODES:
+        raise ValueError(f"laser.coulomb_log_mode must be one of "
+                         f"{'|'.join(COULOMB_LOG_MODES)} "
+                         f"(got {las['coulomb_log_mode']!r})")
     if float(las.get("intensity", 0.0)) < 0:
         raise ValueError("laser.intensity must be non-negative")
     rc = float(las.get("ray_cfl", 0.25))

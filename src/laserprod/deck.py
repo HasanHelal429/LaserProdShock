@@ -410,6 +410,16 @@ def render(cfg: dict) -> str:
       f"        # {ang:g} deg")
     a(f"laser_deposition.Z_eff                = {_num(las.get('Z_eff', 1.0))}")
     a(f"laser_deposition.coulomb_log          = {_num(las.get('coulomb_log', 2.0))}")
+    # lnLambda: 'constant' uses the value above; 'nrl'/'flash'/'ib' evaluate it per cell
+    # from the local (n_e, T_e) and IGNORE it -- which multiplies K by a factor of a few
+    # (2 vs the ~7 a keV corona actually has is 3.6x in absorption), so the deck must say
+    # so on its face. Emitted only when the config asks, like the ray-march knobs below:
+    # the operator's default is `constant` and bit-identical to having no such option, so
+    # writing the line unconditionally would rewrite every already-completed run's deck
+    # for a no-op.
+    if las.get("coulomb_log_mode") is not None:
+        a(f"laser_deposition.coulomb_log_mode     = "
+          f"{str(las['coulomb_log_mode'])}")
     a(f"laser_deposition.electron_temperature = th_t")
     a(f"laser_deposition.temperature_mode     = {str(las.get('temperature_mode', 'local'))}")
     if las.get("temperature_floor_theta") is not None:
@@ -645,7 +655,8 @@ def key_params(path: str) -> dict:
 
     # --- the laser block: this is the operator under test, so compare it strictly ---
     for k, conv in (("species", str), ("direction", str), ("inject_side", str),
-                    ("temperature_mode", str), ("intervals", str),
+                    ("temperature_mode", str), ("coulomb_log_mode", str),
+                    ("intervals", str),
                     ("beam_profile", str), ("profile_intervals", str),
                     ("profile_prefix", str)):
         kk = f"laser_deposition.{k}"

@@ -33,8 +33,11 @@ CI tests plus eight research-scale accuracy runs: uniform-slab deposition profil
 turning point at the analytic position, `z_m` tracking `z_crit cos²θ₀` to ~1 cell out to
 60°, and a coefficient audit flat to 1e-5 over a 275× range of `K` (exponents
 2.018 / 0.9999 / 0.9999 / −1.4999 / 2.028 on `n_e`, `Z_eff`, `lnΛ`, `T_e`, `I`). Local-`T_e`
-mode tracks an imposed 10× ramp to 0.05 %. PSC cross-validation (Test C) is blocked
-upstream: Hyder et al.'s PSC ray-tracing module is not public.
+mode tracks an imposed 10× ramp to 0.05 %. PSC cross-validation at the **operator level is
+done** (2026-08-03, upstream): the module is in hand, builds, and its compiled routines are
+called directly — lnΛ agrees to 0.000e+00 and the coefficient to 6.7e-16, the whole residual
+being two constants PSC rounds. Test C (the coupled expanding-plasma case) still awaits a
+matched PSC PIC run.
 
 **Three inherited open issues**, carried into this project's gates:
 1. **Exit-boundary overshoot** — the ray takes a partial extra arc-length step past the far
@@ -1303,3 +1306,402 @@ are drawn through `ParallelForRNG` and the draws follow the thread scheduling. A
 `OMP_NUM_THREADS=1` the deck is exact. Production is unaffected (`--gpu` forces 1 thread), but
 **any bit-level comparison of CPU runs must pin the thread count** — including a run against its
 `_off` control, where this would land inside the G3 subtraction.
+
+## 2026-08-02 — The PSC ray-trace module read against ours: **same physics to 0.46 %**, three defects in the PSC file, and PSC's unit map settles the `n_cr` question
+
+Reference read, no runs. Sources: `psc-raytrace-master.zip` (the PSC Fortran original,
+`src/PIC_part_heating.F90`, 846 lines, plus its `INIT_param.f` / `INIT_variables.f`
+normalization) and Lezhnin et al., *Phys. Plasmas* **32**, 022701 (2025) — the PIC-coupling
+paper our operator's header already cites. Ours is
+`warpx-cda/Source/Particles/LaserDeposition/{LaserDeposition.H,LaserDeposition.cpp}`.
+
+**The provenance matters: the zip is NOT the version the paper ran.** It carries a
+`- D Petersen` attribution comment, `! CHANGED:` markers around the `l3n/l3x` z-window, and a
+per-cell `get_lnlambda` that directly contradicts the paper's §II B statement that they "apply
+a single value of the Coulomb logarithm to the whole simulation box" (`INIT_param.f:112` still
+sets the now-dead `lnlambda = 6.0`). Read it as a later development branch, and do not attribute
+its defects to the published results.
+
+### 1. The absorption physics is the same function, to 0.46 %
+
+Different-looking formulas, one identity. Paper Eq. (10) is
+
+    nu_IB = (4/3) sqrt(2 pi) n_e Z e^4 lnLambda / ( m_e^(1/2) (kB Te)^(3/2) )
+
+which is **our `m_K_coeff` verbatim** (`LaserDeposition.cpp:537-548`, with the SI `(4 pi eps0)^2`),
+used as `K = (A/n_cr) n_e^2 / sqrt(1 - n_e/n_cr)` per unit **arc length**. The PSC *code* instead
+uses the NRL formulary's rounded CGS coefficient (`PIC_part_heating.F90:279, 718-744`)
+
+    K0 = 9.74e-17 * Z_eff * lnLambda
+    K  = -K0 * n_e^2 / ( N_c cos(theta_0) * sqrt(1 - n_e/N_m) * Te^(3/2) )   [1/cm]
+
+per unit **axial** length, with `N_m = N_c cos^2(theta_0)`. Evaluated head-to-head
+(`xcheck.py`, λ₀ = 1.064 µm, Z = 6, lnΛ = 6):
+
+| n_e/n_cr | T_e = 100 eV | 1 keV | 4.7 keV | 39.9 keV |
+|---|---|---|---|---|
+| 0.01 | 1.0046 | 1.0046 | 1.0046 | 1.0046 |
+| 0.10 | 1.0046 | 1.0046 | 1.0046 | 1.0046 |
+| 0.50 | 1.0045 | 1.0045 | 1.0045 | 1.0045 |
+| 0.90 | 1.0040 | 1.0040 | 1.0040 | 1.0040 |
+| 0.99 | 0.9981 | 0.9981 | 0.9981 | 0.9981 |
+
+(ratio K_PSC/K_ours). The residual is entirely the rounding in `9.74e-17` and in PSC's
+`N_c = 1.115e21/λ_µm^2` — its n_cr is 9.8490e20 cm^-3 against our exact 9.8477e20, which is why
+the ratio dips below 1 only where `sqrt(1 - n_e/n_cr)` is sensitive to it. **There is no physics
+disagreement in the absorption coefficient.** PSC's oblique factors `1/cos(theta_0)` and
+`1/sqrt(1 - n_e/N_m)` are the analytically exact 1D-stratified obliquity correction, and reduce
+to ours at normal incidence.
+
+**The near-critical singular layer is the identical integral**, independently derived. Both
+evaluate ∫ r²(1-r)^(-1/2) dr = `2√w − (4/3)w^(3/2) + (2/5)w^(5/2)` with `w = 1 − r_prev`, and both
+double it for the round trip. PSC parameterizes the linear ramp by the *z*-slope of n_e
+(by the turning density over the density slope, lines 358-389); we parameterize it by `L_eff = 1/(dr/ds)` along the
+actual ray (`LaserDeposition.cpp:1217-1236`). Same closed form.
+
+**The kick is the same operator.** Both apply a drag-free isotropic Gaussian momentum kick
+`du_i = sqrt((2/3) H dt_dep) N(0,1)` per component — PSC hand-rolls Box–Muller
+(`PIC_part_kick`, lines 767-813), we call `amrex::RandomNormal` — so `<dE> = m_e H dt_dep` per
+electron in both. Both subcycle on the same Wiener self-similarity (PSC `heating_every = 20`
+hardcoded; ours `intervals` with `gap` measured from the last applied step). Call ordering also
+matches: PSC `PIC_part_source → PIC_part_heating → PIC_bin_coll` (`VLA.f:52`), ours
+`TargetInjector → ParticleHeater → LaserDeposition → doCollisions`
+(`WarpXEvolve.cpp:284-301`).
+
+### 2. What PSC has that we do not: **per-cell lnΛ**
+
+`get_lnlambda` (lines 816-845) evaluates the NRL two-branch electron-ion Coulomb logarithm per
+cell from the local n_e and T_e, floored at 1. Ours takes a single constant `coulomb_log`
+(default **2**, validated only `> 0`). Given how much trouble lnΛ-as-a-knob has already caused
+next door (`../KinShock2020/CLAUDE.md`, collisions gotcha: lnΛ = 7713 = 667× physical), a
+`coulomb_log = physical` mode that inverts the NRL formula per cell is the one substantive
+capability we are missing. Note the paper's own Eq. (14) prescribes a *different* lnΛ for IB
+than for transport, and the PSC code implements neither — it uses the transport form for
+absorption. Worth doing properly rather than copying.
+
+That is the whole list. Everything else runs the other way.
+
+### 3. What we have that PSC does not
+
+1. **Actual refraction.** PSC does not bend rays *at all*: it marches column-by-column down the
+   grid-aligned z index (`cntz = cntz-1`), and oblique incidence enters only as the analytic
+   `cos(theta_0)` factors. The paper says so — §II B, "we consider **1D** laser ray propagation
+   along [z]". Ours integrates the eikonal equation with RK4 in arc length over
+   `AMREX_SPACEDIM`, so rays refract, self-focus, and reflect off the critical surface about its
+   actual normal `grad n_ref`. Nothing in PSC can represent the 2D spot physics Phase 1 measured.
+2. **Drift-subtracted temperature.** PSC forms its electron temperature from the trace of the second-moment
+   tensor divided by the density (`PIC_moments_xyz.f:131-145`) — the **full** second moment, so the bulk
+   flow is *not* removed. In an ablation plume at Mach several this reads the ram energy as heat,
+   and since K ∝ T^(−3/2) it biases absorption **low** exactly in the flowing corona. The first
+   moments (`NVxe`, `NPxe`) are already computed and sitting there unused, so the fix is one line.
+   Ours subtracts it (`kT = m_e(<|u|^2> − |<u>|^2)/3`, `LaserDeposition.cpp:683-684`) and adds a
+   temperature floor plus a `min_macroparticles_per_cell` guard against the convexity bias of
+   T^(−3/2) in thinly-sampled cells — neither of which PSC has.
+3. **An energy audit.** We report `LASERDEP ... Pabs Eabs` every application. PSC accumulates no
+   scalar at all; only the `laser_heating` field is written out, so absorbed energy cannot be
+   checked against the incident beam. Given §4 below, that is not a cosmetic gap.
+4. Deterministic threaded march (accumulator buckets, thread-count-independent reduction),
+   beam profile in **physical** units (waist / super-Gaussian order / center / converging
+   `beam_focus`), sub-cell ray bundling, periodic transverse wrap, and the profile + ray-path
+   dumps. PSC's transverse Gaussian is centred on the domain midpoint with widths of 10 and 1 **cells**,
+   hardcoded next to a comment calling them "Currently placeholders".
+
+### 4. Three defects in the PSC file (in the version we were given)
+
+1. **A unit inconsistency that silently discards the near-critical absorption.** Positions are
+   converted to **cm** at line 246, so the march's cell-spacing variable is in cm at lines 323
+   and 458 (the "in code units" comments there are stale). But the turning-point branch sets
+   that same spacing from the *code-unit* cell width at **line 403**, and a comment there marks
+   that a dimensionally-correct line was replaced. The absorbed power density in the
+   reflection cell is therefore low by the code-length→cm factor `K_length*1e2`, which for the
+   paper's normalization (K_length = D_i0,phys/√100 = 7.26e-7 m) is **≈1.4×10⁴**. That is the one
+   cell the analytic singular layer deposits into, i.e. most of the absorption at normal
+   incidence. Both the deposited energy and the `laser_heating` diagnostic are wrong together, so
+   an absorption-profile plot would show it — further evidence this branch postdates the paper's
+   FLASH benchmark. **Check with the PSC authors before trusting anything from this zip.**
+2. **Hardcoded transverse indices in the no-reflection branch.** Line 554 writes
+   `laser_heating_big(i1n, i2n, l3n_local)` instead of `(cntx, cnty, ...)`, and lines 504-509 read
+   `Sxxe(i1n,i2n,...)` / `NNe(i1n,i2n,...)` while testing `NNe(cntx, cnty, cnt3)` with `cnt3` a
+   leftover loop variable (value `i3mx+1` after the moment loop). In 2D every column that fails
+   to reach critical dumps its last-cell absorption into the `(i1n,i2n)` corner. Harmless in the
+   1D runs the paper published.
+3. **No temporal pulse shape.** `lsr_rise_time = 0.1e-9` is declared at `INIT_param.f:124` and
+   **never read anywhere** — the operator applies a constant `I_0 = 1e20 erg/s/cm² = 1e13 W/cm²`.
+   The paper's pulse is 0.9 ns flat-top preceded by a 0.1 ns linear rise. **We have the same
+   gap:** our `intensity` is a constant-expression parser input, not a function of `t`. Shared,
+   and a real one for matching an experiment.
+
+### 5. PSC's unit map — the structural difference, and it settles the `n_cr` question
+
+PSC's raytrace does **not** work in the PIC code's units. `INIT_param.f:150-158` builds an
+explicit code↔physical map and the operator converts into CGS before touching absorption
+(density scaled by `K_density` into cm^-3, temperature by `K_temperature` into eV, and
+length by `K_length` into cm, lines 244-246):
+
+| PSC | value | meaning |
+|---|---|---|
+| `K_density` = critical density | 9.85e26 m^-3 | **the code density unit IS n_cr** — code density 1.0 is the critical surface |
+| `K_length` = proton skin depth ratio | 7.26e-7 m | proton d_i evaluated at n_cr |
+| `K_temperature` = target T_e / reduced-c parameter | 3000/0.05 = **60 000 eV** | = **m_e c², the paper's reduced electron rest energy** (§II B: "m_e c² = 60 keV") |
+
+`ReducedSoL = 0.05` is misnamed — it is not c_red/c but the target's θ_e, and the identity the
+code actually uses everywhere is `K_temperature = m_e c²_code`. `INIT_param.f:543` confirms it:
+the collision rate is corrected by `ReducedSoL^2 * (511000/temp_phys)^2 = (511/60)^2`, i.e.
+exactly `(m_e c²_real / m_e c²_code)^2`.
+
+**Two consequences for us.**
+
+**(a) n_cr is a chosen parameter, not a wavelength.** PSC picks n_cr as the density unit and lets
+λ₀ follow. Ours derives `m_n_cr` from `wavelength` alone with **no override path**
+(`LaserDeposition.cpp:523-526`), so to place the critical surface at a chosen code density we
+must solve backwards for λ₀. This independently confirms the corrected claim in
+`../KinShock2020/README.md` ("n_cr is a dimensionless parameter, not 351 nm") and is the
+strongest argument yet for the ranked change *accept `critical_density` directly*. The paper also
+supplies the number that kills the density-contrast worry outright: real solid Al is
+**n_e,solid ≈ 700 n_cr**, but PSC caps the target at **n_max,PIC = 10 n_cr** and Appendix A scans
+**2–20 n_cr** with all runs converging. A few × n_cr is enough. There is no 10⁵ contrast
+requirement.
+
+**(b) Our T_e for the IB coefficient is ~8.5× too hot, and the fix is cheaper than the README
+says.** WarpX has no reduced c, so `electron_temperature` is literal: R1_warm's θ_e = 0.078 means
+T_e = **39.9 keV**, not the few keV a real ablation plasma has. At 0.5 n_cr the absorption length
+is **6.6 cm at 39.9 keV vs 2.7 mm at 4.7 keV** — the difference between a transparent plasma and
+an absorbing one. The `../KinShock2020/README.md` section derived a rescaling factor
+s = √(39900/470) = **9.21** by targeting T_e,ab ≈ 470 eV. But the paper does not target 470 eV: it
+runs m_e c² = 60 keV at I₀ = 1e13 W/cm² and matches FLASH. Adopting *the paper's own* reduced rest
+energy gives
+
+    s = sqrt(511/60) = 2.92 :  theta 0.078 -> 0.00916 (T_e = 4.68 keV),
+                               vA_over_c / 2.92,  max_step x 2.92
+
+— **2.9× the timesteps, not 9.2×** — and Appendix A scans m_e c² ∈ {20, 60, 200} keV and
+m_p/m_e ∈ {100, 400} and finds convergence, so this is a *validated* reduction rather than a
+guess. The README's 9.2× / 470 eV framing should be corrected to this.
+
+**Caveat, not yet worked through.** Lowering θ at fixed m_e (what a WarpX config can do) is *not*
+identical to raising m_e at fixed θ (what PSC does): both give T_e ÷ s² in eV, but PSC's d_e in
+cm grows by s while ours does not, so the absorption length measured in d_e differs by s = 2.92
+between the two routes. Since n0 is otherwise a free scale factor here, that is absorbable by
+rescaling n0 (and B₀ ∝ √n0 with it), but the four knobs (θ, B₀, n0, λ₀) are coupled and the
+algebra has **not** been checked. That coupling is the argument for a derived `laser.target`
+block in `units.py` — PSC parameterizes by (n_cr, T_target, m_e c², µ) and *derives* its four K
+factors; our config parameterizes by (n0, θ, B₀, λ₀) and derives nothing laser-facing. Writing
+that map is the concrete next piece of work, and it is a prerequisite for any quantitative
+PSC↔WarpX cross-validation.
+
+**Bottom line for the campaign.** The operator is not the risk. Absorption coefficient, the
+near-critical closed form, and the kick all agree with the reference implementation to rounding,
+and on refraction, temperature measurement, and energy accounting ours is the stronger of the
+two. The gaps worth closing before a validation campaign are, in order: **(i)** a physical
+per-cell lnΛ, **(ii)** the temperature scale — either the rescaled config above or a derived
+`laser.target`, and **(iii)** a temporal pulse profile, which neither code has.
+
+## 2026-08-02 (later) — Per-cell Coulomb logarithm: `laser_deposition.coulomb_log_mode`, and lnΛ = 2 was ~3.6× too low
+
+The one capability the PSC comparison above found us *missing*. Built, verified against the
+C++ from an independent Python implementation, and against the pre-change binary for
+bit-identity. No production runs.
+
+### What it is
+
+`laser_deposition.coulomb_log_mode`, four modes. The three per-cell ones evaluate lnΛ from
+the local `(n_e, T_e)` — the **same** values, and the same sparse-cell fall-back, that set
+`T_e` in the coefficient — floored at 1, and 1 where there is no plasma (as PSC's
+`get_lnlambda` does; such a cell contributes nothing to `K ∝ n_e²` and is reached only
+through edge interpolation).
+
+| mode | lnΛ | why it exists |
+|---|---|---|
+| `constant` (default) | `coulomb_log` | the **knob**. Not a fallback: pinning lnΛ is the only way to hold collisionality fixed while something else varies. |
+| `nrl` | NRL e–i, two branches at `T_e = 10 Z²` eV | the **transport** logarithm, *not* the absorption one. Exists solely to cross-validate against PSC, which uses it for IB. |
+| `flash` | `ln(b_max/b_min)`, `b_max` = λ_D, `b_min` = max(classical, de Broglie) | Eqs. (11)–(13) of Lezhnin 2025, i.e. FLASH's IB logarithm. For reproducing that paper. |
+| `ib` | the same with `b_max = v_th/max(ω_pe, ω_laser)` | **the physical one.** Correction (I) that Lezhnin et al. recommend over the FLASH operator they were constrained to use. |
+
+**Why `ib` is the right default choice for physics.** Below critical `ω > ω_pe`, so `b_max`
+becomes `v_th/ω` — a length with **no density dependence**. lnΛ therefore *saturates* at its
+critical-surface value all the way out into the corona, instead of growing like
+`½ln(1/n_e)`. That growth is the unphysical part: an encounter lasting longer than `1/ω`
+is adiabatic and absorbs nothing from the wave. Above critical `ω_pe` wins and `ib` reduces
+to `flash` exactly. Measured on `run_profile_ramp` (θ_e = 2e-3, Z = 1, λ₀ = 1.053 µm):
+
+| n_e/n_cr | `nrl` | `flash` | `ib` |
+|---|---|---|---|
+| 0.9996 | 6.7499 | 7.3157 | 7.3155 |
+| 0.2002 | 7.5539 | **8.1197** | **7.3155** ← saturated, to all 10 digits |
+
+### Verification
+
+1. **`constant` is bit-identical.** `run_profile_ramp` re-run against the *pre-change* binary's
+   `run.log`: `Pabs` and `Eabs` match on **all 60 steps**. The warm/local-temperature path too
+   (`run_te_gradient`, `Pabs 2.2216e+12 Eabs 0.022216 Tlocalfrac 1`, exact at OMP=4 and 8 —
+   OMP=1 differs by the *known* thermal-RNG/thread-scheduling effect, not this change). The two
+   constant-lnΛ expressions were deliberately left in their original floating-point form rather
+   than factored, so this is guaranteed rather than measured lucky.
+2. **Per-cell lnΛ matches an independent implementation** to **<4e-9** across all three modes
+   and both `fixed` and measured-`T_e` paths, and `A = C0 lnΛ/(kB T_e)^{3/2}` round-trips to
+   3e-9. `tests/test_units.py` now pins all four modes against values read out of these runs,
+   so the Python mirror is checked against the C++, not against itself.
+3. **`flash`'s b_max/b_min IS the paper's closed form** — `ln(λ_D/b_cl)` agrees with the code's
+   `ln((v_th/ω_pe)/b_cl)` to **0.00e+00** at three (n_e, T_e). Note the classical `b_min`
+   dominates only below **9 eV** (Z=1) / **327 eV** (Z=6), so at keV the de Broglie branch wins
+   and citing Eqs. (11)–(13) rather than the classical-only Eq. (14) is the correct claim.
+4. **All five WarpX CI decks pass** (1D, 1D-ramp, 2D gaussian/oblique/focus), worst relative
+   error 1.6% against tolerances of 5–6%. 2D and `temperature_mode = fixed` both exercised,
+   including the branch where component 2 is not gathered.
+5. **213 tests pass** (was 202; 11 added).
+
+### The number that matters
+
+On `run_profile_ramp`, going from the deck's `coulomb_log = 2.0` to the physical value:
+
+    lnLmean  2.0  ->  7.25 (ib) / 7.30 (flash) / 6.74 (nrl)
+    Pabs     6.05e12 -> 9.66e12 W   (x1.60)
+
+**lnΛ = 2 was understating absorption by ~1.6× on this deck, and the P1 runs used 5.0.**
+τ_tot goes 0.446 → 1.63, i.e. absorbed fraction 0.59 → 0.96. Anything that was tuned against
+absorbed fraction with a guessed lnΛ needs re-reading, and `Z_eff·lnΛ` is no longer one knob:
+`Z_eff` stays a knob, lnΛ can now be physics.
+
+### Three things fixed on the way
+
+- **The profile dump's θ_e was inverted out of A** (`theta = (C/A)^{2/3}`), which is only valid
+  while lnΛ is constant and would have *silently* misreported it in a per-cell mode. Component 2
+  of the measured field now carries the measured θ_e itself instead of a 0/1 flag — `> 0` is the
+  same test the flag satisfied, so `Tlocalfrac` is unchanged to its last digit — and the dump
+  reads θ_e directly and derives lnΛ from it exactly. A new `lnLambda` column reports it per cell.
+- **Appending that column made the positional `PROFILE_TAIL` scheme ambiguous**: 7 trailing
+  columns is 1D-with-lnΛ or 2D-without, 8 is 2D-with or 3D-without. `io.read_profile_table` now
+  names columns from the dump's **own header row** (the operator always wrote one; nothing read
+  it), with the count-based scheme kept only as a fall-back, and `studies/ray_march_perf/
+  compare.py` was routed through it instead of duplicating the logic. Old dumps stay readable.
+- **`coulomb_log_mode` is emitted only when the config asks**, matching the ray-march knobs.
+  Emitting it unconditionally would have rewritten **24 completed runs' decks** for a semantic
+  no-op; the operator's default is `constant` and bit-identical to having no such option.
+  `--verify` catches it in both directions (`tests/test_structures.py`).
+
+### Still open from the PSC comparison
+
+`lnLmean` is now on every `LASERDEP` line and per cell in the dump, so (i) is closed. Remaining,
+in order: **(ii) the temperature scale** — our θ_e = 0.078 means a literal 39.9 keV where a real
+ablation plasma is at keV, fixable either by the 2.92× config rescale to the paper's
+m_e c² = 60 keV or by a derived `laser.target` block; and **(iii) a temporal pulse profile**,
+which neither code has.
+
+## 2026-08-03 — PSC cross-validation, run for real: the two modules are the **same function** to round-off, and PSC's coefficient is computed in single precision
+
+The 2026-08-02 entry compared the PSC ray-trace module against ours *by reading it* and put
+the agreement at "0.46 %". With `psc-raytrace-master` now in hand that estimate has been
+replaced by a measurement, and the number is much better than 0.46 %: the residual is
+**entirely** two constants PSC rounds, and once those are accounted for the two codes agree
+to machine epsilon. This closes the `LASER_DEPOSITION_PLAN.md` checklist item *"Build PSC
+reference data (uniform slab + density ramp) and analytic IB baselines"*, blocked since
+2026-07-27 on module access.
+
+### Two things that made this cheaper than expected
+
+1. **PSC builds and runs unmodified here.** The zip is a complete autotools distribution
+   (the Fortran PSC 1.90 — `VLI` initializes, `VLA` runs), not just the module. It compiled
+   clean on the first attempt with gfortran 13: `h5pfc` supplies MPI + parallel HDF5 in one
+   wrapper, and `-std=legacy -fallow-argument-mismatch -fallow-invalid-boz` are what a
+   1.90-era tree needs from a modern compiler. Recipe in `psc_reference/README.md`.
+2. **Its routines are callable directly**, so **nothing was ported.**
+   `laser_deposition/psc_reference/{psc_kref,psc_march}.F90` link PSC's compiled objects and
+   *call* `get_lnlambda`, `absorption_calc` and `trapazoidal_int`. Every PSC digit below is
+   produced by PSC's own code; the drivers only supply the caller's context (CGS-with-eV
+   units, `Nc = 1.115e21/λ²`, `K0 = 9.74e-17·Z·lnΛ`), copied from
+   `PIC_part_heating.F90:244-249,279`.
+
+   Watch out: `src/Makefile.am` names `PIC_part_heating.f`, which does not exist — automake's
+   suffix rule picks up the `.F90`. Confirmed with `nm` that it is what lands in `VLA`.
+
+### The result
+
+`scripts/compare_psc_coefficient.py`, over a 1681-point (n_e, T_e) map spanning 1e-3–0.999
+n_cr and 1 eV–100 keV:
+
+| check | result |
+|---|---|
+| lnΛ: PSC `get_lnlambda` vs our `coulomb_log_mode = nrl` | **0.000e+00**, all 1681 points |
+| — coverage | both NRL branches (1600 / 81 points) **and** 81 points on the floor of 1 |
+| IB coefficient, PSC's rounded constant accounted for | **6.7e-16** |
+| PSC's `trapazoidal_int` vs the plain trapezoid | **2.2e-16** |
+| PSC `9.74e-17` vs the exact `9.694430e-17` (Lezhnin Eq. 10) | **+0.4701 %** |
+| PSC `1.115e21/λ²` vs `ε₀m_eω²/e²` | **+0.0131 %** |
+
+**The `nrl` mode was worth building.** It was added on 2026-08-02 purely to be
+PSC-comparable, on the argument that PSC uses the NRL *transport* logarithm for inverse
+bremsstrahlung. That argument is now confirmed at the bit level — exactly zero difference,
+including the `T_e = 10 Z²` eV branch switch and the floor.
+
+### PSC's absorption coefficient is formed in single precision
+
+The coefficient constant (`PIC_part_heating.F90:279`) is *written* as `9.74e-17`, but it is
+assembled from literals that carry no double-precision suffix, so it is formed in **single
+precision** and only then promoted to the double precision of everything around it.
+gfortran folds it to **9.73999943499718752e-17**, i.e. **5.80e-8 below** the intended
+`9.74e-17`. Established two independent ways — backed out of PSC's own output (constant to
+1.1e-15 across the table) and by compiling the literal alone.
+
+Physically this is nothing. It is recorded because it is the difference between explaining
+the comparison's residual to 1e-15 and leaving 6e-8 of it unexplained; the script therefore
+predicts with the value PSC *computes*, not the value it appears to write.
+
+### The compiled C++, not just a Python mirror
+
+`laser_deposition/run_psc_xcheck/` is a probe deck: 512 cells sweeping **0.013–0.911 n_cr and
+279 eV–21 keV simultaneously** (density and temperature ramped anti-correlated), one step, no
+field solver. Each cell's *measured* `(n_e, θ_e)` is read out of the operator's own profile
+dump and handed to PSC, so particle noise in the temperature cancels exactly rather than
+degrading the comparison.
+
+| | |
+|---|---|
+| lnΛ, compiled C++ vs PSC | 4.7e-9 |
+| `A = pref·Z·lnΛ/(k_BT_e)^{3/2}` self-consistency | 8.5e-9 |
+| `A_PSC/A_C++` vs the predicted +0.4701 % | 7.8e-9 |
+| optical depth τ, same trapezoid on both coefficient sets | **+0.4067 %** — the coefficient offset, nothing else |
+| operator's own RK4 march vs midpoint quadrature of its own K | −0.291 % |
+
+All the 1e-9s are the dump's ~9-significant-digit print precision, i.e. as tight as this
+comparison can be made without a wider dump format.
+
+### `psc_march` is sub-critical only — scope, not shortcut
+
+PSC's turning-point branch (`PIC_part_heating.F90:350-478`) takes its cell spacing from the
+PIC **code-unit** cell size at line 403, where every other length in the march — including
+the same spacing variable at line 323 — is in **cm** (converted at line 246). That is the
+dimensional inconsistency flagged on 2026-08-02, and it means the near-critical layer is not
+a meaningful reference to compare against. `psc_march` therefore refuses to march past the
+turning-point density and says so.
+
+### Two traps worth keeping
+
+1. **`laser_deposition.electron_temperature` is the FLOOR in local mode.** Set to the *top*
+   of a temperature ramp rather than below its bottom, it binds in essentially every cell:
+   `Tlocalfrac` collapses to 5e-5 and the run silently measures nothing, degenerating to a
+   single temperature. Cost one wasted run here; now documented in the deck.
+2. **Integrate the full domain when K peaks at a boundary.** On this profile K rises three
+   decades toward the dense end, so the hi-end *half*-cell alone carries ~2.2 % of τ. A
+   cell-centre trapezoid drops a half-cell at each end and makes the operator look 2 % off;
+   the midpoint rule over all 512 cells gives −0.291 %. The code-to-code *ratio* is immune
+   (both sides truncate identically), which is why (b) and (c) above use different bases.
+
+### What Test C is now about
+
+Not the operator. The coefficient and the march are both settled above, free of PIC
+confounders — different pushers, different collision modules, and PSC's
+`PIC_moments_xyz.f:131-145` doing **no drift subtraction** where ours does. Test C is now
+specifically about the *coupled evolution*, and it is no longer blocked on access: PSC runs,
+and already dumps its per-cell `laser_heating` (`OUT_moments.f:441`,
+`dowrite_laser_heating = 1` at `INIT_param.f:803`). It is blocked on work — PSC is configured
+at compile time (`INIT_param.f` + `CASE_nVT.f`, no runtime deck), so a matched case means
+editing those, rebuilding, and reading its output format.
+
+### Provenance caveat (unchanged, and now stronger)
+
+This tree is **not** the version behind the published results: `INIT_param.f:379-411` carries
+commented-out reads of `/home/klezhnin/flash_01_ns_I1e13_lb_{dens,etemp,itemp,veloc}.txt`,
+the module carries `! CHANGED:` markers, and `get_lnlambda` computes lnΛ **per cell** where
+the paper states a single value. Those FLASH-profile paths also identify it as Lezhnin's own
+working copy. Nothing from this code should be attributed to the paper's results without
+checking with the authors.

@@ -251,6 +251,10 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg, n_targ=None, n_amb=None
     """
     Z_eff = float(cfg["laser"].get("Z_eff", 1.0))
     lnL = float(cfg["laser"].get("coulomb_log", 2.0))
+    # The prediction must use the same lnLambda mode the run does, or the curve below is
+    # a curve for a different operator -- and a per-cell mode changes K by a factor of a
+    # few, which is the same order as the effects this panel exists to show.
+    lnL_mode = str(cfg["laser"].get("coulomb_log_mode", "constant"))
     from .units import K_ib, theta_group
 
     # K is evaluated at the GROUP temperature the operator measures per cell, not at the
@@ -265,7 +269,7 @@ def absorption_panel(ax_K, ax_tau, z_de, n_tot, sc, cfg, n_targ=None, n_amb=None
         th = (theta_group(n_targ[i], sc.theta_e_targ, n_amb[i], sc.theta_e_amb)
               if (n_targ is not None and n_amb is not None) else sc.theta_e_targ)
         x = min(n / sc.n_cr, 0.999999)
-        K.append(K_ib(x * sc.n_cr, th, sc.n_cr, Z_eff, lnL))
+        K.append(K_ib(x * sc.n_cr, th, sc.n_cr, Z_eff, lnL, lnL_mode))
 
     # March from the injection face and STOP AT THE TURNING POINT. The ray reflects at
     # n_e = n_cr cos^2(theta0) and never enters the overdense interior, so integrating

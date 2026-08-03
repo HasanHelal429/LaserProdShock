@@ -110,8 +110,25 @@ not, and work while a run is still going.
   describe what the operator does.
 - **`Z_eff·lnΛ` is a very strong knob — change it in small steps.** 5/5 → 13/7 coupled
   **16×** more energy (92 keV per slab ion), giving a 0.06 c piston that crossed the domain
-  in a fraction of a gyroperiod. `lnΛ` here is an honest mid-Z stand-in, and is a fixed
-  input, so the model is not fully self-consistent (logarithmically, not as a power law).
+  in a fraction of a gyroperiod.
+- **`lnΛ` no longer has to be a guess: `laser.coulomb_log_mode`** (added 2026-08-02, after
+  reading PSC's ray-trace module, which does it per cell and ours did not). `constant` (the
+  default, and bit-identical to before) keeps `laser.coulomb_log`; `nrl` / `flash` / `ib`
+  evaluate lnΛ **per cell** from the local `(n_e, T_e)` — the same values, and the same
+  sparse-cell fall-back, that set `T_e` in the coefficient. **`ib` is the physical one**:
+  it cuts off at `b_max = v_th/max(ω_pe, ω_laser)`, so below critical lnΛ *saturates* at its
+  critical-surface value instead of growing logarithmically out into the corona, which is
+  right because an encounter lasting longer than `1/ω` is adiabatic and absorbs nothing.
+  `flash` is Eqs. (11)–(13) of Lezhnin 2025 (Debye `b_max`), `nrl` is the **transport**
+  logarithm and exists only to cross-validate against PSC, which uses it for IB — and that
+  cross-validation is now **done and exact**: PSC's compiled `get_lnlambda` and our `nrl`
+  differ by **0.000e+00** over 1681 points, covering both NRL branches and the floor
+  (2026-08-03; `warpx-cda/laser_deposition/psc_reference/`). So `nrl` is the mode to pick
+  when the question is "what would PSC have done here", and never for physics.
+  Measured on the `run_profile_ramp` deck: **lnΛ 2 → ~7.3, absorbed power ×1.6**. The
+  effective value is reported as `lnLmean` on every `LASERDEP` line and per cell in the
+  `profile_intervals` dump. Keep using `constant` when you need collisionality *pinned*
+  (e.g. holding it fixed while something else varies) — that is a real use, not a fallback.
 - **Thickening the target does not raise the Mach number.** Coupled energy and mass both
   scale with thickness, so `v = √(2E/m)` is unchanged. Thickness buys piston *momentum*
   (drive distance).

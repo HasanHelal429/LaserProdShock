@@ -110,8 +110,14 @@ open questions**:
 ### 1.3 Explicitly out of scope
 
 - Re-validating the ray tracer against analytic IB / WKB (done upstream; §1.1).
-- Cross-validation against PSC — blocked upstream because Hyder et al.'s PSC ray-tracing
-  module is not public (`LASER_DEPOSITION_PLAN.md`, 2026-07-27).
+- Cross-validation against PSC — **done upstream at the operator level** as of 2026-08-03
+  (`LASER_DEPOSITION_PLAN.md`; blocked on module access only from 2026-07-27 to then). The
+  PSC ray-trace module is now in hand and builds; `laser_deposition/psc_reference/` links
+  its compiled routines and calls them, and the two modules agree to round-off: lnΛ to
+  **0.000e+00** over 1681 points, the coefficient to **6.7e-16**, with the whole residual
+  being two constants PSC rounds (+0.4701 % and +0.0131 %). Out of scope *here* because it
+  is settled upstream, not because it is blocked. Test C (the coupled expanding-plasma
+  case) still awaits a matched PSC PIC run.
 - Mesh refinement: the operator asserts `finestLevel() == 0`. One uniform grid must resolve
   both the near-critical target and the tenuous ambient; that scale separation is a central
   difficulty, not something to be engineered away.

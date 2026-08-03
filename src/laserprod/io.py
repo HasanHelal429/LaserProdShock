@@ -166,8 +166,12 @@ def profile_tables(run_dir: str, prefix: str = "laserdep_profile") -> list[str]:
 
 # Trailing columns of a laserdep_profile dump, in order, AFTER the coordinates. The
 # file's `#` lines are prose, not a column-name row, so the layout is positional:
-# <coords...> n_e H P_abs theta_e A   -- 6 columns in 1D, 7 in 2D, 8 in 3D.
-PROFILE_TAIL = ["n_e", "H", "P_abs", "theta_e", "A"]
+# <coords...> n_e H P_abs theta_e A lnLambda -- 7 columns in 1D, 8 in 2D, 9 in 3D.
+#
+# `lnLambda` was appended when the operator gained per-cell Coulomb logarithms; it is
+# LAST precisely so that the coordinate count still comes out right for dumps written
+# before it existed (see `read_profile_table`).
+PROFILE_TAIL = ["n_e", "H", "P_abs", "theta_e", "A", "lnLambda"]
 
 
 def read_profile_table(path: str) -> dict:
@@ -175,24 +179,46 @@ def read_profile_table(path: str) -> dict:
 
     Keys are ``z`` (and ``x`` in 2D) for the cell-centre coordinates, then ``n_e``
     [m^-3], ``H`` [m^2/s^3], ``P_abs`` [W/m^3], ``theta_e`` (the value actually used for
-    K) and ``A`` (the IB coefficient). The coordinate keys are named so callers never
-    have to index by position -- getting that wrong silently reads ``theta_e`` as
-    ``P_abs``, which is how this reader was first written.
+    K), ``A`` (the IB coefficient) and ``lnLambda`` (the logarithm that went into it).
+    The coordinate keys are named so callers never have to index by position -- getting
+    that wrong silently reads ``theta_e`` as ``P_abs``, which is how this reader was
+    first written.
+
+    Names come from the dump's LAST ``#`` line, which the operator writes as a column
+    header. Deriving them from the column count instead is not merely fragile, it is
+    now ambiguous: once ``lnLambda`` was appended, 7 columns means 1D-with-lnLambda or
+    2D-without, and 8 means 2D-with or 3D-without. The positional scheme below is kept
+    only as a fall-back for a file whose header cannot be read.
     """
     rows: list[list[float]] = []
+    header: list[str] = []
     with open(path) as fh:
         for line in fh:
             s = line.strip()
-            if not s or s.startswith("#"):
+            if not s:
+                continue
+            if s.startswith("#"):
+                # Keep the most recent '#' line that parses as a name row; the prose
+                # lines above it contain spaces and punctuation but also words, so the
+                # discriminator is that every field is a known column name.
+                fields = s.lstrip("#").split()
+                if fields and all(
+                        f in PROFILE_TAIL or f in ("x", "y", "z")
+                        for f in fields):
+                    header = fields
                 continue
             rows.append([float(v) for v in s.split()])
     if not rows:
         return {}
     ncol = len(rows[0])
-    ncoord = max(ncol - len(PROFILE_TAIL), 0)
-    coord_names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}.get(
-        ncoord, [f"c{i}" for i in range(ncoord)])
-    cols = coord_names + PROFILE_TAIL[:ncol - ncoord]
+    if len(header) == ncol:
+        cols = header
+    else:
+        # Fall-back: assume the tail is the newest layout, truncated as needed.
+        ncoord = max(ncol - len(PROFILE_TAIL), 0)
+        coord_names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}.get(
+            ncoord, [f"c{i}" for i in range(ncoord)])
+        cols = coord_names + PROFILE_TAIL[:ncol - ncoord]
     return {c: [r[i] for r in rows] for i, c in enumerate(cols)}
 
 

@@ -253,3 +253,15 @@ def test_unknown_boundary_name_is_a_hard_error():
 def test_non_z_normal_axis_is_rejected_with_an_explanation():
     with pytest.raises(ValueError, match="only 'z' is supported"):
         lpconfig.validate(cfg(**{"geometry.normal_axis": "x"}))
+
+
+def test_bad_coulomb_log_mode_is_rejected():
+    """A typo here must not reach WarpX, where it aborts mid-launch."""
+    for good in lpconfig.COULOMB_LOG_MODES:
+        assert lpconfig.validate(cfg(**{"laser.coulomb_log_mode": good})) is not None
+    with pytest.raises(ValueError, match="coulomb_log_mode"):
+        lpconfig.validate(cfg(**{"laser.coulomb_log_mode": "debye"}))
+    # Absent means 'constant', the back-compatible default.
+    c = copy.deepcopy(BASE)
+    c["laser"].pop("coulomb_log_mode", None)
+    lpconfig.validate(c)
