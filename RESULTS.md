@@ -1788,3 +1788,78 @@ PSC-side patches (including a reporting-only absorbed-fraction diagnostic that e
 `LASERDEP` lines in WarpX's format) live with the PSC tree outside both repositories, since
 the module is unreleased — see the sensitivity rules in
 `warpx-cda/laser_deposition/psc_reference/.gitignore`.
+
+## 2026-08-03 (later still) — the 27 % sharp-edge over-absorption: it was the temperature **floor** leaking through the coefficient interpolation
+
+Fixed. Test C found this yesterday-in-the-same-day; this is the cause and the cure.
+
+### Cause
+
+`sample` interpolated the inverse-bremsstrahlung coefficient `A` **plainly** across the
+plasma boundary. An empty cell's `A` is not meaningless-but-harmless — it is built from the
+**temperature floor**, and
+
+    A ∝ (k_B T_e)^(−3/2)
+
+so a floor far below the plasma temperature makes it *enormous*: **0.511 eV against 300 eV
+is a factor 2240**. Averaging that into a cell half full of plasma inflated K at both slab
+edges by hundreds of times, and the operator reported **τ = 0.615 where its own per-cell
+coefficient field integrates to 0.449**.
+
+The in-code comment asserting this was "second order, since n_e² → 0" was wrong, and is
+corrected in place: at a sharp edge the *interpolated* n_e is ~half the plasma density, so
+it is a first-order error, not second.
+
+**This inverts the stated purpose of the floor.** The header says the floor exists so that
+"noise in a thinly-sampled cell cannot produce a wild coefficient" — but because
+`A ∝ T^{−3/2}`, a *low* temperature floor is a *high* ceiling on A. A floor set well below
+the plasma temperature does the opposite of what it is for. Worth remembering when choosing
+`electron_temperature` in local mode: it is not a harmless "don't bind" knob.
+
+### Why it hid
+
+On any smooth profile every cell adjacent to plasma also *holds* plasma, so no
+floor-temperature `A` is ever in the stencil. Even a run that starts sharp self-heals —
+thermal motion smoothed the edge within one heating interval and the error fell from +37 %
+to ≤0.2 % by the third application. Only a profile that is discontinuous *at the moment the
+operator fires* shows it.
+
+### How it was localised — three wrong guesses, each killed by measurement
+
+1. **`vacuum_skip`** — re-ran with `vacuum_skip=0`: **bit-identical** `Pabs`. Not it.
+2. **The boundary condition** (a ray wrapping through a periodic axis and re-traversing the
+   slab) — re-ran with `pec`/absorbing: **bit-identical**. Not it. (`wrap[axis]` is
+   unconditionally false, so the axis always terminates — the code is right there.)
+3. **The quadrature / eikonal drift** — a Python model of the march reproduced **0.449**,
+   not 0.615, and the `|T| = n_ref` invariant drifted only 0.998–1.003. Not it.
+
+Then putting the floor-temperature `A` into the vacuum cells of that same model reproduced
+**0.612** against the operator's 0.615, and the diagnosis was settled.
+
+### Fix
+
+Interpolate `A` **weighted by n_e**:
+
+    A_out = Σ w·A·n_e / Σ w·n_e
+
+`A` is a property of the electrons in a cell, so a cell with none gets no vote. Exact in
+both limits that matter — uniform n_e reduces to the plain average, uniform `A` returns that
+`A` — so it changes nothing except where **both** fields vary, which is precisely the edge.
+
+| | before | after |
+|---|---|---|
+| sharp-edge τ vs its own coefficient field | **1.37** | **0.994** |
+| Test C tapered case, f_abs | 0.348443 | 0.348431 |
+| WarpX `laser_deposition` CI | 12/15 | 12/15 (same 3 pre-existing 2D checksum failures) |
+
+The Test C number barely moving is the point: it confirms the taper never triggered the bug,
+so **the Test C result against PSC stands unchanged**.
+
+### Guard
+
+`run_sharp_edge/` upstream keeps one deck whose density is genuinely discontinuous, with
+`scripts/check_sharp_edge.py` comparing the operator's absorbed fraction against a
+quadrature of its *own* dumped coefficient field — a ratio, so there is no analytic
+reference, no PSC tree, and no hard-coded number to go stale. Its temperature floor is
+deliberately pathological; a realistic one would mask the regression. Not yet a CTest —
+that is the follow-up before any upstream PR.
