@@ -1979,3 +1979,96 @@ it is separate from the double count fixed above.
 Study: `warpx-cda/laser_deposition/run_refraction/` + `scripts/compare_refraction.py`
 (figure: `media/refraction/refraction_modes.png`, gitignored/regenerable). Docs:
 `laser_deposition.refraction` in `Docs/source/usage/parameters.rst`.
+
+---
+
+## 2026-08-04 (later) — WarpX vs PSC at **oblique** incidence: the cross-check `refraction = 0` unlocks. Coefficient exact to ten digits, march to 0.004 %
+
+Every earlier PSC cross-check was at **normal incidence**, and not by choice. Away from it
+the two codes were not computing the same quantity: WarpX bent its rays with an RK4 eikonal
+trace and integrated K along the curved path, while PSC marches straight down the grid axis
+with a `1/cosθ₀` path factor and turns at `n_m = n_cr cos²θ₀`. Both are right for a
+stratified target, but they are different algorithms, so an oblique disagreement could not
+have been attributed to anything. `refraction = 0` **is** PSC's algorithm, so the obliquity
+treatment is now directly testable — and it was the part of the new mode that had only ever
+been checked against a closed form.
+
+**Sub-critical by design, not convenience.** PSC's turning-point branch sets `dzs = dz` in
+PIC code units where every other length in its march is in cm, so **its near-critical layer
+cannot be a reference** (`psc_march` refuses to run past `n_m` for that reason). Peak
+density 0.18 n_cr stays below `n_m = 0.25 n_cr` even at 60°. The Snell denominator is still
+properly exercised: `1/√(1−n_e/n_m)` runs **1.10 → 1.89** across the sweep. Fixed T_e, to
+keep the `T^{-3/2}` convexity bias out of a measurement that is not about it; lnΛ still
+per-cell (`nrl`), as PSC's `get_lnlambda` is.
+
+### 1. Coefficient — reproduced to every digit printed, at every angle
+
+PSC's compiled `absorption_calc` vs the straight-ray expression, 0–60°: deviation
+**0.000000 %** at all five angles.
+
+The target is **not 1.0** — PSC rounds two constants (IB prefactor `9.74e-17` vs the exact
+`9.694430e-17`, and `n_cr = 1.115e21/λ²`), so the correct answer is a predicted **+0.457 %**
+offset, and hitting 1.0 would mean something known-to-be-there had cancelled.
+
+**The residual initially drifted with angle (−0.017 % at 60°), and chasing it paid off.**
+PSC's rounded `n_cr` appears **twice** in K: once as the explicit `1/n_cr`, and again inside
+`n_m` *under the square root*, so the codes evaluate `√(1−n_e/n_m)` at slightly different
+arguments. That second appearance is amplified by `r/(2(1−r))` toward the turning point —
+0.11× the n_cr error at r = 0.18, **1.29× at r = 0.72**. Including it collapses the residual
+to zero to ten digits. Nothing about the oblique coefficient is unexplained.
+
+### 2. March — the code-level test, ≤ 0.004 %
+
+PSC's compiled march on WarpX's **own measured** profile, against the optical depth the C++
+operator reported. Nothing on the WarpX side is a mirror of anything. Single pass, so
+`τ = −ln(1−f_abs)` with no reflected leg.
+
+| θ₀ | f_abs | τ_WarpX | τ_PSC | ratio | predicted | dev |
+|---:|---|---|---|---|---|---|
+| 0° | 0.112835 | 0.119724 | 0.120273 | 1.004582 | 1.004555 | +0.003 % |
+| 30° | 0.133620 | 0.143432 | 0.144089 | 1.004578 | 1.004549 | +0.003 % |
+| 60° | 0.330625 | 0.401411 | 0.403195 | 1.004445 | 1.004408 | **+0.004 %** |
+
+The prediction is **profile-weighted** — the pointwise ratio varies along the march, so for
+an integral the prediction is the ratio of the two coefficient fields integrated over the
+same profile, not the peak value.
+
+**The refracting mode agrees too** (≤0.017 %, worst at 0°). That is the control that keeps
+the claim honest: both modes are right on a stratified target, so this shows
+`refraction = 0` **reproduces PSC's algorithm**, not that it is uniquely correct. Its
+residual is the flatter of the two — at 0° +0.003 % against the refracting mode's +0.017 %,
+because the straight position update is exact where RK4 has truncation error.
+
+### 3. Coupled Test C in both modes — the ray model is not what separates the codes
+
+| | f_abs (ray-march total) | PSC/WarpX |
+|---|---|---|
+| `refraction = 1` | 0.348389 | +1.75 % |
+| `refraction = 0` | 0.348125 | +1.83 % |
+| PSC's matched run | 0.354490 | — |
+
+The flag moves WarpX by **−0.076 %** against a ~1.8 % PSC-to-WarpX gap, of which the
+coefficient constants are +0.46 % and the rest is the two codes realizing slightly
+different plasma (Test C's finding). At θ₀ = 0 the modes coincide by construction, so this
+is a check that the flag changes nothing it should not.
+
+**Convention caught while doing this:** these are ray-march totals (`Pabs/I0`), which is
+what PSC's own diagnostic reports. `compare_testC.py` quotes a different quantity for WarpX
+— the deposited field integrated over the grid, `∫P_abs dz/I0` = 0.348431. They agree to
+1.2e-4, so it is a self-consistency check on the deposition rather than a disagreement, but
+they are not interchangeable and should not be compared across.
+
+### What this does and does not establish
+
+**Does:** the straight-ray mode reproduces PSC's absorption operator, *including both
+obliquity factors*, to 0.004 % of an independently predicted offset from 0° to 60°, with the
+residual coefficient difference attributed down to PSC's rounded literals.
+
+**Does not:** say anything about the near-critical layer, where PSC's own implementation
+carries a unit bug; or about non-stratified targets, which PSC's model cannot represent at
+all — there the two WarpX modes differ by 8.5 % on the total and far more on the pattern,
+and PSC is not available as a referee.
+
+`warpx-cda/laser_deposition/run_psc_oblique/` + `scripts/compare_psc_refraction.py`
+(figure: `media/psc_refraction/psc_oblique_xcheck.png`). The PSC-linked reference drivers
+stay outside both repositories, with the PSC tree.
