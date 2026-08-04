@@ -1863,3 +1863,119 @@ quadrature of its *own* dumped coefficient field — a ratio, so there is no ana
 reference, no PSC tree, and no hard-coded number to go stale. Its temperature floor is
 deliberately pathological; a realistic one would mask the regression. Not yet a CTest —
 that is the follow-up before any upstream PR.
+
+---
+
+## 2026-08-04 — `refraction = 0`: straight rays with the refraction carried analytically. It is *exact* for a stratified target, 3.2× cheaper, and it exposed a turning-point double count
+
+For many of the applications this operator is for, the transverse ray deflection is not the
+answer wanted — the absorbed power is. PSC's module already works that way, so the flag
+`laser_deposition.refraction = 0` now does too. Landed on `warpx-cda`
+`feature/laser-deposition`.
+
+**PSC has no ray trace at all**, which is the finding that shaped the design. Its heating
+routine walks straight down the grid axis, one column per transverse cell, and carries the
+obliquity as a constant `1/cos θ₀` path factor with a turning point at `n_m = n_cr cos²θ₀`.
+Reading that as "PSC neglects refraction" would be wrong, and building the flag that way
+would have been a bug:
+
+**For a plane-stratified target, a straight march carrying the Snell invariant is EXACT at
+any incidence angle.** With `n sinθ = sinθ₀` and `n = √(1−n_e/n_cr)`,
+
+```
+cosθ = cosθ₀ √(1 − n_e/n_m) / n ,     n_m = n_cr cos²θ₀
+dτ/dz = (A/n_cr) n_e² / ( cosθ₀ √(1 − n_e/n_m) )
+```
+
+and per unit **arc length** of the straight march (`dz = cosθ₀ ds`) the `cosθ₀` cancels. So
+the entire change from the refracting mode is one substitution,
+`√(1−n_e/n_cr) → √(1−n_e/n_m)`, in the absorption denominator, the turning test, and the
+analytic near-critical layer. At normal incidence `n_m = n_cr` and the two modes coincide.
+
+**Scored against an analytic reference, not against the other mode.** The linear-ramp closed
+form `τ = A n_cr z_crit (16/15) cos⁵θ₀` — the same one `analysis_oblique.py` validates the
+*refracting* mode against — is derived by integrating along the **curved** path, so a march
+that never bends a ray has no obvious right to satisfy it:
+
+| θ₀ | `refraction = 1` | `refraction = 0` | no Snell factor would be |
+|---:|---|---|---|
+| 0° | −0.60 % | **−0.22 %** | τ ×1.0 |
+| 15° | +0.05 % | **−0.18 %** | τ ×1.2 |
+| 30° | +0.13 % | **−0.14 %** | τ ×2.4 |
+| 45° | +0.58 % | **−0.32 %** | τ ×8.0 |
+| 60° | +1.99 % | **−0.17 %** | τ ×64.0 |
+
+**The cheap mode is the more accurate one here.** It is flat in angle, while the refracting
+trace drifts to +1.99 % at 60° where its RK4 has to resolve an increasingly bent path. The
+last column is what the flag is *not*: a genuinely unrefracted ray keeps the `n_cr`
+denominator, so nothing turns it before the true critical surface and it marches to a depth
+it should never reach — overestimating τ by `1/cos⁶θ₀`, **64× at 60°**. That is the failure
+signature to look for if this ever regresses.
+
+**Cost: the ray march is 3.2× faster** (36.0 → 11.1 ms per application on a 256-ray bundle,
+from the `LaserDeposition::rayTrace` timer rather than wall clock). Five field samples per
+step become two, and each drops the density gradient — the expensive half of the
+interpolation. The turning angle is taken per-ray from its own launch direction, the same
+thing for a parallel beam and the right thing for a converging one.
+
+**The limit is measured, not asserted.** A stratified sweep can only ever show this mode
+agreeing, so `run_refraction/inputs_refraction_corrugated` breaks the stratification on
+purpose: a corrugated density front, 12.5 % depth modulation, normal incidence.
+
+| | total absorbed | transverse contrast of P_abs |
+|---|---|---|
+| `refraction = 1` (reference here) | 9.4078e10 W/m | 4.086 |
+| `refraction = 0` | 1.0210e11 W/m (**+8.5 %**) | 0.089 |
+
+The integral is the forgiving number; the pattern is not. Straight rays cannot be steered out
+of the ridges, so every column absorbs the same and the corrugation is invisible to them —
+the straight-mode total is 8× the flat-ramp 0° value to the digit, which is the check that
+this is the mode behaving as designed rather than misbehaving. The figure shows it as the
+operator's **own dumped ray paths**: the refracting bundle leans out of the ridges and
+crosses itself into caustics over the valleys, the straight bundle is a picket fence that
+turns at the corrugated surface and returns along its own path. **If the transverse
+deposition pattern is what a run is for, this flag is the wrong economy.**
+
+### What building it found: a turning-point double count, in both modes
+
+The step that reaches the turning surface was absorbing **twice** — once by the step's own
+midpoint rule, and again through the analytic near-critical layer, which covers exactly that
+interval (`r_prev` up to the surface) and back. Worse, that step *overshoots* the surface, so
+its midpoint denominator was the clamped `√n_floor2` rather than a physical one, inflating K
+there by up to `1/n_floor` = 100.
+
+It was worth **~5 % of the absorbed fraction** at the default `ray_cfl` on the oblique ramp
+(+4.88 % before, −0.14 % after) and decayed only as **O(h)** — so recovering the accuracy by
+refining would have needed an 8× smaller step, spending the entire 3.2× the mode exists for.
+This is why the fix is part of the feature and not a follow-up.
+
+**Why it hid.** In the refracting mode the branch fires only at near-normal incidence, on one
+step of one ray, and the error sat inside the 6 % test tolerance *in both directions* —
+measured −1.2 % to +2.5 % across `ray_cfl` on the 1D ramp, i.e. non-monotonic, which reads
+as noise rather than as a bug. The straight-ray mode is what made it matter, by turning
+**every** oblique ray at `n_m` instead of no ray at all.
+
+**Fix**: decide whether a step reaches the turning surface *before* applying its absorption,
+and let the analytic layer own that interval alone. Verification:
+
+- refracting mode at oblique incidence — **bit-identical** (its branch never fires there)
+- refracting mode, 1D ramp at default `ray_cfl` — **bit-identical**; at finer steps it
+  improves toward the closed form (+2.53 % → +1.80 % at `ray_cfl` 0.0625)
+- Test C `f_abs` **0.348431** and the sharp-edge guard **0.58 % PASS** — both reproduce to
+  the digit, as expected since both are sub-critical and have no turning point
+- `ctest -R laser_deposition` **14/17**: the new straight-ray test passes both stages, and the
+  3 failures are the same pre-existing 2D checksums (`oblique`, `gaussian`, `focus`)
+
+**In CI**: `test_2d_laser_deposition_straight` is the existing oblique deck plus the one
+flag, checked by `analysis_oblique.py` **unchanged** — because both modes must satisfy the one
+closed form, which is the property worth pinning. No checksum; the physics assertion is the
+test.
+
+**Still open, and pre-existing**: the refracting mode's near-critical layer at *normal*
+incidence is now the weakest number in the operator — −1.2 % to +1.8 % across `ray_cfl`,
+non-monotonic. That is the singular layer itself, where the ray genuinely reaches `n_cr`, and
+it is separate from the double count fixed above.
+
+Study: `warpx-cda/laser_deposition/run_refraction/` + `scripts/compare_refraction.py`
+(figure: `media/refraction/refraction_modes.png`, gitignored/regenerable). Docs:
+`laser_deposition.refraction` in `Docs/source/usage/parameters.rst`.
