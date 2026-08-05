@@ -72,6 +72,8 @@ warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 # --- grid (dz = 0.5 d_e, dx = 1.0 dz; z = propagation axis) ---
 amr.n_cell        = 640 2600
 amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)
+amr.max_grid_size_x = 320  # transverse: split here to balance particles
+amr.max_grid_size_y = 2600  # this is the PROPAGATION axis
 geometry.dims     = 2
 geometry.prob_lo  = xlo zlo
 geometry.prob_hi  = xhi zhi

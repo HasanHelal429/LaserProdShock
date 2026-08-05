@@ -20,7 +20,8 @@
 #
 #   -j, --threads N    OMP_NUM_THREADS (default 8; forced to 1 with --gpu)
 #   -w, --warpx PATH   WarpX binary (default: $LPS_WARPX, else picked from geometry.dims)
-#   -g, --gpu [N]      run the CUDA build on GPU N (default 0) -- see below
+#   -g, --gpu [N|L]    run the CUDA build on GPU N (default 0), or on a comma list
+#                      such as `-g 0,1` for ONE run spread over both cards via MPI
 #   -b, --background   detach and return immediately (prints the PID)
 #   -L, --logger       also start scripts/run_progress_logger.py in the background
 #   -f, --force        launch even though diags/ already holds output (see below)
@@ -30,6 +31,19 @@
 # to a single device with CUDA_VISIBLE_DEVICES, and sets OMP_NUM_THREADS=1 (with the CUDA
 # backend the particle push is on the device; host threads only add contention). There
 # are two RTX 4070s on this machine, so `-g 0` and `-g 1` can carry two runs at once.
+#
+# `-g 0,1` instead puts ONE run across both, as one MPI rank per device. Two things to
+# know before using it. (1) The laser operator gathers the whole density onto a single
+# box and ray-traces on the rank that owns it (others get an empty MFIter), then scatters
+# the heating rate back -- so it is CORRECT under MPI, but the ray march does not
+# parallelise and stays on one rank. Since Phase 1.5 that is only ~6 % of a step, so
+# little is lost. (2) AMReX balances CELLS, not particles. In an ablation deck the plasma
+# is a slab at one end of a long vacuum domain, so a decomposition that cuts the
+# propagation axis gives one rank nearly every macroparticle. Set
+# `numerics.max_grid_size` to cut the TRANSVERSE axis only (a planar target is uniform
+# in x, so that split is exactly balanced) -- and this script refuses to spread a run
+# over several devices unless the deck pins the decomposition, because the default one
+# silently wastes a card.
 #
 # WarpX_DIMS is a COMPILE-time setting, so the CUDA build is one tree PER DIMENSIONALITY:
 #   build_cuda1d/bin/warpx.1d      build_cuda/bin/warpx.2d
@@ -72,8 +86,8 @@ while [[ $# -gt 0 ]]; do
         --)              shift; EXTRA=("$@"); break ;;
         -j|--threads)    THREADS="${2:-}"; shift 2 ;;
         -w|--warpx)      WARPX="${2:-}";   shift 2 ;;
-        -g|--gpu)        # optional argument: only consume $2 when it is a bare number
-                         if [[ "${2:-}" =~ ^[0-9]+$ ]]; then GPU="$2"; shift 2
+        -g|--gpu)        # optional argument: a device index, or a comma list of them
+                         if [[ "${2:-}" =~ ^[0-9]+(,[0-9]+)*$ ]]; then GPU="$2"; shift 2
                          else GPU=0; shift; fi ;;
         -b|--background) BACKGROUND=1; shift ;;
         -L|--logger)     LOGGER=1;     shift ;;
@@ -128,11 +142,21 @@ fi
 
 # A CUDA binary on a machine with no visible device fails deep inside AMReX init; catch it
 # here where the message can say what to do.
+NRANKS=1
 if [[ -n "$GPU" ]]; then
     command -v nvidia-smi >/dev/null || die "--gpu but no nvidia-smi on PATH"
     NGPU="$(nvidia-smi --list-gpus 2>/dev/null | wc -l)"
     [[ "$NGPU" -gt 0 ]] || die "--gpu but nvidia-smi lists no devices"
-    [[ "$GPU" -lt "$NGPU" ]] || die "--gpu $GPU but only $NGPU device(s) present (0..$((NGPU-1)))"
+    IFS=',' read -r -a GPULIST <<< "$GPU"
+    NRANKS=${#GPULIST[@]}
+    for g in "${GPULIST[@]}"; do
+        [[ "$g" -lt "$NGPU" ]] || die "--gpu $GPU names device $g but only $NGPU \
+device(s) present (0..$((NGPU-1)))"
+    done
+    # A repeated index would put two ranks on one card, which is a mistake every time.
+    if [[ "$(printf '%s\n' "${GPULIST[@]}" | sort -u | wc -l)" -ne "$NRANKS" ]]; then
+        die "--gpu $GPU repeats a device index"
+    fi
 fi
 
 # Exactly one deck, so we never guess which input file was meant.
@@ -157,10 +181,34 @@ if [[ -d "$RUN_DIR/diags" ]] && compgen -G "$RUN_DIR/diags/*" >/dev/null; then
     fi
 fi
 
+MPIRUN=()
 if [[ -n "$GPU" ]]; then
     THREADS=1                   # the push is on the device; host threads only contend
+    if [[ $NRANKS -gt 1 ]]; then
+        command -v mpirun >/dev/null || die "--gpu $GPU needs $NRANKS ranks but there is \
+no mpirun on PATH"
+        # Refuse the default decomposition on several devices: AMReX balances cells, and
+        # an ablation deck's particles all sit in one end of the domain, so without a
+        # pinned decomposition one card would idle. Better to stop than to waste it.
+        if ! grep -qE "^amr\.max_grid_size(_[xyz])? *=" "${DECKS[0]}" 2>/dev/null; then
+            die "--gpu $GPU spreads this run over $NRANKS devices, but the deck pins no
+     decomposition (no amr.max_grid_size*). AMReX balances CELLS, not particles, so the
+     default split would hand one rank nearly every macroparticle and leave a card idle.
+     Set numerics.max_grid_size in config.yaml to cut the TRANSVERSE axis only, e.g.
+       max_grid_size: [<half the transverse cells>, <all the axial cells>]
+     then regenerate the deck. Or run on one device with -g <N>."
+        fi
+        MPIRUN=(mpirun -np "$NRANKS")
+        echo "launch: GPU mode -- $NRANKS MPI ranks, one per device ($GPU), \
+OMP_NUM_THREADS forced to 1"
+        echo "launch:      decomposition: $(grep -hE '^amr\.max_grid_size' \
+"${DECKS[0]}" | tr '\n' ' ')"
+        echo "launch:      NOTE the ray march runs on ONE rank (it owns the gathered
+launch:      full-domain box); only the push, deposit and field solve decompose."
+    else
     echo "launch: GPU mode -- device $GPU ($(nvidia-smi --query-gpu=name \
         --format=csv,noheader -i "$GPU" 2>/dev/null)), OMP_NUM_THREADS forced to 1"
+    fi
     # The push belongs on the device, but since Phase 1.5 the ray march is threaded HOST
     # code, and it is ~65 % of a driven 2D step. OMP_NUM_THREADS=1 leaves it serial unless
     # the deck asks for threads by itself, which is what laser_deposition.ray_threads is
@@ -185,7 +233,7 @@ fi
 echo "launch: $(basename "$RUN_DIR")  deck=$DECK  threads=$THREADS"
 echo "launch: warpx=$WARPX"
 echo "launch: cwd=$RUN_DIR  (so diags/ lands here, not in the repo root)"
-echo "launch: $WARPX $DECK ${EXTRA[*]:-} > run.log 2>&1"
+echo "launch: ${MPIRUN[*]:-}${MPIRUN:+ }$WARPX $DECK ${EXTRA[*]:-} > run.log 2>&1"
 if [[ $DRYRUN -eq 1 ]]; then
     echo "launch: --dry-run, nothing started."
     exit 0
@@ -218,12 +266,19 @@ start_logger() {   # after WarpX, so run.log exists (the logger waits for it any
 }
 
 if [[ $BACKGROUND -eq 1 ]]; then
-    nohup "$WARPX" "$DECK" ${EXTRA[@]+"${EXTRA[@]}"} > run.log 2>&1 &
-    echo "launch: warpx pid $! -> $(basename "$RUN_DIR")/run.log"
+    nohup ${MPIRUN[@]+"${MPIRUN[@]}"} "$WARPX" "$DECK" \
+         ${EXTRA[@]+"${EXTRA[@]}"} > run.log 2>&1 &
+    if [[ ${#MPIRUN[@]} -gt 0 ]]; then
+        echo "launch: mpirun pid $! -> $(basename "$RUN_DIR")/run.log"
+        echo "launch:      (kill THAT pid, not the warpx children -- and kill BY PID)"
+    else
+        echo "launch: warpx pid $! -> $(basename "$RUN_DIR")/run.log"
+    fi
     start_logger
     echo "launch: tail -f $RUN_DIR/run.log"
 else
     start_logger
     echo "launch: running in the foreground; tail -f $RUN_DIR/run.log"
-    exec "$WARPX" "$DECK" ${EXTRA[@]+"${EXTRA[@]}"} > run.log 2>&1
+    exec ${MPIRUN[@]+"${MPIRUN[@]}"} "$WARPX" "$DECK" \
+         ${EXTRA[@]+"${EXTRA[@]}"} > run.log 2>&1
 fi

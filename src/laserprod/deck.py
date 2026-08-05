@@ -322,6 +322,39 @@ def render(cfg: dict) -> str:
       + "; z = propagation axis) ---")
     a(f"amr.n_cell        = {' '.join(str(c) for c in n_cell)}")
     a("amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)")
+    # Grid decomposition. Only emitted when the config asks, because AMReX's default
+    # is what every single-rank run here used and writing a line unconditionally would
+    # rewrite completed decks for a no-op.
+    #
+    # This exists for MULTI-RANK runs. AMReX's DistributionMapping balances CELLS, and
+    # in an ablation deck the plasma occupies a small slab at one end of a long vacuum
+    # domain -- so a decomposition that splits the PROPAGATION axis hands one rank
+    # nearly all the macroparticles and the other rank vacuum. Splitting the TRANSVERSE
+    # axis instead is exactly balanced whenever the target is uniform in x, which a
+    # planar slab is, and needs no load-balancing machinery to stay that way.
+    #
+    # NAMING TRAP: `amr.max_grid_size` is per-LEVEL (one scalar applied to every
+    # dimension), NOT per-dimension. Per-dimension needs the suffixed names, and those
+    # are AMReX's dimension indices, not WarpX's axis letters -- in 2D XZ,
+    # `max_grid_size_y` is dimension 1, which is **z**. Verified in
+    # AMReX_AmrMesh.cpp (max_grid_size_z is compiled out below 3D).
+    mgs = num.get("max_grid_size")
+    if mgs is not None:
+        if isinstance(mgs, (list, tuple)):
+            if len(mgs) != dims:
+                raise ValueError(
+                    f"numerics.max_grid_size has {len(mgs)} entries for a {dims}D run; "
+                    f"give one per axis in mesh order {units.axis_names(dims)}, or a "
+                    f"single number to apply to every axis")
+            suffix = ("x", "y", "z")
+            for i, v in enumerate(mgs):
+                ax = units.axis_names(dims)[i]
+                note = ("  # this is the PROPAGATION axis"
+                        if ax == str(geo.get("normal_axis", "z")) else
+                        "  # transverse: split here to balance particles")
+                a(f"amr.max_grid_size_{suffix[i]} = {int(v)}{note}")
+        else:
+            a(f"amr.max_grid_size = {int(mgs)}")
     a(f"geometry.dims     = {dims}")
     a(f"geometry.prob_lo  = {' '.join(f'{n}lo' for n in ax_names)}")
     a(f"geometry.prob_hi  = {' '.join(f'{n}hi' for n in ax_names)}")
@@ -667,6 +700,12 @@ def key_params(path: str) -> dict:
     if "warpx.random_seed" in d:
         out["warpx.random_seed"] = int(float(d["warpx.random_seed"]))
     out["n_cell"] = " ".join(str(int(float(v))) for v in d["amr.n_cell"].split())
+    # Decomposition: changes which rank owns which particles, so a multi-rank run is
+    # only reproducible at the same value -- same argument as n_accumulators.
+    for k in ("amr.max_grid_size", "amr.max_grid_size_x", "amr.max_grid_size_y",
+              "amr.max_grid_size_z", "amr.blocking_factor"):
+        if k in d:
+            out[k] = int(float(d[k]))
     for key in ("geometry.prob_lo", "geometry.prob_hi"):
         out[key] = " ".join(f"{_eval(v, ns):.10g}" for v in d[key].split())
     for bkey in ("boundary.field_lo", "boundary.field_hi",

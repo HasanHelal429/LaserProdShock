@@ -82,6 +82,16 @@ numerics:
   cfl: 0.35
   particle_shape: 2
   max_step: 216000
+  # [x, z] in mesh order. Two boxes of 320 x 2600 -- split on the TRANSVERSE axis
+  # only, never on z. This run is launched on two GPUs as two MPI ranks, and AMReX's
+  # DistributionMapping balances CELLS: the plasma occupies z in [-200, +182] of a
+  # [-200, +1100] domain, i.e. under a third of it, so any decomposition that cuts z
+  # would give one rank nearly all 35.2e6 macroparticles and the other rank vacuum.
+  # Cutting x is exactly balanced instead, because a planar target is uniform in x,
+  # and it stays balanced without load-balancing machinery. It also gives each rank
+  # ONE maximal box, which is the arrangement a GPU wants (a 1D run measured 7.9x
+  # between one box and the default decomposition).
+  max_grid_size: [320, 2600]
   ppc:
     target: 36
     ambient: 36
