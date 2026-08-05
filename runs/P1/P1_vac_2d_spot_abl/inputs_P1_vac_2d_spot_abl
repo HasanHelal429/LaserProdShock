@@ -20,7 +20,7 @@
 # Derived scales (2D, lengths in d_e,critical = 0.1676 um):
 #   n_cr = 1.005e+27 m^-3   d_e,cr = lam0/2pi = 0.1676 um
 #   target 1.5 n_cr (d_e = 0.1368 um)   ambient: VACUUM
-#   dt = 0.0692 fs   t_end = 14.9419 ps   n_cell = 640 x 3200
+#   dt = 0.0692 fs   t_end = 14.9419 ps   n_cell = 640 x 2600
 #   GATE G1 omega_pe*dt: 0.152 initial, 0.214 at compression; hits 2 at 261.22 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 61
 #   predicted absorption: tau(flat top) = 706, f_abs ~ 1.000
@@ -52,7 +52,7 @@ my_constants.th_ti  = 1e-06
 # --- domain ---
 my_constants.xlo = -160.*de
 my_constants.xhi = 160.*de
-my_constants.zlo = -500.*de
+my_constants.zlo = -200.*de
 my_constants.zhi = 1100.*de
 
 # --- time / solver ---
@@ -70,7 +70,7 @@ warpx.cfl     = 0.35
 warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 
 # --- grid (dz = 0.5 d_e, dx = 1.0 dz; z = propagation axis) ---
-amr.n_cell        = 640 3200
+amr.n_cell        = 640 2600
 amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)
 geometry.dims     = 2
 geometry.prob_lo  = xlo zlo
@@ -141,6 +141,7 @@ laser_deposition.Z_eff                = 5.
 laser_deposition.coulomb_log          = 5.
 laser_deposition.electron_temperature = th_t
 laser_deposition.temperature_mode     = local
+laser_deposition.refraction           = 0
 laser_deposition.ray_cfl              = 0.25
 laser_deposition.intervals            = 10
 laser_deposition.ray_threads          = 8

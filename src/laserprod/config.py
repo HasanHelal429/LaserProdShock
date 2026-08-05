@@ -409,6 +409,181 @@ def gate_summary(gs: list[Gate]) -> str:
 # --------------------------------------------------------------------------- #
 # ASCII geometry diagram (for run READMEs)
 # --------------------------------------------------------------------------- #
+def _beam_intensity_frac(cfg: dict, x_de: float) -> float:
+    """Local intensity / peak intensity at transverse offset ``x_de``, for the diagram.
+
+    Mirrors what ``LaserDeposition`` applies: ``I = I0 exp(-((r/w)^2)^order)``, with
+    ``order = 1`` for ``profile = gaussian`` -- so the waist is the 1/e radius of the
+    INTENSITY, not of the field. A uniform beam is flat across the box.
+    """
+    beam = (cfg["laser"].get("beam") or {})
+    prof = str(beam.get("profile", "uniform"))
+    if prof == "uniform":
+        return 1.0
+    w = float(beam.get("waist_de", 0.0))
+    if w <= 0:
+        return 1.0
+    ctr = beam.get("center_de", 0.0)
+    if isinstance(ctr, (list, tuple)):
+        ctr = float(ctr[0]) if ctr else 0.0
+    r = abs(x_de - float(ctr))
+    order = float(beam.get("order", 1.0) or 1.0)
+    return math.exp(-((r / w) ** 2) ** order)
+
+
+def _target_face_de(cfg: dict, x_de: float, face_planar: float,
+                    inject_hi: bool) -> float | None:
+    """The target's laser-facing face at transverse offset ``x_de``, or None if the
+    target does not exist there.
+
+    Kept in step with ``deck._face_expr`` / ``deck._density_exprs``: ``curved`` displaces
+    the face by ``x^2/(2 Rc)`` (towards the laser for ``inject_hi``), and
+    ``finite_width`` simply has no target beyond ``+-w/2``.
+    """
+    tgt = cfg["plasma"]["target"]
+    shape = str(tgt.get("shape", "planar"))
+    if shape == "finite_width":
+        if abs(x_de) > 0.5 * float(tgt["width_de"]):
+            return None
+        return face_planar
+    if shape == "curved":
+        Rc = float(tgt["curvature_radius_de"])
+        return face_planar - x_de**2 / (2.0 * Rc) if inject_hi \
+            else face_planar + x_de**2 / (2.0 * Rc)
+    return face_planar
+
+
+def _geometry_diagram_2d(cfg: dict, width: int = 58, height: int = 17) -> str:
+    """The x-z plane of a 2D/3D run: target, corona, all four boundaries, and the beam.
+
+    ``height`` is odd so that one row lands exactly on x = 0, which is where a centred
+    beam peaks and where every on-axis quantity is measured.
+    """
+    sc = units.derive(cfg)
+    geo, las = cfg["geometry"], cfg["laser"]
+    tgt = cfg["plasma"]["target"]
+    de = sc.de_ref
+    z_lo, z_hi = sc.domain_lo / de, sc.domain_hi / de
+    zspan = z_hi - z_lo
+    tr = geo["transverse"]
+    x_lo, x_hi = float(tr["lo_de"]), float(tr["hi_de"])
+    inject_hi = str(las.get("inject_side", "lo")) == "hi"
+    faces = boundary_faces(cfg)
+    ax_lo, ax_hi = faces[str(geo.get("normal_axis", "z"))]
+    t_lo, t_hi = faces["x"]
+
+    centre = float(tgt.get("center_de", 0.0))
+    half = 0.5 * float(tgt["thickness_de"])
+    Ln = float(tgt.get("scale_length_de", 0.0))
+    face0 = centre + half if inject_hi else centre - half
+    reach = 0.0
+    if Ln > 0 and sc.n_targ > 1e-3 * sc.n_cr:
+        reach = Ln * math.sqrt(math.log(sc.n_targ / (1e-3 * sc.n_cr)))
+
+    vac = is_vacuum(cfg)
+    fill = " " if vac else "."
+    laser_off = float(las.get("intensity", 0.0) or 0.0) == 0.0
+    BARMAX = 9
+    LBL = 7                                    # width of the "  +160 " x-label column
+    gutter = 0 if inject_hi else BARMAX + 2    # beam is drawn on the injection side
+
+    def col(z_de):
+        return max(0, min(width - 1, int(round((z_de - z_lo) / zspan * (width - 1)))))
+
+    def beam_bar(x_de):
+        if laser_off:
+            return ""
+        frac = _beam_intensity_frac(cfg, x_de)
+        n = int(round(BARMAX * frac))
+        if frac <= 5e-3 and n <= 0:
+            return ""
+        return ("<" + "=" * n) if inject_hi else ("=" * n + ">")
+
+    body = []
+    for i in range(height):
+        x = x_hi - (x_hi - x_lo) * i / (height - 1)
+        line = [fill] * width
+        f = _target_face_de(cfg, x, face0, inject_hi)
+        if f is not None:
+            if inject_hi:
+                for c in range(col(f), col(f + reach) + 1):
+                    line[c] = "~"
+                for c in range(col(f - 2 * half), col(f) + 1):
+                    line[c] = "#"
+            else:
+                for c in range(col(f - reach), col(f) + 1):
+                    line[c] = "~"
+                for c in range(col(f), col(f + 2 * half) + 1):
+                    line[c] = "#"
+        bar = beam_bar(x)
+        lbl = f"{x:+6.0f} "
+        if inject_hi:
+            body.append(" " * gutter + lbl + "|" + "".join(line) + "|" + bar)
+        else:
+            body.append(bar.rjust(gutter - 1) + " " + lbl + "|" + "".join(line) + "|")
+
+    pad = " " * (gutter + LBL)
+    border = pad + "+" + "-" * width + "+"
+    L = ["```"]
+    a = L.append
+    a(f"{int(geo['dims'])}D  |  z = propagation axis (across), x = transverse (down)"
+      f"  |  lengths in d_e at {sc.length_scale} density = {de*1e6:.4f} um")
+    a("")
+    a(pad + f" x = {x_hi:+.0f}   ({t_hi})")
+    a(border)
+    L += body
+    a(border)
+    a(pad + f" x = {x_lo:+.0f}   ({t_lo})")
+    a(pad + " " + "^" + " " * (width - 2) + "^")
+    a(pad + " " + ax_lo + " " * max(1, width - len(ax_lo) - len(ax_hi)) + ax_hi)
+    zl, zr = f"z = {z_lo:+.0f}", f"z = {z_hi:+.0f}"
+    a(pad + " " + zl + " " * max(1, width - len(zl) - len(zr)) + zr)
+    a("")
+    shape = str(tgt.get("shape", "planar"))
+    extra = ""
+    if shape == "curved":
+        extra = (f", CURVED face (R_c = {tgt['curvature_radius_de']:g} d_e, so the face "
+                 f"is displaced by x^2/(2 R_c))")
+    elif shape == "finite_width":
+        extra = f", FINITE WIDTH {tgt['width_de']:g} d_e in x"
+    a(f"  #  target flat top : {tgt['density_over_ncr']:g} n_cr, "
+      f"{tgt['thickness_de']:g} d_e thick, centred at {centre:+g} d_e{extra}")
+    if Ln > 0:
+        a(f"  ~  coronal ramp   : Gaussian, L_n = {Ln:g} d_e on the LASER-FACING side "
+          f"(face at z = {face0:+g}), drawn out to 1e-3 n_cr")
+    if vac:
+        a("  ' ' vacuum        : no ambient plasma")
+    else:
+        amb = cfg["plasma"]["ambient"]
+        a(f"  .  ambient        : {amb['density_over_ncr']:g} n_cr, theta_e = "
+          f"{amb['theta_e']:g}  (fills BOTH sides -- no vacuum gap)")
+    beam = (las.get("beam") or {})
+    if laser_off:
+        a("  x  LASER OFF      : intensity = 0 (gate-G3 control; geometrically identical "
+          "to its physics run)")
+    else:
+        prof = str(beam.get("profile", "uniform"))
+        if prof == "uniform":
+            a(f"  <  laser          : uniform (plane wave), I0 = {float(las['intensity']):g} W/m^2, "
+              f"enters the {'hi' if inject_hi else 'lo'} z face")
+        else:
+            a(f"  <  laser          : {prof}, w0 = {float(beam['waist_de']):g} d_e "
+              f"(1/e radius of INTENSITY), I0 = {float(las['intensity']):g} W/m^2 peak, "
+              f"enters the {'hi' if inject_hi else 'lo'} z face")
+            a("                      bar length is proportional to the LOCAL intensity, so "
+              "the beam is drawn to scale against x")
+    if sc.B0 is not None:
+        axis = {"perpendicular": "y", "perpendicular_y": "y",
+                "perpendicular_x": "x"}[str(cfg["field"]["orientation"])]
+        a(f"  B  field          : B0 = {sc.B0:.3g} T along {axis} "
+          f"(perpendicular to z), 1/w_ci0 = {sc.wci0_inv*1e12:.3g} ps")
+    a(f"  grid              : {' x '.join(str(c) for c in sc.n_cell)} cells "
+      f"(x by z), dz = dx = {geo['dz_over_de']:g} d_e, dt = {sc.dt*1e15:.4g} fs, "
+      f"{sc.max_step} steps = {sc.t_end*1e12:.4g} ps")
+    a("```")
+    return "\n".join(L)
+
+
 def geometry_diagram(cfg: dict, width: int = 66) -> str:
     """An ASCII sketch of the run's geometry, GENERATED FROM THE CONFIG.
 
@@ -416,8 +591,17 @@ def geometry_diagram(cfg: dict, width: int = 66) -> str:
     builds -- the same reason the density panel in ``run_checks`` is sampled from the
     deck's own ``density_function``. Shows the propagation axis with the target slab, its
     coronal ramp, the ambient fill, the boundary condition on each face, and which face
-    the laser enters through; in 2D it adds the transverse extent and its boundaries.
+    the laser enters through.
+
+    In 2D (and 3D, which is drawn as its x-z plane) this is a genuine TWO-DIMENSIONAL
+    map rather than an axial strip with the transverse extent noted underneath. That
+    matters for a finite-spot run specifically -- the target is uniform in x while the
+    BEAM is not, so a 1D sketch draws the one thing a spot run is not about and omits
+    the one thing it is. The beam bar length is proportional to the local intensity, so
+    the waist is visible against the box rather than only quoted.
     """
+    if int(cfg["geometry"]["dims"]) > 1:
+        return _geometry_diagram_2d(cfg)
     sc = units.derive(cfg)
     geo, las = cfg["geometry"], cfg["laser"]
     tgt = cfg["plasma"]["target"]

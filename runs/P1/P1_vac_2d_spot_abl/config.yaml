@@ -33,6 +33,7 @@ laser:
   temperature_mode: local
   intervals: 10
   ray_threads: 8
+  refraction: 0
   ray_cfl: 0.25
   profile_intervals: 21600
   ray_intervals: 21600
@@ -64,7 +65,7 @@ geometry:
   dz_over_de: 0.5
   dx_over_dz: 1.0
   axis:
-    lo_de: -500
+    lo_de: -200
     hi_de: 1100
   transverse:
     lo_de: -160
@@ -176,14 +177,39 @@ targets:
     drive a shock into; phase_space.py is not the arbiter of anything here and the word "shock"
     must not appear in this run's result. Also NOT a convergence test -- one ppc, one ray_cfl,
     one dz.
-  refraction_note: run with FULL refraction (laser_deposition.refraction defaults to 1). The
-    cheap straight-ray mode added 2026-08-04 is 3.2x faster on the march and EXACT for a
-    plane-stratified target, but a laser-bored crater is precisely the non-stratified structure
-    it cannot see -- on a merely 12.5 % corrugated front it put the total 8.5 % high and
-    collapsed the transverse contrast of absorbed power from 4.086 to 0.089. This run makes a
-    far steeper corrugation on purpose, so it needs the refracting march. A matched
-    refraction = 0 companion would MEASURE that error in a real crater rather than an
-    artificial corrugation -- worth doing, cheap, and deliberately left out of scope here.
+  refraction_note: RUN WITH refraction = 0, the straight-ray mode added 2026-08-04 -- an
+    explicit, accepted accuracy trade taken to see what localized ablation looks like, not an
+    oversight. What the mode is -- every ray marches straight down the axis and carries the
+    refraction analytically through the Snell invariant, which is EXACT for a plane-stratified
+    target at any incidence angle and 3.2x cheaper on the march. What it costs HERE, stated so
+    the figures are read correctly -- it is blind to transverse structure the PLASMA creates,
+    measured on a deliberately corrugated front as the total reading +8.5 % high and the
+    transverse contrast of P_abs collapsing 4.086 -> 0.089. Two things follow, and the
+    distinction matters -- (1) the Gaussian beam's OWN profile is untouched, because each
+    column still receives its own incident intensity, so the spot stays localized and a
+    localized crater still forms; the corrugated-front number above is NOT the error bar on
+    this run's contrast, because there all the transverse structure came from refraction
+    whereas here it comes from the beam. (2) What IS lost is rays bending into or out of the
+    crater once it is deep -- i.e. the self-focusing/defocusing feedback of the crater on its
+    own drive. Expect the crater to come out somewhat NARROWER and DEEPER than a refracting
+    run would give, since straight rays cannot be steered out of a concave surface, and treat
+    the late-time crater PROFILE as indicative rather than quantitative. Also note the
+    ray-path dump is much less interesting in this mode -- a picket fence of straight lines
+    rather than a bending bundle -- so it is retained to document the mode, not to show
+    refraction. A refracting companion on the identical crater is the clean way to bound all
+    of this and remains worth doing.
+  rear_truncation_note: the domain lo face is at -200 d_e, FLUSH with the target's rear face --
+    no vacuum behind the target, which removes 600 of 3200 axial cells (18.8 %). This is the
+    truncation CLAUDE.md validated (front-side ion count within 0.11 %, E_abs within 0.9 %,
+    target p_z within 0.54 %), and it costs no particles at all because that region held none.
+    Two caveats carried deliberately -- (1) truncating COSTS THE ENERGY BUDGET, measured at
+    6.13 % weight loss by 30 ps against 1.14 % untruncated, so G6 cannot be closed tightly on
+    this run and strict closure must come from an untruncated one; (2) the truncation was
+    validated at 20 and 80 d_e thickness and its fidelity IMPROVES with thickness because the
+    rear rarefaction crosses proportionally less of a thicker slab -- at 200 d_e it is sound,
+    but validate it the RIGHT way, by core decoupling (the width of slab still at its initial
+    density between the two disturbance fronts), never by asking the boundary density to stay
+    put. That boundary sits on a free surface and MUST rarefy.
   coulomb_log_note: deliberately left at the constant lnLambda = 5.0 of every other P1 run,
     NOT switched to the physical per-cell coulomb_log_mode = ib added 2026-08-02, which would
     raise lnLambda to ~7.3 in a keV corona and absorption by ~1.45x. Three things already
@@ -202,8 +228,15 @@ targets:
     The n_e-weighted A interpolation (ef450039) removes the EMPTY-cell half of that bug, which
     is why the floor is not being moved here, but Tlocalfrac must be watched -- it was 0.90-0.99
     in the earlier spot runs and anything materially below that makes the floor a live term.
-  cost_note: 640 transverse x 3200 axial cells = 2.05e6 cells; 35.2e6 macroparticles;
+  cost_note: 640 transverse x 2600 axial cells = 1.66e6 cells; 35.2e6 macroparticles;
     216000 steps to 14.94 ps. ESTIMATED BY SCALING from P1_vac_2d_spot_long (0.1033 s/step at
     1.54e6 cells / 26.8e6 particles on one RTX 4070) and therefore NOT TO BE TRUSTED -- CLAUDE.md
     records a 4x error from exactly this kind of scaling because cell count dominates more than
     a particle x step product allows for. Benchmark a 2000-step slice before believing any ETA.
+    Where the time actually goes, and why the two economies here are SMALL -- Phase 1.5 already
+    cut the ray march to ~6 % of a driven 2D step, so refraction = 0 removes at most ~4 % of the
+    wall clock (3.2x off 6 %), and the rear truncation removes 18.8 % of the CELLS but no
+    particles. The dominant cost is the particle push and deposit over 35.2e6 macroparticles,
+    which is 1.31x the parent and which neither change touches. Net estimate ~0.12 s/step,
+    i.e. ~7.3 h, against ~8.2 h for the untruncated refracting version -- so the accuracy trade
+    buys about half an hour, and was taken for the physics question rather than for the clock.

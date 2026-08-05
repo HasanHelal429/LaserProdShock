@@ -428,6 +428,19 @@ def render(cfg: dict) -> str:
     if las.get("min_macroparticles_per_cell") is not None:
         a(f"laser_deposition.min_macroparticles_per_cell = "
           f"{_num(las['min_macroparticles_per_cell'])}")
+    # refraction = 0 marches every ray STRAIGHT down the axis and carries the
+    # refraction analytically through the Snell invariant (n_m = n_cr cos^2 theta0).
+    # It is EXACT for a plane-stratified target at any angle and 3.2x cheaper on the
+    # march -- but it is blind to transverse structure the plasma itself creates: on a
+    # 12.5 % corrugated front it read +8.5 % high and collapsed the transverse contrast
+    # of P_abs from 4.086 to 0.089. A Gaussian beam's own profile survives untouched
+    # (each column still gets its own incident intensity); what is lost is rays bending
+    # INTO or OUT OF a feature such as an ablation crater. Emitted only when the config
+    # asks, because the operator's default is 1 and writing the line unconditionally
+    # would rewrite every completed run's deck for a no-op.
+    if las.get("refraction") is not None:
+        a(f"laser_deposition.refraction           = "
+          f"{1 if las['refraction'] else 0}")
     a(f"laser_deposition.ray_cfl              = {_num(las.get('ray_cfl', 0.25))}")
     # intervals: an IntervalsParser, so 'start:stop:period' expresses a FINITE PULSE
     a(f"laser_deposition.intervals            = {str(las.get('intervals', 1))}")
@@ -681,7 +694,10 @@ def key_params(path: str) -> dict:
               # Phase 1.5. `ray_threads` cannot change the answer, but
               # `n_accumulators` fixes the summation order and `vacuum_skip`
               # gates an exact optimisation -- both belong in --verify.
-              "ray_threads", "n_accumulators", "vacuum_skip"):
+              "ray_threads", "n_accumulators", "vacuum_skip",
+              # `refraction` selects between two different marches, so it is the
+              # least skippable line in the block.
+              "refraction"):
         kk = f"laser_deposition.{k}"
         if kk in d:
             out[kk] = _eval(d[kk], ns)

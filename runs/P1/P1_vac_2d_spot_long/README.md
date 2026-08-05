@@ -14,19 +14,39 @@ measures how much drive is left at the far end.
 ## Geometry
 
 ```
-2D  |  propagation axis z  |  lengths in d_e at critical density = 0.1676 um
+2D  |  z = propagation axis (across), x = transverse (down)  |  lengths in d_e at critical density = 0.1676 um
 
-                                                               <== laser
-      ############~~~~
-      ^                                                                ^
-      open                                                          open
-      z = -400                                                  z = +2000
+        x = +80   (periodic)
+       +----------------------------------------------------------+
+   +80 |###########~~~                                            |
+   +70 |###########~~~                                            |
+   +60 |###########~~~                                            |
+   +50 |###########~~~                                            |
+   +40 |###########~~~                                            |<
+   +30 |###########~~~                                            |<=
+   +20 |###########~~~                                            |<===
+   +10 |###########~~~                                            |<=======
+    +0 |###########~~~                                            |<=========
+   -10 |###########~~~                                            |<=======
+   -20 |###########~~~                                            |<===
+   -30 |###########~~~                                            |<=
+   -40 |###########~~~                                            |<
+   -50 |###########~~~                                            |
+   -60 |###########~~~                                            |
+   -70 |###########~~~                                            |
+   -80 |###########~~~                                            |
+       +----------------------------------------------------------+
+        x = -80   (periodic)
+        ^                                                        ^
+        open                                                  open
+        z = -400                                         z = +2000
 
   #  target flat top : 1.5 n_cr, 400 d_e thick, centred at -200 d_e
-  ~  coronal ramp   : Gaussian, L_n = 60 d_e on the LASER-FACING side (face at z = +0)
+  ~  coronal ramp   : Gaussian, L_n = 60 d_e on the LASER-FACING side (face at z = +0), drawn out to 1e-3 n_cr
   ' ' vacuum        : no ambient plasma
-  x  transverse     : -80 .. 80 d_e, boundaries periodic/periodic
-  grid              : 320 x 4800 cells, dz = 0.5 d_e, dt = 0.06918 fs, 432000 steps = 29.88 ps
+  <  laser          : gaussian, w0 = 20 d_e (1/e radius of INTENSITY), I0 = 1e+18 W/m^2 peak, enters the hi z face
+                      bar length is proportional to the LOCAL intensity, so the beam is drawn to scale against x
+  grid              : 320 x 4800 cells (x by z), dz = dx = 0.5 d_e, dt = 0.06918 fs, 432000 steps = 29.88 ps
 ```
 
 ## Setup

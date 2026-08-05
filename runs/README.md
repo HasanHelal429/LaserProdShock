@@ -49,7 +49,16 @@ Write the top half **before** launching (it is the hypothesis), the bottom half 
 
 It is built from config.yaml (target slab, coronal ramp, ambient fill, boundary condition
 per face, which face the laser enters, transverse extent in 2D, B0 axis, grid and
-duration), so it cannot drift away from what the deck actually builds.>
+duration), so it cannot drift away from what the deck actually builds.
+
+A 1D run renders as an axial strip. A 2D or 3D run renders as a real map of the x-z plane:
+all four boundaries labelled, the target drawn per transverse row (so `shape: curved` shows
+its displaced face and `shape: finite_width` shows its edges), and the beam drawn on the
+injection side with bar length proportional to the LOCAL intensity. That last part is the
+point for a finite-spot run -- the target is uniform in x while the beam is not, so an axial
+strip draws the one thing a spot run is not about and omits the one thing it is. Re-render
+every 2D README after touching the generator; the block under `## Geometry` is the only
+thing that changes.>
 
 ## Setup
 <what differs from its parent run, and why. Link the parent by ID. Densities in n_cr,

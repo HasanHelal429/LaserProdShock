@@ -19,6 +19,41 @@ Identical to `P1_vac_2d_spot` — 320 × 2200 cells, `z` ∈ [−400, +700] `d_e
 `x` ∈ [−80, +80] periodic, 36 ppc, 144 000 steps = 9.961 ps. The only difference in the rendered
 deck is `laser_deposition.intensity = 0`.
 
+```
+2D  |  z = propagation axis (across), x = transverse (down)  |  lengths in d_e at critical density = 0.1676 um
+
+        x = +80   (periodic)
+       +----------------------------------------------------------+
+   +80 |######################~~~~~~~~                            |
+   +70 |######################~~~~~~~~                            |
+   +60 |######################~~~~~~~~                            |
+   +50 |######################~~~~~~~~                            |
+   +40 |######################~~~~~~~~                            |
+   +30 |######################~~~~~~~~                            |
+   +20 |######################~~~~~~~~                            |
+   +10 |######################~~~~~~~~                            |
+    +0 |######################~~~~~~~~                            |
+   -10 |######################~~~~~~~~                            |
+   -20 |######################~~~~~~~~                            |
+   -30 |######################~~~~~~~~                            |
+   -40 |######################~~~~~~~~                            |
+   -50 |######################~~~~~~~~                            |
+   -60 |######################~~~~~~~~                            |
+   -70 |######################~~~~~~~~                            |
+   -80 |######################~~~~~~~~                            |
+       +----------------------------------------------------------+
+        x = -80   (periodic)
+        ^                                                        ^
+        open                                                  open
+        z = -400                                          z = +700
+
+  #  target flat top : 1.5 n_cr, 400 d_e thick, centred at -200 d_e
+  ~  coronal ramp   : Gaussian, L_n = 60 d_e on the LASER-FACING side (face at z = +0), drawn out to 1e-3 n_cr
+  ' ' vacuum        : no ambient plasma
+  x  LASER OFF      : intensity = 0 (gate-G3 control; geometrically identical to its physics run)
+  grid              : 320 x 2200 cells (x by z), dz = dx = 0.5 d_e, dt = 0.06918 fs, 144000 steps = 9.961 ps
+```
+
 ## Setup
 
 **Why it cannot be inherited from `P1_vac_2d_off`.** That control has 64 transverse columns and a

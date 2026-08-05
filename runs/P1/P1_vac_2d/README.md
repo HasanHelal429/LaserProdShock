@@ -29,19 +29,38 @@ the thickness criterion below is wrong.
 ## Geometry
 
 ```
-2D  |  propagation axis z  |  lengths in d_e at critical density = 0.1676 um
+2D  |  z = propagation axis (across), x = transverse (down)  |  lengths in d_e at critical density = 0.1676 um
 
-                                                               <== laser
-      #################~~~~~~~                                          
-      ^                                                                ^
-      open                                                          open
-      z = -400                                                  z = +1200
+        x = +16   (periodic)
+       +----------------------------------------------------------+
+   +16 |###############~~~~~~                                     |<=========
+   +14 |###############~~~~~~                                     |<=========
+   +12 |###############~~~~~~                                     |<=========
+   +10 |###############~~~~~~                                     |<=========
+    +8 |###############~~~~~~                                     |<=========
+    +6 |###############~~~~~~                                     |<=========
+    +4 |###############~~~~~~                                     |<=========
+    +2 |###############~~~~~~                                     |<=========
+    +0 |###############~~~~~~                                     |<=========
+    -2 |###############~~~~~~                                     |<=========
+    -4 |###############~~~~~~                                     |<=========
+    -6 |###############~~~~~~                                     |<=========
+    -8 |###############~~~~~~                                     |<=========
+   -10 |###############~~~~~~                                     |<=========
+   -12 |###############~~~~~~                                     |<=========
+   -14 |###############~~~~~~                                     |<=========
+   -16 |###############~~~~~~                                     |<=========
+       +----------------------------------------------------------+
+        x = -16   (periodic)
+        ^                                                        ^
+        open                                                  open
+        z = -400                                         z = +1200
 
   #  target flat top : 1.5 n_cr, 400 d_e thick, centred at -200 d_e
-  ~  coronal ramp   : Gaussian, L_n = 60 d_e on the LASER-FACING side (face at z = +0)
+  ~  coronal ramp   : Gaussian, L_n = 60 d_e on the LASER-FACING side (face at z = +0), drawn out to 1e-3 n_cr
   ' ' vacuum        : no ambient plasma
-  x  transverse     : -16 .. 16 d_e, boundaries periodic/periodic
-  grid              : 64 x 3200 cells, dz = 0.5 d_e, dt = 0.06918 fs, 432000 steps = 29.88 ps
+  <  laser          : uniform (plane wave), I0 = 1e+18 W/m^2, enters the hi z face
+  grid              : 64 x 3200 cells (x by z), dz = dx = 0.5 d_e, dt = 0.06918 fs, 432000 steps = 29.88 ps
 ```
 
 ## Setup
