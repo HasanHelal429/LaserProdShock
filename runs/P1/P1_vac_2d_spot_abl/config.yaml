@@ -1,0 +1,209 @@
+meta:
+  run_id: P1_vac_2d_spot_abl
+  phase: 1
+  deck: inputs_P1_vac_2d_spot_abl
+  description: Phase-1 finite-spot ABLATION run -- the first spot run built to make the
+    ablation itself visible rather than to test the operator. Three changes from the parent
+    P1_vac_2d_spot_long, each forced by a measurement on that run (see targets.sizing) --
+    (1) the transverse boundaries are OPEN instead of periodic, because a periodic box cannot
+    host a spot that ablates a visible depth at ANY intensity; (2) the peak intensity is 10x
+    higher (1e19 W/m^2), which is what buys ablation depth per unit wall clock; (3) the target
+    is HALF as thick (200 d_e, not 400), because only 37 d_e of the 400 was consumed in 27 ps
+    -- the rest was inert mass being pushed through the particle loop. The question is no
+    longer whether the operator absorbs correctly (Phase 1 and the PSC cross-check settled
+    that) but whether a laser spot in this model bores a crater with a resolvable shape.
+  reference: TEST_PLAN.md 7.2 and H5 (2.3); parent P1_vac_2d_spot_long; ablation-rate,
+    temperature and plume-front measurements taken off that run's laserdep_profile dumps
+    (RESULTS 2026-08-05); operator at warpx-cda feature/laser-deposition 10ad86d9 (transverse
+    clamp fixed c817b63, Phase-1.5 O1-O4, n_e-weighted A interpolation ef450039)
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0
+  charge_state: 1
+
+laser:
+  wavelength_um: 1.053
+  intensity: 1.0e19
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 5.0
+  coulomb_log: 5.0
+  temperature_mode: local
+  intervals: 10
+  ray_threads: 8
+  ray_cfl: 0.25
+  profile_intervals: 21600
+  ray_intervals: 21600
+  ray_stride: 16
+  ray_step_stride: 40
+  beam:
+    profile: gaussian
+    waist_de: 20
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 1.5
+    thickness_de: 200
+    scale_length_de: 60
+    center_de: -100
+    shape: planar
+    theta_e_init: 1.0e-4
+    theta_i_init: 1.0e-6
+  ambient: null
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 2
+  normal_axis: z
+  dz_over_de: 0.5
+  dx_over_dz: 1.0
+  axis:
+    lo_de: -500
+    hi_de: 1100
+  transverse:
+    lo_de: -160
+    hi_de: 160
+  boundary:
+    axis:
+      lo: open
+      hi: open
+    transverse:
+      lo: open
+      hi: open
+
+numerics:
+  cfl: 0.35
+  particle_shape: 2
+  max_step: 216000
+  ppc:
+    target: 36
+    ambient: 36
+
+diagnostics:
+  plotfile_intervals: 108000
+  field_intervals: 5400
+  phase_intervals: 27000
+  reduced_intervals: 540
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 36
+  compression_factor: 2.0
+
+controls:
+  laser_off: null
+  laser_off_deliberately_omitted: DECIDED, not overlooked -- gate G3 is left OPEN for this run.
+    A matched intensity-0 control would double the compute for this geometry, and the primary
+    deliverable here does not need one -- the crater is predicted 96-142 cells deep against an
+    11.8 percent per-cell shot-noise floor, so its SHAPE is not a marginal signal of the kind a
+    control exists to adjudicate (that service was for the planar run's 5 percent ripple). What
+    is genuinely given up, and must therefore not be claimed from this run -- (1) the G3
+    subtraction, so no few-percent energy statement is quotable, in particular not a
+    grid-heating-corrected E_abs; (2) a baseline for weight and energy loss through the OPEN
+    transverse faces, which are new here, so the lateral loss can be quoted as a TOTAL but not
+    decomposed into laser-driven and grid-driven parts; (3) the sign-of-net-KE discriminator.
+    A short (few-thousand-step) intensity-0 run would bound grid heating per step, since it
+    accumulates roughly linearly with step count, but it would differ from this deck in
+    max_step and so would not satisfy the differ-only-in-intensity invariant that
+    tests/test_structures.py enforces -- it would be a separate study, not a control.
+  parent_geometry: P1_vac_2d_spot_long
+  periodic_transverse_predecessor: P1_vac_2d_spot_long (same target material, same waist,
+    1/10 the intensity, PERIODIC transverse faces -- the run whose measured dark/lit rising
+    0.098 -> 0.921 is the thing this geometry is built to avoid)
+  planar_1d_baseline: P1_vac_1d_thick (1e18 only; there is no 1e19 1D baseline yet, so the
+    intensity scaling of f_abs and T_e predicted below is an EXTRAPOLATION, not a comparison)
+  ray_cfl_ladder: studies/exit_overshoot (ray_cfl 0.05-1.0; total absorbed low by
+    0.1-2.0%, no net energy creation; per-cell aliasing rms 0.73% -> 20%)
+
+targets:
+  sizing: EVERY number below is measured off P1_vac_2d_spot_long's laserdep_profile dumps
+    rather than assumed, because two previous spot runs were sized from estimates and both
+    lost their transverse contrast. Measured there -- the on-axis critical surface recedes at
+    v_crit = 1.5 d_e/ps (37.7 -> 0.3 d_e over 26.9 ps, linear); absorption-weighted T_e
+    SATURATES at 236 eV from 3 ps onward (52 eV at t = 0), giving v_th,e = 38 d_e/ps and
+    c_s = 8.6 d_e/ps; the 1e-3 n_cr on-axis front moves 162 -> 663 d_e over 26.9 ps and the
+    1e-4 front 182 -> 1320 d_e.
+  why_periodic_is_impossible: this is the finding that dictates the geometry. A periodic
+    transverse box holds a spot only while the electron thermal excursion has not crossed half
+    the pitch, so contrast survives to t ~ (L_t/2 - 1.5 w0)/v_th,e; the crater meanwhile
+    deepens at v_crit. Requiring both gives L_t/2 >~ (v_th,e/v_crit)*D + 1.5 w0 for a crater of
+    depth D, and the MEASURED ratio is v_th,e/|v_crit| = 23. Both speeds scale as sqrt(T_e), so
+    the ratio -- and hence the required box -- is INDEPENDENT OF INTENSITY -- cranking the laser
+    buys depth and heat in the same proportion. A crater merely one waist deep (20 d_e) already
+    needs +-490 d_e, and the 48-71 d_e predicted here needs +-1130 to +-1660 d_e, i.e. 7-10x
+    this run's transverse cell count. That is why the boundary changes rather than the box.
+  open_transverse_rationale: with OPEN transverse faces (pec fields + absorbing particles, the
+    combination Phase 0 validated axially) the laterally streaming hot electrons LEAVE instead
+    of accumulating, so the box no longer fills in and contrast is preserved by construction.
+    The price is real and must be quoted, not hidden -- lateral hot-electron loss to the wall is
+    an energy sink a wide real target would not have, so this run UNDERSTATES the retained
+    energy where a periodic run OVERSTATES the confinement. The two errors have opposite sign
+    and only one of them is measurable from inside the run -- quote the weight and energy lost
+    through the transverse faces beside every number, as CLAUDE.md requires for boundary loss.
+  expect_crater: v_crit scales as I_abs/(n_i * epsilon) with epsilon ~ kT_e, so v_crit ~
+    I^(1/3) if T_e ~ I^(2/3) and I^(1/2) if T_e ~ I^(1/2). At 10x intensity that is
+    v_crit = 3.2-4.7 d_e/ps and a crater 48-71 d_e deep at t_end = 14.94 ps, i.e. 2.4-3.5 w0 --
+    resolvable as a shape (96-142 cells deep by ~40 cells across the 1/e radius), which is the
+    point of the run. It also stays well inside the 200 d_e slab, which MATTERS -- the operator's
+    known exit-boundary overshoot deposits a full RK4 step past the far face and reads +24.9 %
+    high in the clamped final cell, so a holed target would fire that bug on axis. The 2x
+    margin between predicted crater and thickness is deliberate.
+  expect_temperature: absorption-weighted T_e = 0.75-1.1 keV (236 eV x 10^(1/2..2/3)), so
+    v_th,e = 60-73 d_e/ps and c_s = 14-17 d_e/ps. Report BOTH weightings -- on-axis T_e was
+    243 eV absorption-weighted against 81 eV density-weighted in P1_vac_2d_spot, a factor 3,
+    hence sqrt(3) in every timescale built on c_s.
+  expect_forward_gap: scaling the MEASURED 1e-3 n_cr front displacement by the same
+    sqrt(T) factor of 2.15-3.16 puts it at 500-660 d_e at t_end, and the 1e-4 front at
+    800-1080 d_e, against an injection face at +1100 d_e. So the beam should never launch
+    inside its own plume -- CHECK IT, because rays launch EXACTLY ON the injection face and
+    once the plume reaches that plane the drive becomes a boundary quantity rather than a
+    target quantity. make_inputs.py warns at 1e-3 n_cr on the face; that warning firing
+    mid-run is a validity failure, not a cosmetic one.
+  falsified_by: the run fails to deliver what it is for if scripts/spot_isolation.py reports
+    dark/lit > 0.5 at any time (the definition of "effectively planar" this project already
+    uses) -- that would mean OPEN transverse faces do not preserve contrast either, and that
+    a finite spot in this model is unaffordable rather than merely awkward. It is also
+    falsified as an ABLATION run if the crater at t_end is under ~1 w0 = 20 d_e deep, which
+    would say the I^(1/3..1/2) scaling of v_crit is wrong and the intensity must go up again.
+  what_is_NOT_claimed: no shock, no piston, no Mach number. There is no ambient and nothing to
+    drive a shock into; phase_space.py is not the arbiter of anything here and the word "shock"
+    must not appear in this run's result. Also NOT a convergence test -- one ppc, one ray_cfl,
+    one dz.
+  refraction_note: run with FULL refraction (laser_deposition.refraction defaults to 1). The
+    cheap straight-ray mode added 2026-08-04 is 3.2x faster on the march and EXACT for a
+    plane-stratified target, but a laser-bored crater is precisely the non-stratified structure
+    it cannot see -- on a merely 12.5 % corrugated front it put the total 8.5 % high and
+    collapsed the transverse contrast of absorbed power from 4.086 to 0.089. This run makes a
+    far steeper corrugation on purpose, so it needs the refracting march. A matched
+    refraction = 0 companion would MEASURE that error in a real crater rather than an
+    artificial corrugation -- worth doing, cheap, and deliberately left out of scope here.
+  coulomb_log_note: deliberately left at the constant lnLambda = 5.0 of every other P1 run,
+    NOT switched to the physical per-cell coulomb_log_mode = ib added 2026-08-02, which would
+    raise lnLambda to ~7.3 in a keV corona and absorption by ~1.45x. Three things already
+    change here (intensity, thickness, transverse BC) and CLAUDE.md's standing warning is that
+    Z_eff*lnLambda is a very strong knob to be changed in small steps. Holding it fixed keeps
+    this run commensurable with the 1e18 runs it is scaled against; the per-cell logarithm
+    deserves its own controlled pair.
+  waist_convention: laser_deposition.beam_waist is the 1/e radius of the INTENSITY, not the
+    field -- I = I0*exp(-(r^2/w^2)^order) with order = 1 for profile = gaussian. w0 = 20 d_e =
+    3.35 um, FWHM = 33.3 d_e, and the total power per unit length is I0*w0*sqrt(pi) =
+    5.94e13 W/m. `intensity` is the PEAK, as in every other spot run.
+  temperature_floor_caveat: laser_deposition.electron_temperature is left at th_t = 1e-4
+    (51 eV), the initial target temperature, as in every prior run -- but note the 2026-08-03
+    finding that a LOW floor is a HIGH ceiling on the IB coefficient (A ~ T_e^-3/2), so a
+    thinly-sampled cell falls back to a 51 eV A while its neighbours sit at 1 keV, a factor 62.
+    The n_e-weighted A interpolation (ef450039) removes the EMPTY-cell half of that bug, which
+    is why the floor is not being moved here, but Tlocalfrac must be watched -- it was 0.90-0.99
+    in the earlier spot runs and anything materially below that makes the floor a live term.
+  cost_note: 640 transverse x 3200 axial cells = 2.05e6 cells; 35.2e6 macroparticles;
+    216000 steps to 14.94 ps. ESTIMATED BY SCALING from P1_vac_2d_spot_long (0.1033 s/step at
+    1.54e6 cells / 26.8e6 particles on one RTX 4070) and therefore NOT TO BE TRUSTED -- CLAUDE.md
+    records a 4x error from exactly this kind of scaling because cell count dominates more than
+    a particle x step product allows for. Benchmark a 2000-step slice before believing any ETA.
