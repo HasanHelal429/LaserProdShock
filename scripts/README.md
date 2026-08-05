@@ -18,6 +18,7 @@ python scripts/<script>.py <run_dir> [options]
 | Script | Purpose | Reads | Writes | Status |
 |---|---|---|---|---|
 | `launch.sh` | **The** way to start a run | `config.yaml`, `README.md`, deck | `<run_dir>/{run.log,diags/}` | **built** |
+| `queue_run.sh` | Wait for other work / GPUs to clear, then hand off to `launch.sh` | the `--after` run dirs, `nvidia-smi` | stdout (redirect it) | **built** |
 | `run_progress_logger.py` | Sidecar wall-clock progress/ETA + live absorption-shutoff readout | `run.log`, deck | `<run_dir>/progress.log` | **built** |
 | `make_inputs.py` | `config.yaml` → deck (`--verify`, `--check`) | `config.yaml` | `inputs_<id>` | **built** |
 | `run_checks.py` | Derived scales + numerical gates G1–G7 + a pre-run figure | `config.yaml`, `run.log`, reduced diags | `media/<ID>/checks.png`, `gates.png` | **built** |
@@ -73,6 +74,35 @@ scripts/launch.sh runs/P1/P1_vac_1d -- max_step=20   # ParmParse overrides: smok
 
 Overrides after `--` are not reflected in `config.yaml`, so `make_inputs.py --verify` will
 flag them afterwards. Use them for smoke tests, not physics.
+
+## `queue_run.sh`
+
+A queue of one: wait until named runs are finished and named GPUs are idle, then run
+`launch.sh` with whatever arguments you give it after `--`.
+
+```bash
+scripts/queue_run.sh -a ../KinShock2020/runs/implicit_phase/i0_implicit_cfl075 \
+                     -a ../KinShock2020/runs/implicit_phase/i1_explicit_villasenor \
+                     -G 0,1 runs/P1/P1_vac_2d_spot_abl -- -b -L --gpu 0,1
+```
+
+Three decisions in it are worth knowing, because each replaces something that fails:
+
+- **"Finished" is the absence of a process with that cwd, not `DONE` in `progress.log`.**
+  A run that was killed, or never launched, never writes `DONE`, and a queue waiting for a
+  string that will never appear waits forever. Reading `/proc/<pid>/cwd` also cannot match
+  the queue's own command line, which is the trap `pkill -f` falls into.
+- **The GPU test is separate from the run test.** This is a shared machine: a run
+  directory can be idle while its card is still held by somebody else, and launching into
+  that gets the new run starved or OOM-killed. Idle means under `$GPU_IDLE_MIB` (600) and
+  no compute apps.
+- **`--orphan-timeout` (default 2 h) is the one judgement call.** Queue behind a run that
+  is never launched and strict waiting means yours never starts. So once everything else
+  is clear, a *never-started* `--after` directory is waited on for that long and then
+  given up on, loudly, in the log. A run that has started is never given up on.
+
+Redirect the output and detach it (`nohup ... > queue.out 2>&1 &`); the log is the only
+record of why it did or did not fire. **Kill it by PID**, never `pkill -f queue_run`.
 
 ## `run_progress_logger.py`
 
