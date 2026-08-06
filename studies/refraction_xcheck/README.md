@@ -30,6 +30,7 @@ deleted, along with 2.4 GB of plotfiles from the same invalid binary.
 | `pabs_refr1_step0_transverse.txt` | column-integrated `P_abs` [W/m] vs `x/d_e` — the transverse deposition profile |
 | `pabs_refr1_step0_axial.txt` | on-axis (`abs(x) < 5 d_e`) `P_abs` [W/m^3] and `n_e/n_cr` vs `z/d_e` |
 | `scalars_refr1_step0.txt` | the three numbers below |
+| `zcrit_profile_spot_abl.txt` | **the crater.** `z_crit(x)` at `t` = 0 and at 13.45 ps for the completed `refraction = 0` run — the critical surface goes from a flat 37.7 d_e to 4.2 d_e on axis against 50.3 d_e at \|x\| ~ 90, i.e. 46.1 d_e = 2.30 `w0` deep. Kept here rather than under the run because its natural companion is the refracting reference above. |
 
 ## The numbers
 
