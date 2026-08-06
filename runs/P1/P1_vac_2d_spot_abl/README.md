@@ -163,7 +163,7 @@ Disk ≈ **13 GB** (diag1 3 × 2.0 GB, diag_fields 41 × 100 MB, diag_phase 9 ×
 | G2 `dz/λ_D` (target / ambient) | 61.2 target(cold) / no ambient | INFO — under-resolved by construction |
 | G3 laser-off control | **none** | **WARN — deliberately open, see below** |
 | G4 `ray_cfl` check | 0.25; interior critical surface exists but carries 0.000 % of `P_abs` at `L_n` = 60 | PASS |
-| G5 ppc / `Tlocalfrac` | 36 ppc, `local`; bias ≲ 3.5 % | PASS — watch `Tlocalfrac` |
+| G5 ppc / `Tlocalfrac` | 36 ppc, `local`; bias ≲ 3.5 %; `Tlocalfrac` 0.431 at step 0 | PASS — watch the **trend**, see below |
 | G6 energy closure | post-run; quote transverse+axial loss beside it | POST |
 
 **G3 is left open as a decision, not an oversight.** A matched intensity-0 control would double
@@ -175,9 +175,48 @@ in particular a grid-heating-corrected `E_abs`; (2) a *decomposition* of loss th
 open transverse faces into laser-driven and grid-driven parts — the total is measurable, the
 split is not; (3) the sign-of-net-KE discriminator.
 
+### `Tlocalfrac`: watch the trend, not the value
+
+Corrected after launch, because the threshold first written into this README would have
+condemned a healthy run. `Tlocalfrac` is the **n_e²-weighted** fraction of plasma whose `T_e`
+was measured rather than floored (`w_local/w_total`, weight `n_e²`, `LaserDeposition.cpp` ~890),
+so empty cells carry zero weight and vacuum *cannot* dilute it — which is exactly why a low
+value looks alarming. But it is low at `t` = 0 in **every** run on disk, because the target
+starts at 51 eV, i.e. at the floor, and it climbs as the target heats:
+
+| run | first | max | ppc |
+|---|---|---|---|
+| `P1_vac_2d_spot_omp` | 0.432 | 0.860 | 36 |
+| `P1_vac_2d_spot_long` | 0.432 | 0.954 | 36 |
+| `P1_vac_2d_omp` (planar) | 0.432 | 0.998 | 36 |
+| `P1_vac_1d_long` | 0.430 | 1.000 | 400 |
+| `P1_vac_1d_thick` | 0.409 | 0.999 | 36 |
+
+Note the **spot** runs plateau lower than the planar ones (0.86–0.95 vs 0.998), which is
+expected rather than a defect: a spot heats only part of the target, so part of the `n_e²`
+weight stays cold and floored for the whole run. The failure signature is therefore
+`Tlocalfrac` **failing to rise, or falling back** — not its starting value. This run read
+0.431 at step 0 and 0.423 at step 1860, on the family curve.
+
 ## Result
 
-*Not yet run.*
+*Running.* Launched 2026-08-05 20:26 on two GPUs (2 MPI ranks, `-g 0,1`), queued behind the
+KinShock `i0`/`i1` implicit runs by `scripts/queue_run.sh` (waited 3 h 34 m).
+
+Measured at launch, to be replaced by the full result:
+
+- **Decomposition worked.** `2 grids, smallest 320 x 2600, biggest 320 x 2600` — one maximal
+  box per rank, split on x only. Both cards carry **9114 MiB** and, sampled over 15 s, **49 %**
+  and **53 %** mean utilisation at 71–105 W. A single instantaneous sample read 0 % on device 1
+  and looked like an idle card; it is a bursty workload, and only the average is meaningful.
+- **0.0771 s/step** measured over a 60 s window (778 steps) ⇒ **~4.6 h**, against a ~7.2 h
+  single-GPU estimate. Expect the true figure to be *longer*: cost grows during a vacuum run as
+  the plume spreads over more cells (a 1D run went 526 → 10 800 occupied cells at flat particle
+  count), and this window was taken at 0.13 ps.
+- Neither card is saturated (~50 %, ~90 W of 200 W), consistent with the two ranks partly
+  serialising on MPI synchronisation rather than overlapping — so the realised speedup is well
+  under the 1.96× Amdahl ceiling, as expected.
+- `f_abs` ≈ **0.42** at 0.13 ps (`Pabs` 2.5e13 W/m against 5.94e13 W/m incident).
 
 ## Retracted
 

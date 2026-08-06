@@ -236,8 +236,20 @@ targets:
     finding that a LOW floor is a HIGH ceiling on the IB coefficient (A ~ T_e^-3/2), so a
     thinly-sampled cell falls back to a 51 eV A while its neighbours sit at 1 keV, a factor 62.
     The n_e-weighted A interpolation (ef450039) removes the EMPTY-cell half of that bug, which
-    is why the floor is not being moved here, but Tlocalfrac must be watched -- it was 0.90-0.99
-    in the earlier spot runs and anything materially below that makes the floor a live term.
+    is why the floor is not being moved here, but Tlocalfrac must be watched.
+  tlocalfrac_baseline: WATCH THE TREND, NOT THE VALUE -- corrected 2026-08-05 after this run
+    started, because the threshold first written here would have condemned a healthy run.
+    Tlocalfrac is the n_e^2-WEIGHTED fraction of plasma whose T_e was measured rather than
+    floored (w_local/w_total with weight n_e^2, LaserDeposition.cpp ~line 890), so empty cells
+    carry zero weight and vacuum cannot dilute it -- which is why a low value looks alarming.
+    But it is low at t = 0 in EVERY run on disk, because the target starts at 51 eV, i.e. at
+    the floor, and it climbs as the target heats -- measured first/max: P1_vac_2d_spot_omp
+    0.432/0.860, P1_vac_2d_spot_long 0.432/0.954, P1_vac_2d_omp 0.432/0.998, P1_vac_1d_long
+    0.430/1.000, P1_vac_1d_thick 0.409/0.999. Note the SPOT runs plateau lower than the planar
+    ones (0.86-0.95 against 0.998), which is expected -- a spot heats only part of the target,
+    so part of the n_e^2 weight stays cold and floored for the whole run. The failure signature
+    is therefore Tlocalfrac FAILING TO RISE, or falling back, not its starting value. This run
+    read 0.431 at step 0 and 0.423 at step 1860, on the family curve.
   cost_note: 640 transverse x 2600 axial cells = 1.66e6 cells; 35.2e6 macroparticles;
     216000 steps to 14.94 ps. ESTIMATED BY SCALING from P1_vac_2d_spot_long (0.1033 s/step at
     1.54e6 cells / 26.8e6 particles on one RTX 4070) and therefore NOT TO BE TRUSTED -- CLAUDE.md
