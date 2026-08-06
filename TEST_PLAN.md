@@ -487,6 +487,76 @@ oblique CI deck, wrong from its first application, was used instead.
 
 ---
 
+### 2.9 STARTED 2026-08-06 — **H1: the mechanism is right, the threshold is wrong by ~an order of magnitude**
+
+H1 is the last of H1–H5 still open. H2 is falsified (§2.4), H3 confirmed (§2.5–2.6), H5 is
+now *testable* thanks to `P1_vac_2d_spot_abl`'s open transverse faces, and H4 waits on Phase 3A.
+
+**H1 as written.** Absorption shuts off when the optical depth through the absorbing layer
+falls to ~1, so `T_e,shutoff ∝ (Z_eff lnΛ n_e² L)^{2/3}`.
+
+**First leg cost nothing.** The per-cell profile dump carries `n_e`, `theta_e` *and the IB
+coefficient `A`*, so τ is integrable directly off runs already on disk — the mechanism can be
+tested before any new run. With `K = (A/n_cr) n_e²/√(1 − n_e/n_m)` integrated from the
+injection face down to the turning point (`$CLAUDE_JOB_DIR/tmp/h1_tau.py`; fold into
+`laserprod.metrics` when that exists):
+
+| run | `I₀` | τ at `t` = 0 | τ later | `1 − e^{−2τ}` | measured `f_abs` |
+|---|---|---|---|---|---|
+| `P1_vac_1d` | 1e18 | 6.69 | 0.198 (5 ps) | 0.327 | ≈ 0.24 plateau |
+| `P1_vac_1d_long` | 1e18 | 6.64 | 0.119 (10 ps) | 0.212 | ≈ 0.24 plateau |
+| `P1_vac_1d_thick` | 1e18 | 4.85 | 0.112 (15 ps) | 0.200 | — |
+| `P1_vac_2d_spot_long` | 1e18 | 6.49 | 0.485 (15 ps) | 0.621 | 0.68 final |
+| `P1_vac_2d_spot_abl` | 1e19 | 6.38 | **0.131** (13.4 ps) | **0.2305** | **0.2264** |
+
+**Three findings, and they split H1 down the middle.**
+
+1. **The optical-depth picture of the plateau is RIGHT.** `1 − e^{−2τ}` — a ray that turns and
+   comes back out — reproduces the measured plateau to **1.8 %** on `P1_vac_2d_spot_abl`
+   (0.2305 vs 0.2264) and to within ±40 % across the 1D corpus. So `f_abs` really is set by the
+   corona's instantaneous optical depth, which is H1's underlying claim.
+2. **The corona DOES thermostat.** τ collapses from ~5–7 at `t` = 0 to ~0.1–0.2 within 1–3 ps
+   and then holds roughly flat for the rest of the run while `T_e` keeps climbing. That
+   self-regulation is exactly the behaviour H1 describes.
+3. **But it thermostats at τ ≈ 0.1–0.2, not τ ~ 1** — an order of magnitude below H1's
+   criterion. At τ = 1 the absorbed fraction would still be `1 − e^{−2}` = **0.86**, i.e. nearly
+   full absorption, nothing like a shutoff. **So H1's numerical threshold is wrong, and the
+   constant in `T_e,shutoff` with it.** The `(Z_eff lnΛ n_e² L)^{2/3}` *form* may still hold —
+   it follows from `τ = const` and `K ∝ Z lnΛ n_e² T_e^{−3/2}` for any constant, not just 1.
+
+   And the thermostat point is **not universal**: τ ranges 0.13 → 0.93 across the corpus, with
+   the 2D spot at 1e18 sitting ~4× above the 1D runs. So "fixed τ" is geometry-dependent, and a
+   single-number `T_e,shutoff` cannot be right across dimensionality.
+
+**Consequence for the wording of H1.** `T_e,shutoff` is not a shutoff temperature — nothing
+shuts off, and §2.5 already retired the half-peak `t_s` for the same reason. The quantity that
+exists is the **plateau coronal temperature** `T_e,plat`, the temperature at which the corona
+holds τ ≈ 0.1–0.2. H1 should be re-read as a prediction about *that*:
+
+    H1' :  T_e,plat  proportional to  (Z_eff lnLambda n_e^2 L)^(2/3)     [exponent UNTESTED]
+
+**What is still needed, and it does need runs.** The exponent. The one knob with a standing
+quantitative tension is `Z_eff·lnΛ`: H1–H2 predict `E_abs ∝ (Z_eff lnΛ)^{2/3}`, a factor 2.4 for
+the upstream 25 → 91 change, where **16×** was measured (§2.3). Nothing in *this* project has
+varied `Z_eff·lnΛ` yet, so that tension is still inherited rather than reproduced. The cheapest
+decisive test is a **1D vacuum ladder** — `P1_vac_1d` runs in ~8 min on one GPU:
+
+- **Leg B (`Z_eff·lnΛ`, 3 new runs)** at `I₀` = 1e18: 5×7 = 35, 13×5 = 65, 13×7 = 91, with
+  `P1_vac_1d` (25) as the anchor. H1' predicts `T_e,plat ∝ (Z lnΛ)^{2/3}`, i.e. ×2.36 over
+  25 → 91. **Change it in small steps** — 25 → 91 coupled 16× more energy upstream and produced
+  a 0.06 c piston, so the ladder is deliberately ordered and each step checked before the next.
+- **Leg A (`I₀`, 2–3 new runs)** at `Z_eff·lnΛ` = 25: 1e17, 1e19, 1e20. H1'/H2 predict
+  `T_e,plat` independent of `I₀`; the only measurement so far is `T_e ∝ I^0.18` between two 2D
+  runs at different times and BCs, which is indicative at best. **This leg is what settles
+  whether "nearly independent" means independent.**
+- Legs C (`n_e`) and D (`L`) afterwards, and note D is confounded: `L_n` moves the absorption
+  *regime* (optically thin ↔ thick, §2.5 and RESULTS 2026-07-30), not just the amount.
+
+Report `T_e,plat` **absorption-weighted, and say so** — it runs 2–3× above the density-weighted
+value, and quoting the wrong one is a factor √3 in every sound speed built on it.
+
+---
+
 ## 3. Architecture and working rules
 
 Identical in spirit to `KinShock2020`; see `CLAUDE.md` for the enforced version.
@@ -1354,18 +1424,52 @@ boundaries, is the project's headline output.
       solvable by enlarging the box.
 
 **Phase 1 — vacuum ablation**
-- [ ] `P1_vac_1d` + `P1_vac_1d_off` (G3) + `ray_cfl` check (G4)
-- [ ] Energy budget closes (G6); deposition profile vs WKB at step 0
-- [ ] `f_abs(t)`, `t_s`, `T_e,shutoff`, `v_p` measured; H1/H3 confirmed or replaced
+- [x] `P1_vac_1d` + `P1_vac_1d_off` (G3) + `ray_cfl` check (G4) — both reached max_step
+      2026-07-28; `ray_cfl` ladder is `studies/exit_overshoot/` (0.05–1.0)
+- [x] Energy budget closes (G6) — **−0.74 %** on `P1_vac_1d` at 0.0104 % WEIGHT loss (0.68 %
+      of macroparticles; the escapers are the tenuous corona tail, which is why quoting weight
+      rather than count is what let G6 close at all). Step-0 deposition profile analysed
+- [~] `f_abs(t)` and `v_p` measured; **`t_s` RETIRED** as a quantity — absorption floors onto a
+      plateau and then decays hydrodynamically when peak `n_e` drops below `n_cr`, so a half-peak
+      shutoff time is meaningless (quote the plateau level, the `n_cr`-crossing time and `dE/dt`
+      instead). **H3 CONFIRMED** (α = 1.5–2.4 from the MEASURED `<KE_e>`, §2.5). **H1 is what
+      remains, and `T_e,shutoff` has to be redefined with it** — see §2.9
 - [ ] Self-similar rarefaction / Schaeffer Eq. 1 recovered
-- [ ] `P1_vac_2d` planar reproduces 1D on axis
+- [ ] `P1_vac_2d` planar reproduces 1D on axis — **still open, and now a bookkeeping problem
+      rather than a physics one**: `P1_vac_2d_omp` is valid but its control `P1_vac_2d_off`
+      predates the c817b63 clamp fix, so the pair cannot be differenced. Only the control needs
+      re-running (RESULTS 2026-07-31)
 - [x] `P1_vac_2d_spot` + `_off` RAN (9.96 ps, 5 h 38 m). Operator **exact at `t` = 0** on a
       spatial measure (per-column ratio 1.00010, ac1 −0.521, total within 2.2e-5 of `I₀w₀√π`);
       c817b63 `wall/in` ≤ 1.16 on all 10 dumps. G3 −13.2 % (negative), G6 −16.86 % at 2.06 %
       weight loss
-- [ ] **H5 still untested** — the run loses transverse isolation after **1.99 ps** (`dark/lit`
-      0.135 → 0.946), so the predicted degradation appears only in the invalid window. Needs
-      `L_t/2` ≳ 396 `d_e` (4.9× wider, 1 584 columns) for 10 ps — i.e. it waits on Phase 1.5
+- [ ] **H5 still untested** — `P1_vac_2d_spot` loses transverse isolation after **1.99 ps**
+      (`dark/lit` 0.135 → 0.946), so the predicted degradation appears only in the invalid window.
+      Needs `L_t/2` ≳ 396 `d_e` (4.9× wider, 1 584 columns) for 10 ps — i.e. it waits on Phase 1.5
+- [x] **A finite spot can be held together after all, but by changing the BOUNDARY, not the box**
+      (`P1_vac_2d_spot_abl`, 2026-08-06). A periodic box needs `L_t/2 ≳ (v_th,e/v_crit)·D + 1.5w₀`
+      for a crater of depth `D`, and the MEASURED ratio is `v_th,e/|v_crit|` = **23** —
+      intensity-independent, since both speeds go as `√T_e`. So no affordable periodic box works.
+      With **open** transverse faces the lateral heat leaves instead of accumulating: `dark/lit`
+      0.116 → 0.394 (9 ps) → 0.523 (13.4 ps) against 0.946 by 10 ps periodic. Isolated ~5 ps,
+      marginal to ~12 ps. **This is what makes an H5 `w₀` scan possible**, and the remaining lever
+      is a wider box or a larger `w₀`, not the BC
+- [x] `P1_vac_2d_spot_abl` — the first run built to make the ABLATION visible: crater **46.1 d_e
+      = 2.30 `w₀` = 92 cells** at 14.94 ps, deepening at **3.56 d_e/ps** (predicted 3.2–4.7 ✓).
+      Ablation removes mass on axis (areal density −16.8 % vs −2.7 % unlit) while ALSO acting as a
+      piston (peak on-axis `n_e` rises 1.500 → 1.579 `n_cr`). Ran `refraction = 0`, validated
+      against a matched refracting reference at `t` = 0 to **3.4e-6**
+- [x] **`T_e` is nearly intensity-independent** — 236.0 eV at `I₀` = 1e18 → 355.9 eV at 1e19,
+      ×1.51 for ten times the intensity, i.e. `T_e ∝ I^0.18` (same estimator on both, but
+      different `t` and transverse BC, so indicative). This is **H1's signature**, and it is why
+      H1 is now the live hypothesis — §2.9
+- [~] **H1 half-settled at zero GPU cost** (§2.9). τ integrated straight off the existing profile
+      dumps, since they carry `A` as well as `n_e` and `theta_e`. The optical-depth picture of the
+      plateau is RIGHT — `1 − e^{−2τ}` reproduces `f_abs` to **1.8 %** on `P1_vac_2d_spot_abl` —
+      and the corona really does thermostat, τ collapsing 6.4 → 0.13 in ~1.5 ps and then holding.
+      But it holds at **τ ≈ 0.1–0.2, not τ ~ 1**, so H1's threshold is out by an order of
+      magnitude (τ = 1 would mean `f_abs` = 0.86, not a shutoff), and τ is geometry-dependent
+      (0.13–0.93 across the corpus). The `^{2/3}` EXPONENT is untested and needs Legs A/B
 - [x] `w₀` scan NOT started, and deliberately deferred: a scan in a box this size would measure
       the box, not `w₀`
 - [x] `rays_per_cell` convergence settled without a ladder — `ac1` negative on all 10 dumps
@@ -1408,10 +1512,13 @@ boundaries, is the project's headline output.
       driven deck sets no `ray_threads` (`OMP_NUM_THREADS=1` stays right for the push)
 - [x] **O4, unplanned**: form the IB coefficient on the device and gather 3 components instead
       of 6 — the last O(cells) serial host loop, −18 % of the operator on CPU, bit-identical
-- [ ] launch a physics run on `build_cuda_omp` — nothing has been run in anger with it yet
+- [x] launch a physics run on `build_cuda_omp` — four now: `P1_vac_2d_omp`,
+      `P1_vac_2d_spot_omp`, `P1_vac_2d_spot_long` (12 h 23 m) and `P1_vac_2d_spot_abl`
+      (4 h 49 m, the first on **two** ranks / two GPUs)
 
 **Phase 2 — ambient**
-- [ ] `scripts/tune_shock.py`, `make_figures.py`, `phase_space.py`, `make_movies.py`
+- [~] `scripts/phase_space.py` and `make_movies.py` **built**; `tune_shock.py` and
+      `make_figures.py` still missing (both are only needed once there is a shock to fit)
 - [ ] `P2_unmag` (+`_off`) — negative control, calibrates the pipeline
 - [ ] `P2_mag` (+`_off`) retargeted for `M_ms ≈ 2.6`; seven criteria, three timescales
 - [ ] Phase space checked **before** any shock claim
@@ -1419,11 +1526,18 @@ boundaries, is the project's headline output.
 
 **Phase 3 — sweeps**
 - [ ] `studies/sweep_intensity/` — `I₀`, `Z_eff lnΛ`, λ₀, `w_t`, `L_n`, duration
-- [ ] Resolve the 16× vs 2.4× `Z_eff lnΛ` discrepancy
+- [ ] Resolve the 16× vs 2.4× `Z_eff lnΛ` discrepancy — **now a defined 1D ladder, §2.9 Leg B**
+      (3 runs, ~8 min each). Still inherited, not reproduced: nothing in this project has varied
+      `Z_eff·lnΛ` yet
+- [ ] **§2.9 Leg A — the `I₀` ladder** (1e17/1e19/1e20 in 1D at `Z_eff·lnΛ` = 25). Settles whether
+      `T_e,plat` is *independent* of `I₀` or merely weakly dependent; the only datum is
+      `T_e ∝ I^0.18` between two 2D runs at different times and BCs
 - [ ] `studies/sweep_geometry/` — dims, `w₀`, profile, θ₀, focus, target shape, inject side
 - [ ] Scaling summary: fitted exponents, H1–H5 verdicts, the working parameter box
 
 **Throughout**
-- [ ] Every run dir has a `README.md` before it is launched (`launch.sh` enforces)
-- [ ] `RESULTS.md` dated entry per substantive run or finding
-- [ ] Gates G1–G7 reported for every run
+- [x] Every run dir has a `README.md` before it is launched (`launch.sh` enforces) — held for
+      every run to date
+- [x] `RESULTS.md` dated entry per substantive run or finding — held; ~25 entries
+- [x] Gates G1–G7 reported for every run — held, including the ones that legitimately WARN
+      (`P1_vac_2d_spot_abl` runs with G3 open by decision, recorded in its config and README)
