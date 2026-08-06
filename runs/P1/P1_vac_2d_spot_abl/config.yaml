@@ -243,7 +243,7 @@ targets:
     floored (w_local/w_total with weight n_e^2, LaserDeposition.cpp ~line 890), so empty cells
     carry zero weight and vacuum cannot dilute it -- which is why a low value looks alarming.
     But it is low at t = 0 in EVERY run on disk, because the target starts at 51 eV, i.e. at
-    the floor, and it climbs as the target heats -- measured first/max: P1_vac_2d_spot_omp
+    the floor, and it climbs as the target heats -- measured first/max -- P1_vac_2d_spot_omp
     0.432/0.860, P1_vac_2d_spot_long 0.432/0.954, P1_vac_2d_omp 0.432/0.998, P1_vac_1d_long
     0.430/1.000, P1_vac_1d_thick 0.409/0.999. Note the SPOT runs plateau lower than the planar
     ones (0.86-0.95 against 0.998), which is expected -- a spot heats only part of the target,
