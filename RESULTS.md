@@ -2302,3 +2302,156 @@ and PSC is not available as a referee.
 (figure: `media/psc_refraction/psc_oblique_xcheck.png`). The PSC-linked reference drivers
 stay outside both repositories, with the PSC tree.
 
+
+---
+
+## 2026-08-06 — `P1_vac_2d_spot_abl`: a laser spot bores a **resolvable crater**, 46 d_e = 2.3 `w₀`. Open transverse faces are what made it possible, and a stale binary nearly invalidated the whole thing
+
+The first spot run built to make the *ablation* visible rather than to test the operator.
+216 000 steps to 14.94 ps, 640 × 2600 cells, 35.2e6 macroparticles, **two MPI ranks on two
+RTX 4070s**, 4 h 49 m at 0.0805 s/step, 12 GB of diagnostics, zero errors, `--verify` clean.
+Requested changes from the parent `P1_vac_2d_spot_long`: 10× the intensity, half the target
+thickness, no vacuum behind the target, and `refraction = 0`.
+
+### The result: the crater is real and close to prediction
+
+| | measured | pre-registered |
+|---|---|---|
+| crater depth at `t_end` | **46.1 d_e = 2.30 `w₀` = 92 cells** | 48–71 d_e (2.4–3.5 `w₀`) |
+| deepening rate | **3.56 d_e/ps** | 3.2–4.7 d_e/ps ✓ |
+| `T_e` axis / unlit reference | **1.73** | — (1.00 would mean planar) |
+| `T_e` absorption-weighted, whole domain | **355.9 eV** | 0.75–1.1 keV ✗ **falsified** |
+| areal density, axis vs reference | **0.832 vs 0.973** | — |
+| `E_abs` | **162.1 J/m** | — |
+| `f_abs` | 1.0000 → **0.2264** | ~1.000 at t=0 ✓ |
+| `Tlocalfrac` | 0.431 → **0.980** | must RISE ✓ |
+
+The critical surface goes from a flat 37.7 d_e everywhere to **4.2 d_e on axis against 50.3 d_e
+at |x| ≈ 90**, i.e. a `w₀`-scaled depression 92 cells deep — visible without any processing in
+`media/P1/P1_vac_2d_spot_abl/fields_map2d.png`, `rays.png` and `movie_map2d.mp4`.
+
+**`T_e` is nearly insensitive to intensity — the one clearly falsified prediction.** Like-for-like
+on the same estimator (whole-domain absorption-weighted): **236.0 eV at 1e18 → 355.9 eV at 1e19**,
+×1.51 for ten times the intensity, i.e. `T_e ∝ I^0.18` against the `I^(1/2..2/3)` assumed. That is
+the self-limiting absorption asserting itself — `K ∝ T_e^{−3/2}`, so a hotter corona absorbs less
+and thermostats itself against intensity. Report the weighting: on axis it is **370.4 eV**
+absorption-weighted against **183.8 eV** density-weighted, the usual factor ~2–3.
+
+**The crater nonetheless landed in its predicted band because two errors cancelled.**
+`v_crit ∝ I_abs/kT_e`, so over-predicting `T_e` and under-predicting its flatness offset each
+other — a weaker `T_e` response makes each absorbed joule ablate more mass. The depth agreement is
+therefore *not* evidence for the temperature scaling; one of its two inputs was wrong by 2–3×. A 1D
+intensity ladder would settle the exponent cheaply, and is the obvious next run.
+
+**Mass is genuinely removed on axis, but the spot also acts as a piston.** Areal density falls
+16.8 % on axis against 2.7 % in the unlit reference band — a 14-point net ablation signature.
+Yet peak on-axis `n_e` *rises* slightly, 1.500 → 1.579 `n_cr`, and the fraction of each axial
+column's mass still behind z = 0 goes **up** on axis (0.790 → 0.881) while falling in the
+reference (0.790 → 0.739). So at this intensity the drive both blows mass off forward *and*
+pushes the remainder inward. Ions hold **33.3 %** of the coupled energy at 15 ps (the 100 ps
+1D run reached 62–66 %, so this is the same transfer caught early).
+
+### Open transverse faces did the job they were chosen for — but only just
+
+The whole geometry rests on one argument: a periodic box cannot host a spot that ablates a
+visible depth at *any* intensity, because `L_t/2 ≳ (v_th,e/v_crit)·D` and the measured ratio is
+23, intensity-independent since both speeds go as `√T_e`. Measured contrast of the deposited
+energy **increment** (baseline-subtracted; the raw `E(x)` is dominated by the slab's initial
+thermal energy and starts at ~1, meaning nothing):
+
+| | dark/lit |
+|---|---|
+| this run, 1.5 ps | 0.116 (isolated) |
+| this run, 9.0 ps | 0.394 (marginal) |
+| this run, 13.4 ps | **0.523** |
+| `P1_vac_2d_spot_long`, periodic, by 10 ps | **0.946** |
+
+So the run is isolated for ~5 ps, marginal to ~12 ps, and crosses the pre-registered
+"effectively planar" threshold of 0.5 **only in the final dump** — where the periodic
+predecessor was at 0.946 by 10 ps. The open boundary bought roughly the whole run. `T_e`
+axis/reference of 1.73 says it is still a spot thermally at `t_end`. **A longer run at these
+parameters would go planar**, and the next lever is a wider box or a larger `w₀`, not the
+boundary condition.
+
+### What `refraction = 0` did, quantitatively
+
+Accepted as an explicit accuracy trade. At `t = 0` the target is plane-stratified, where a
+straight march carrying the Snell invariant is *exact* — and the aborted run below left a
+matched refracting reference, so that is now measured rather than asserted:
+
+    step-0 P_abs   refraction = 1 : 5.94077e+13 W/m
+                   refraction = 0 : 5.94083e+13 W/m     -> 3.4e-6, the log's print precision
+
+Three consequences, all clean decompositions of earlier refracting findings:
+
+- **Step-0 transverse profile spread 0.000 %** (min/max 1.0000/1.0000) against **3.267 %** with
+  refraction. The earlier scatter was ray wander; straight rays have none by construction.
+- **`w_eff/w₀` peaks at 1.23**, against 1.5–1.6 measured with refraction (RESULTS 2026-07-29).
+  So of that ~1.5× broadening, the part that survives without refraction — the `T_e^{−3/2}`
+  self-suppression of coupling on the hot axis — is ~1.23, and the rest was refractive.
+- **The transverse leak is 0.0008 and the wall/interior ratio 0.00**, against 0.62 in the
+  refracting periodic parent. **Do not read this as a clean run:** straight rays *cannot*
+  scatter transversely, so this run has no power to test the leak question at all. It is a
+  property of the mode, not evidence about the physics.
+- `f_ax`/`f_abs` = 0.886, against 0.39/0.63 = 0.62 refracting — the whole-beam absorbed
+  fraction overstates the axis by 13 % here rather than 60 %.
+
+What is *not* available: the crater's own refractive feedback. Straight rays cannot be steered
+into or out of a 92-cell-deep depression, so the late-time crater **profile** is indicative,
+not quantitative. A matched `refraction = 1` companion on this geometry is the clean bound and
+is still worth running.
+
+### Two process failures, both of the same shape
+
+**1. A stale binary silently ignored `refraction = 0` and the run had to be killed and
+restarted.** `build_cuda_omp` was built 2026-07-31; `refraction` landed 2026-08-04. WarpX
+parsed the key, never queried it, said nothing (`amrex.abort_on_unused_inputs` defaults to 0),
+and marched with **full refraction** while the README claimed straight rays. Nothing in the
+run's own output looked wrong — `f_abs`, `Tlocalfrac`, every gate and both GPUs were healthy.
+The only tell is the key being absent from `warpx_used_inputs`, which is exactly what
+`--verify` reports. Caught at step ~2000 of 216 000: **7 minutes lost instead of 4.6 h.**
+`--verify` is answerable seconds after launch because `warpx_used_inputs` is written at
+initialisation — so run it *then*, not at the end. In CLAUDE.md now. The seven minutes are
+kept as `studies/refraction_xcheck/`, which is where the step-0 comparison above comes from.
+
+**2. A column mis-read that changed which quantity was being plotted.** The rebuilt operator
+writes an 8th profile column (per-cell `lnLambda`). `spot_report.py` and `spot_isolation.py`
+inferred the layout from the column *count*, and 7 columns is ambiguous — 1D-with-`lnLambda`
+as much as 2D-without. **Every 2D dump written before `lnLambda` existed was read as 1D**, so
+`P_abs` came out of the `theta_e` column. Fixed by factoring the header-reading logic into
+`io.profile_column_names` and having both fast readers use it; `tests/test_profile_columns.py`
+pins all six layouts and greps that the duplicate implementation is gone, since a drifting
+duplicate *was* the failure mode. 236 tests pass.
+
+Both failures are one shape: **a change absorbed silently instead of reported.** WarpX
+ignoring an unknown ParmParse key; numpy accepting a name list shorter than the file.
+
+### And a mistake of mine worth recording, because it inverted the conclusion
+
+First pass measured the crater as **3.0 d_e** and read the prediction as falsified by 20×. That
+was a bad reference, not a result: I used `|x| > 120 d_e` as "unilluminated", but those columns
+sit against the open transverse wall and rarefy laterally into it — they lose **30.9 %** of
+their areal density, *more* than the illuminated axis loses. Against the `z_crit(x)` plateau at
+75–115 d_e, where σ stays at 0.973, the crater is 46.1 d_e. **With an open boundary, "far from
+the beam" is not the same as "undisturbed"** — pick the reference from the data, and check that
+the reference itself has not moved.
+
+### Gates and what may not be claimed
+
+G1 pass (`ω_pe dt` 0.214 at 2×), G2 info (61 target, by construction), **G3 WARN — no laser-off
+control, by decision**, G4 pass, G5 pass (`Tlocalfrac` 0.980), **G6 −30.0 % against 13.4 %
+weight loss** (25.7 % of macroparticles — quote weight), G7 info.
+
+G6 cannot close on this run and was not expected to: the rear is truncated flush with the
+target and all four faces are open, so escaping particles carry energy WarpX does not report.
+With no G3 control, **no few-percent energy statement from this run is quotable**, in particular
+no grid-heating-corrected `E_abs`; the lateral loss is a total, not decomposable into
+laser-driven and grid-driven. And no shock, piston speed or Mach number — there is no ambient.
+
+### Figure bugs fixed while doing this
+
+`plot_rays.py` reconstructed the refracting march regardless of the deck, drawing paths a
+straight-ray run never took; it now reads `laser.refraction` and validates at **9.8e-09 d_e**
+against the operator at `t` = 0. `plot_fields.py`'s 2D-map caption asserted "the drive is
+periodic in x" over a run with **open** transverse faces — three lines below a comment warning
+that a wrong caption here is "how a figure caption turns into a retraction".

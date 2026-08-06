@@ -200,23 +200,121 @@ weight stays cold and floored for the whole run. The failure signature is theref
 
 ## Result
 
-*Running.* Launched 2026-08-05 20:26 on two GPUs (2 MPI ranks, `-g 0,1`), queued behind the
-KinShock `i0`/`i1` implicit runs by `scripts/queue_run.sh` (waited 3 h 34 m).
+**Completed** 2026-08-06 01:38. 216 000/216 000 steps to 14.94 ps, **4 h 49 m** at 0.0805 s/step
+on two MPI ranks / two RTX 4070s, 12 GB of diagnostics, zero errors, `--verify` clean.
+Relaunched once — see *Retracted* — so the wall clock is from the second, valid start.
 
-Measured at launch, to be replaced by the full result:
+### The crater is resolved, and close to prediction
 
-- **Decomposition worked.** `2 grids, smallest 320 x 2600, biggest 320 x 2600` — one maximal
-  box per rank, split on x only. Both cards carry **9114 MiB** and, sampled over 15 s, **49 %**
-  and **53 %** mean utilisation at 71–105 W. A single instantaneous sample read 0 % on device 1
-  and looked like an idle card; it is a bursty workload, and only the average is meaningful.
-- **0.0771 s/step** measured over a 60 s window (778 steps) ⇒ **~4.6 h**, against a ~7.2 h
-  single-GPU estimate. Expect the true figure to be *longer*: cost grows during a vacuum run as
-  the plume spreads over more cells (a 1D run went 526 → 10 800 occupied cells at flat particle
-  count), and this window was taken at 0.13 ps.
-- Neither card is saturated (~50 %, ~90 W of 200 W), consistent with the two ranks partly
-  serialising on MPI synchronisation rather than overlapping — so the realised speedup is well
-  under the 1.96× Amdahl ceiling, as expected.
-- `f_abs` ≈ **0.42** at 0.13 ps (`Pabs` 2.5e13 W/m against 5.94e13 W/m incident).
+| | measured | predicted above |
+|---|---|---|
+| crater depth at `t_end` | **46.1 d_e = 2.30 `w₀` = 92 cells** | 48–71 d_e (2.4–3.5 `w₀`) |
+| deepening rate | **3.56 d_e/ps** | 3.2–4.7 d_e/ps ✓ |
+| `T_e`, absorption-weighted (whole domain / on axis) | **355.9 / 370.4 eV** | 0.75–1.1 keV ✗ **falsified** |
+| `T_e`, density-weighted (whole domain / on axis) | **123.2 / 183.8 eV** | — (state the weighting; factor 2–3) |
+| `T_e` axis / unlit reference | **1.73** | — |
+| `E_abs` | **162.1 J/m** | — |
+| `f_abs` | 1.0000 → **0.2264** | ~1.000 at `t` = 0 ✓ |
+| `Tlocalfrac` | 0.431 → **0.980** | must *rise* ✓ |
+
+The critical surface goes from a flat 37.7 d_e everywhere to **4.2 d_e on axis against 50.3 d_e
+at |x| ≈ 90** — a `w₀`-scaled depression 92 cells deep, visible with no processing in
+`fields_map2d.png`, `rays.png` and `movie_map2d.mp4`.
+
+**`T_e` is nearly insensitive to intensity, and that prediction is falsified.** Like-for-like
+against the parent (whole-domain absorption-weighted, the same estimator on both):
+
+    P1_vac_2d_spot_long  I0 = 1e18 : 236.0 eV
+    P1_vac_2d_spot_abl   I0 = 1e19 : 355.9 eV      x1.51 for 10x the intensity
+
+i.e. **`T_e ∝ I^0.18`**, against the `I^(1/2..2/3)` the prediction assumed — so 356 eV where
+0.75–1.1 keV was expected. This is the self-limiting absorption asserting itself: `K ∝ T_e^{−3/2}`,
+so a hotter corona absorbs less, and the corona thermostats itself against intensity. (Caveat:
+the two runs are compared at 26.9 vs 13.4 ps and with different transverse BCs, so 0.18 is
+indicative, not a fitted exponent. A 1D intensity ladder would settle it cheaply.)
+
+**Yet the crater still landed in its predicted band, because the two errors cancelled.**
+`v_crit ∝ I_abs/kT_e`: a weaker `T_e` response means each absorbed joule ablates *more* mass, so
+under-predicting `T_e`'s flatness and over-predicting `T_e` offset each other. **Do not read the
+crater agreement as confirming the temperature scaling** — one of its two inputs was wrong by 2–3×.
+
+**Mass is removed on axis, and the spot is also a piston.** Areal density falls 16.8 % on axis
+against 2.7 % in the reference band (a 14-point net ablation signature), but peak on-axis `n_e`
+*rises* 1.500 → 1.579 `n_cr` and the mass fraction still behind z = 0 goes **up** on axis
+(0.790 → 0.881) while falling in the reference (0.790 → 0.739). Ions hold **33.3 %** of the
+coupled energy at 15 ps.
+
+### The open transverse boundary worked, and only just
+
+Contrast of the deposited-energy **increment** (baseline-subtracted — the raw `E(x)` is
+dominated by the slab's initial thermal energy and starts at ~1):
+
+| | dark/lit |
+|---|---|
+| 1.5 ps | 0.116 — isolated |
+| 9.0 ps | 0.394 — marginal |
+| 13.4 ps | **0.523** |
+| `P1_vac_2d_spot_long` (periodic) by 10 ps | **0.946** |
+
+Isolated for ~5 ps, marginal to ~12 ps, crossing the pre-registered 0.5 threshold **only in the
+final dump**, where the periodic predecessor was at 0.946 by 10 ps. `T_e` axis/reference = 1.73
+says it is still a spot thermally at `t_end`. **A longer run at these parameters goes planar**;
+the next lever is a wider box or a larger `w₀`, not the boundary condition.
+
+### `refraction = 0`, quantified against a matched reference
+
+The aborted run (below) left a `refraction = 1` reference on this exact geometry, so the t = 0
+equivalence is measured, not asserted: step-0 `P_abs` **5.94077e+13 vs 5.94083e+13 W/m**, a
+relative **3.4e-6**. Three clean decompositions of earlier refracting findings:
+
+- step-0 transverse spread **0.000 %** vs 3.267 % refracting — the earlier scatter was ray wander
+- **`w_eff/w₀` peaks at 1.23** vs 1.5–1.6 refracting, so of that broadening ~1.23 is the
+  `T_e^{−3/2}` self-suppression and the rest was refractive
+- `f_ax`/`f_abs` = 0.886 vs 0.62 refracting
+
+**The near-zero transverse leak (0.0008, wall/interior 0.00) is NOT evidence of a clean run.**
+Straight rays cannot scatter transversely, so this run has no power to test the leak at all.
+And the crater's own refractive feedback is absent, so the late-time crater *profile* is
+indicative rather than quantitative.
+
+### Gates
+
+| Gate | Value | Pass? |
+|---|---|---|
+| G1 `ω_pe dt` at peak density | 0.214 at 2× | **PASS** |
+| G2 `dz/λ_D` | 61.2 target(cold) | INFO |
+| G3 laser-off control | none | **WARN — by decision** |
+| G4 `ray_cfl` | 0.25 | PASS |
+| G5 ppc / `Tlocalfrac` | 36 ppc; 0.431 → **0.980** | **PASS** |
+| G6 energy closure | **−30.0 %** against **13.4 % weight loss** | cannot close — see below |
+
+G6 was never closeable here: the rear is truncated flush with the target and all four faces are
+open, so escaping particles carry energy WarpX does not report. 13.4 % of the **weight** left
+(25.7 % of macroparticles — quote weight, they differ by ~2×). With no G3 control, **no
+few-percent energy statement from this run is quotable**, in particular no grid-heating-corrected
+`E_abs`, and the lateral loss is a total that cannot be split into laser- and grid-driven parts.
+No shock, piston speed or Mach number is claimed — there is no ambient.
+
+## Retracted
+
+**1. The first launch (2026-08-05 20:26) is void and was killed at step ~2000.** It ran on a
+`build_cuda_omp` built 2026-07-31, four days before `refraction` existed in the operator.
+`strings` finds no `refraction` in that binary; WarpX parsed the key, never queried it, and said
+nothing, so it marched with **full refraction** while this README claimed straight rays. Caught
+by `--verify` reporting the key missing from `warpx_used_inputs`. Nothing in the run's own output
+looked wrong. Its step-0 dumps are kept as `studies/refraction_xcheck/` and supply the
+`refraction = 1` reference used above.
+
+**2. A first crater measurement of "3.0 d_e", read as falsifying the prediction by 20×, was
+wrong.** It used `|x| > 120 d_e` as the unilluminated reference, but those columns sit against
+the open transverse wall and rarefy laterally into it — they lose **30.9 %** of their areal
+density, *more* than the illuminated axis. Against the `z_crit(x)` plateau at 75–115 d_e, where
+σ stays at 0.973, the crater is 46.1 d_e. **With an open boundary, "far from the beam" is not
+"undisturbed"** — choose the reference from the data and verify the reference itself has not moved.
+
+**3. The `Tlocalfrac` alarm threshold first written into this README (0.90–0.99) was wrong** and
+would have condemned a healthy run reading 0.42. Those are late-time values; every run starts
+near 0.43 because the target starts *at* the temperature floor. Corrected above: watch the trend.
 
 ## Retracted
 
