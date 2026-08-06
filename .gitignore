@@ -52,3 +52,10 @@ studies/psc_absorption_xcheck.py
 
 # --- session worktrees (embedded git repos, not submodules) ---
 .claude/worktrees/
+
+# --- aborted/renamed run logs. A voided run's step output is as large as a live one's
+# (1 MB here, 40 MB for the valid run) and `*.log` does not match `run.log.<suffix>`.
+# Its SMALL siblings are deliberately NOT ignored: warpx_used_inputs.aborted-* is the
+# evidence of what the void binary actually parsed, and progress.log.aborted-* is its
+# cost record. Both are provenance and belong in the repo.
+runs/**/run.log.*
