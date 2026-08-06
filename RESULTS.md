@@ -2455,3 +2455,50 @@ straight-ray run never took; it now reads `laser.refraction` and validates at **
 against the operator at `t` = 0. `plot_fields.py`'s 2D-map caption asserted "the drive is
 periodic in x" over a run with **open** transverse faces — three lines below a comment warning
 that a wrong caption here is "how a figure caption turns into a retraction".
+
+---
+
+## 2026-08-06 (later) — H1 started: the optical-depth **mechanism** is right, the **τ ~ 1 threshold** is wrong by an order of magnitude, and it cost no GPU time
+
+H1 was the last of H1–H5 still open. Testing it turned out to need **no new runs for the first
+leg**: the per-cell `laserdep_profile` dump carries the IB coefficient `A` alongside `n_e` and
+`theta_e`, so the optical depth is integrable directly off runs already on disk —
+
+    tau = ∫ (A/n_cr) n_e² / sqrt(1 − n_e/n_m) dz   from the injection face to the turning point
+
+| run | `I₀` | τ(0) | τ later | `1−e^{−2τ}` | measured `f_abs` |
+|---|---|---|---|---|---|
+| `P1_vac_1d` | 1e18 | 6.69 | 0.198 @ 5 ps | 0.327 | ≈ 0.24 plateau |
+| `P1_vac_1d_long` | 1e18 | 6.64 | 0.119 @ 10 ps | 0.212 | ≈ 0.24 plateau |
+| `P1_vac_1d_thick` | 1e18 | 4.85 | 0.112 @ 15 ps | 0.200 | — |
+| `P1_vac_2d_spot_long` | 1e18 | 6.49 | 0.485 @ 15 ps | 0.621 | 0.68 final |
+| `P1_vac_2d_spot_abl` | 1e19 | 6.38 | **0.131** @ 13.4 ps | **0.2305** | **0.2264** |
+
+**The picture behind H1 is correct.** `1 − e^{−2τ}` — a ray that turns and comes back out —
+reproduces the measured plateau to **1.8 %** on `P1_vac_2d_spot_abl` and to within ±40 % across
+the 1D corpus. And the corona genuinely thermostats: τ collapses from ~5–7 to ~0.1–0.2 within
+1–3 ps and then holds roughly flat *while `T_e` keeps climbing*.
+
+**H1's threshold is not.** It holds at **τ ≈ 0.1–0.2, not τ ~ 1.** At τ = 1 the absorbed
+fraction would still be `1 − e^{−2}` = **0.86** — nearly full absorption, nothing a reasonable
+person would call a shutoff. So the numerical criterion is out by ~10×, and the constant in
+`T_e,shutoff` with it. The `(Z_eff lnΛ n_e² L)^{2/3}` **form survives**, because it follows from
+`τ = const` and `K ∝ Z lnΛ n_e² T_e^{−3/2}` for *any* constant. But τ is not universal either —
+0.13 → 0.93 across the corpus, with the 2D spot at 1e18 sitting ~4× above the 1D runs — so no
+single-number `T_e,shutoff` can hold across dimensionality.
+
+**So H1 is restated, not rescued.** There is no shutoff temperature, exactly as 2026-07-29
+retired the half-peak `t_s` for the same reason. What exists is the **plateau coronal
+temperature** `T_e,plat`, the temperature at which the corona holds τ ≈ 0.1–0.2, and
+`H1' : T_e,plat ∝ (Z_eff lnΛ n_e² L)^{2/3}` — **exponent untested**. Full statement, and the two
+1D ladders that would test it (~8 min per run), in `TEST_PLAN.md` §2.9. Leg B varies
+`Z_eff·lnΛ`, the one knob carrying a standing 16×-vs-2.4× tension that **this project has never
+actually varied** — it is still inherited from upstream, not reproduced.
+
+Method note worth keeping: **quote `T_e` absorption-weighted and say so.** It runs 2–3× the
+density-weighted value here (370 vs 184 eV on axis in `P1_vac_2d_spot_abl`), which is a factor
+√3 in every sound speed built on it.
+
+`TEST_PLAN.md` §11 was also reconciled against what is on disk — nine items marked done or
+partial with evidence, two corrected rather than ticked (the planar-vs-1D comparison is open only
+because `P1_vac_2d_off` predates the clamp fix; `t_s` is retired rather than measured).
