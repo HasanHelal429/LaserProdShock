@@ -168,9 +168,7 @@ def _corona_Te(cfg, sc):
     if not paths:
         return None
     a = np.loadtxt(paths[-1])
-    ncoord = max(a.shape[1] - len(lpio.PROFILE_TAIL), 0)
-    names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}[ncoord]
-    cols = names + lpio.PROFILE_TAIL[:a.shape[1] - ncoord]
+    cols = lpio.profile_column_names(paths[-1], a.shape[1])
     P, th = a[:, cols.index("P_abs")], a[:, cols.index("theta_e")]
     if P.sum() <= 0:
         return None

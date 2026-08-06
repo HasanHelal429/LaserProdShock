@@ -58,15 +58,15 @@ def read_profile_array(path: str) -> dict:
 
     ``laserprod.io.read_profile_table`` is the reference reader, but these dumps are one
     row per cell -- 704 000 rows for a 320x2200 spot run -- and its pure-Python lists cost
-    seconds and hundreds of MB each. The column layout is taken from
-    ``lpio.PROFILE_TAIL`` so the two readers cannot disagree about which column is
-    ``P_abs`` and which is ``theta_e``.
+    seconds and hundreds of MB each. Column names come from
+    ``lpio.profile_column_names``, i.e. from the dump's own header, so the two readers
+    cannot disagree about which column is ``P_abs`` and which is ``theta_e``. Inferring
+    them from the column COUNT (as this did) mis-reads every 2D dump written before
+    ``lnLambda`` was appended -- 7 columns looks like 1D-with-lnLambda -- and shifts every
+    name by one.
     """
     arr = np.loadtxt(path)
-    ncol = arr.shape[1]
-    ncoord = max(ncol - len(lpio.PROFILE_TAIL), 0)
-    names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}[ncoord]
-    cols = names + lpio.PROFILE_TAIL[:ncol - ncoord]
+    cols = lpio.profile_column_names(path, arr.shape[1])
     return {c: arr[:, i] for i, c in enumerate(cols)}
 
 

@@ -174,6 +174,46 @@ def profile_tables(run_dir: str, prefix: str = "laserdep_profile") -> list[str]:
 PROFILE_TAIL = ["n_e", "H", "P_abs", "theta_e", "A", "lnLambda"]
 
 
+def profile_column_names(path: str, ncol: int | None = None) -> list[str]:
+    """Column names for a ``laserdep_profile`` dump, from the dump's own header.
+
+    Split out of :func:`read_profile_table` so the fast numpy readers
+    (``spot_report.py``, ``spot_isolation.py``) resolve columns exactly the way the
+    reference reader does. They used to infer names positionally from the column count,
+    which is WRONG for every 2D dump written before ``lnLambda`` was appended: 7 columns
+    was read as 1D-with-lnLambda instead of 2D-without, shifting every name by one, so
+    ``P_abs`` came from the ``theta_e`` column and ``theta_e`` from ``A``. Measured on
+    P1_vac_2d_spot_long's step-0 dump, which is why this exists.
+
+    ``ncol`` is the actual field count of a data row; pass it when known so a header that
+    disagrees with the file (a truncated write) falls back rather than being trusted.
+    """
+    header: list[str] = []
+    with open(path) as fh:
+        for line in fh:
+            s = line.strip()
+            if not s:
+                continue
+            if s.startswith("#"):
+                fields = s.lstrip("#").split()
+                if fields and all(f in PROFILE_TAIL or f in ("x", "y", "z")
+                                  for f in fields):
+                    header = fields
+                continue
+            if ncol is None:
+                ncol = len(s.split())
+            break
+    if ncol is not None and len(header) == ncol:
+        return header
+    # Fall-back: assume the tail is the newest layout, truncated as needed. Ambiguous
+    # by construction -- that is the point of preferring the header.
+    n = int(ncol or 0)
+    ncoord = max(n - len(PROFILE_TAIL), 0)
+    coord_names = {1: ["z"], 2: ["x", "z"], 3: ["x", "y", "z"]}.get(
+        ncoord, [f"c{i}" for i in range(ncoord)])
+    return coord_names + PROFILE_TAIL[:n - ncoord]
+
+
 def read_profile_table(path: str) -> dict:
     """Read a ``laserdep_profile_<step>.txt`` dump into ``{column: [values]}``.
 
