@@ -274,16 +274,37 @@ def main() -> int:
         # which is how a figure caption turns into a retraction.
         beam = (cfg["laser"].get("beam") or {})
         prof = str(beam.get("profile", "uniform"))
+        # The transverse BC has to be read, not assumed. This caption said "the drive is
+        # periodic in x with pitch L" unconditionally, and printed it over a run whose
+        # transverse faces are OPEN -- the exact species of error the comment above warns
+        # about, in the comment's own figure.
+        tfaces = lpconfig.boundary_faces(cfg)
+        tname = [k for k in tfaces
+                 if k != str(cfg["geometry"].get("normal_axis", "z"))]
+        tbc = str(tfaces[tname[0]][0]) if tname else "periodic"
+        pitch = (float(cfg["geometry"]["transverse"]["hi_de"])
+                 - float(cfg["geometry"]["transverse"]["lo_de"]))
+        if tbc == "periodic":
+            bcnote = (f"the drive is periodic in x with pitch {pitch:g} d$_e$, so once heat "
+                      f"crosses half of that the spot merges with its own images")
+        elif tbc == "open":
+            bcnote = ("the transverse faces are OPEN, so laterally streaming heat leaves "
+                      "instead of wrapping — the spot cannot merge with periodic images, "
+                      "but lateral loss to the wall is real and needs a control to split "
+                      "from grid loss")
+        elif tbc == "reflecting":
+            bcnote = (f"the transverse faces REFLECT, i.e. mirror images at pitch "
+                      f"{2 * pitch:g} d$_e$")
+        else:
+            bcnote = f"transverse faces are '{tbc}' (pitch {pitch:g} d$_e$)"
         if prof == "uniform":
-            cap = ("Transverse structure: a uniform beam on a planar target with periodic "
-                   "transverse boundaries should show NONE — any x dependence here is "
-                   "numerical.")
+            cap = (f"Transverse structure: a uniform beam on a planar target should show "
+                   f"NONE — any x dependence here is numerical. Note {bcnote}.")
         else:
             w0 = float(beam.get("waist_de", 0.0))
             cap = (f"Transverse structure is EXPECTED here: {prof} beam, w$_0$ = {w0:g} "
                    f"d$_e$. The x dependence is the physics — see spot_report.py for the "
-                   f"quantitative version, and note the drive is periodic in x with pitch "
-                   f"{float(cfg['geometry']['transverse']['hi_de']) - float(cfg['geometry']['transverse']['lo_de']):g} d$_e$.")
+                   f"quantitative version, and note {bcnote}.")
         fig3.text(0.005, 0.995, cap, ha="left", va="top", fontsize=8, color=lpp.INK_2)
         lpp.savefig(fig3, "fields_map2d.png", run_id=rid)
     return 0

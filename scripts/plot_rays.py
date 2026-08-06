@@ -129,13 +129,20 @@ def _rk4(field, c, T, h):
     return c, T
 
 
-def trace(field, c0, u0, h, max_steps):
+def trace(field, c0, u0, h, max_steps, straight=False):
     """March the bundle. Returns (paths (S, N, 2), turn_step per ray, n_turns per ray).
 
     Mirrors `trace_ray`: turn when `n_ref <= n_floor` *and* the ray is still climbing
     (`drds > 0`, which is what stops it being re-trapped on the outbound leg), specular
     reflection about `grad n_ref`, rewind to the pre-step position, and terminate on leaving
     the domain through any non-wrapping face.
+
+    ``straight=True`` mirrors the operator's ``refraction = 0``: the ray does not bend at
+    all, it advances along its launch direction and the refraction is carried analytically
+    through the Snell invariant. This MUST follow the deck -- reconstructing a refracting
+    march for a straight-ray run draws paths the run never took, and on this project's own
+    ablation deck that showed up as reconstruction-vs-operator disagreement of 8 d_e median
+    against 0.005 d_e when the modes matched.
     """
     N = c0.shape[0]
     c = c0.copy()
@@ -153,8 +160,14 @@ def trace(field, c0, u0, h, max_steps):
             break
         c_old = c.copy()
         idx = np.flatnonzero(active)
-        cn, Tn = _rk4(field, c[idx], T[idx], h)
-        c[idx], T[idx] = cn, Tn
+        if straight:
+            # No gradient term and no 1/n_ref factor: the position advances along the
+            # (unit) launch direction, which is what makes this mode 3.2x cheaper.
+            nrm = np.linalg.norm(T[idx], axis=1, keepdims=True)
+            c[idx] = c[idx] + h * T[idx] / np.where(nrm > 0.0, nrm, 1.0)
+        else:
+            cn, Tn = _rk4(field, c[idx], T[idx], h)
+            c[idx], T[idx] = cn, Tn
 
         ne, nref, g = field.sample(c)
         r_cur = ne / field.n_cr
@@ -167,7 +180,12 @@ def trace(field, c0, u0, h, max_steps):
             Tdg = (T[hi] * g[hi]).sum(axis=1)
             ok = gm2 > 0.0
             f = np.where(ok, 2.0 * Tdg / np.where(ok, gm2, 1.0), 0.0)
-            T[hi] = np.where(ok[:, None], T[hi] - f[:, None] * g[hi], -T[hi])
+            if straight:
+                # A stratified straight march has nothing to reflect ABOUT: it turns by
+                # reversing along the line it came in on.
+                T[hi] = -T[hi]
+            else:
+                T[hi] = np.where(ok[:, None], T[hi] - f[:, None] * g[hi], -T[hi])
             # Nudge back into the underdense region, as the operator does.
             c[hi] = c_old[hi]
             for j in hi:
@@ -295,6 +313,8 @@ def main() -> int:
     inject_hi = str(las.get("inject_side", "lo")) == "hi"
     ang = np.radians(float(las.get("incidence_angle_deg", 0.0)))
     ray_cfl = float(las.get("ray_cfl", 0.25))
+    # The operator defaults to refracting; `refraction: 0` selects the straight march.
+    straight = not bool(int(las.get("refraction", 1)))
     rpc = int(beam.get("rays_per_cell", 1) or 1)
     profile = str(beam.get("profile", "uniform"))
     w0_de = float(beam.get("waist_de", 0.0) or 0.0)
@@ -346,7 +366,7 @@ def main() -> int:
         u0[:, 1] = (-1.0 if inject_hi else 1.0) * np.cos(ang)
         u0[:, 0] = np.sin(ang)
 
-        tracks, turns = trace(field, c0, u0, h, max_steps)
+        tracks, turns = trace(field, c0, u0, h, max_steps, straight=straight)
 
         # background density
         pos = ne[ne > 0]
@@ -477,9 +497,9 @@ def main() -> int:
     beam_bit = (f"  Beam: {profile}, w$_0$ = {w0_de:g} d$_e$."
                 if profile != "uniform" else "")
     cap = (
-        "Ray paths RECONSTRUCTED OFFLINE from the dumped n$_e$, using the operator's own "
-        "eikonal march, multilinear sampling and wrap/clamp index mapping — not the "
-        "operator's output.\n"
+        f"Ray paths RECONSTRUCTED OFFLINE from the dumped n$_e$, using the operator's own "
+        f"{'STRAIGHT march (refraction = 0: no bending, refraction carried analytically)' if straight else 'eikonal march'}"
+        f", multilinear sampling and wrap/clamp index mapping — not the operator's output.\n"
         "Dashed black = the critical surface the rays turn on. NO absorption is carried "
         "here: the outbound leg is the path a ray WOULD fly, and in an optically thick run "
         "it is extinguished at or before the turn.\n"
