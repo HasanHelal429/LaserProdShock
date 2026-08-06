@@ -191,6 +191,23 @@ not, and work while a run is still going.
   (`--force` to override). `-b` detaches, `-L` also starts the progress logger, `-n`
   dry-runs, and anything after `--` becomes ParmParse overrides (smoke tests only — they
   will trip `--verify`).
+- **A binary that predates a deck's flag IGNORES IT SILENTLY — so run `--verify` right after
+  launch, not at the end.** `P1_vac_2d_spot_abl` was launched with
+  `laser_deposition.refraction = 0` onto `build_cuda_omp` as built on **2026-07-31**;
+  `refraction` was added to the operator on **2026-08-04**. `amrex.abort_on_unused_inputs`
+  defaults to 0, so WarpX parsed the deck, never queried the key, said nothing, and marched
+  with **full refraction** while the run's README claimed straight rays. Nothing in the run's
+  own output looks wrong — `f_abs`, `Tlocalfrac`, the gates and both GPUs were all healthy.
+  The single tell is that the key is **absent from `warpx_used_inputs`**, which is exactly what
+  `make_inputs.py --verify` reports (`laser_deposition.refraction: missing from
+  warpx_used_inputs`). `warpx_used_inputs` is written at initialisation, so **`--verify` is
+  answerable seconds after launch** — that is when the answer is cheap, and it cost 7 minutes
+  here instead of 4.6 h. Settle it in one line with
+  `strings <binary> | grep -x <key>`, and treat **the binary's build date as part of a run's
+  provenance**: check it against the commit that introduced whatever the deck newly relies on.
+  Corollary: `build/` (CPU) and `build_cuda*/` drift apart independently — on 2026-08-05 the
+  CPU build had `refraction` and the CUDA one did not. The step-0 dumps the aborted run left
+  behind are kept as a free refracting reference in `studies/refraction_xcheck/`.
 - **Kill runs BY PID. `pkill -f` matches the shell you type it in.** Its own command line
   contains the pattern, so `pkill -f "warpx.2d inputs_P1_vac_2d_spot_omp"` killed the invoking
   shell (exit 144) and **everything chained after it never ran** — including the second `pkill`
