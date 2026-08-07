@@ -1,5 +1,10 @@
 # --- WarpX simulation output (large, machine-specific, regenerable from the decks) ---
 runs/**/diags/
+# ...and the same path when it is a SYMLINK rather than a directory. A trailing slash
+# matches directories only, so once diags/ is archived off the fast disk (e.g. to
+# /mnt/cellar) and replaced by a symlink, git stops ignoring it and offers to commit a
+# link that resolves nowhere on anyone else's machine.
+runs/**/diags
 runs/**/diags_movies/
 runs/**/diags_movie/
 
