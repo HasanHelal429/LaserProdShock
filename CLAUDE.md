@@ -208,6 +208,21 @@ not, and work while a run is still going.
   Corollary: `build/` (CPU) and `build_cuda*/` drift apart independently — on 2026-08-05 the
   CPU build had `refraction` and the CUDA one did not. The step-0 dumps the aborted run left
   behind are kept as a free refracting reference in `studies/refraction_xcheck/`.
+- **The build trees are SHARED with the other projects in `warpx-cda`, and they get rebuilt
+  under you from other branches.** The bullet above is a binary that is too *old*; this is the
+  same failure from the opposite direction. `build_cuda_omp/bin/warpx.2d` was rebuilt on
+  **2026-08-07 19:04** by the hybrid/particle-heater work — `warpx-cda` is now checked out on
+  `feature/hybrid-laser`, not `feature/laser-deposition` — and that binary contains
+  `electron_energy_mode` and **zero occurrences of `refraction`**. So the binary in the tree
+  today **cannot reproduce `P1_vac_2d_spot_abl`**: re-running that deck with it would silently
+  march with full refraction, which is precisely the 2026-08-05 bug. The completed run is not in
+  doubt — its `warpx_used_inputs` records `laser_deposition.refraction = 0` and is committed,
+  which is *why* that file is tracked — but **a finished run's binary provenance can be
+  invalidated after the fact, by another project, without touching this repo at all**. So:
+  `strings <binary> | grep -x <key>` **at launch**, never assuming yesterday's build survived;
+  and when a result must be reproducible, record the branch and commit
+  (`git -C ~/warpx-cda log -1 --format=%h` into the run README) and rebuild from it rather than
+  trusting whatever the tree currently holds.
 - **Kill runs BY PID. `pkill -f` matches the shell you type it in.** Its own command line
   contains the pattern, so `pkill -f "warpx.2d inputs_P1_vac_2d_spot_omp"` killed the invoking
   shell (exit 144) and **everything chained after it never ran** — including the second `pkill`
