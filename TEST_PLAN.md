@@ -1541,3 +1541,241 @@ boundaries, is the project's headline output.
 - [x] `RESULTS.md` dated entry per substantive run or finding — held; ~25 entries
 - [x] Gates G1–G7 reported for every run — held, including the ones that legitimately WARN
       (`P1_vac_2d_spot_abl` runs with G3 open by decision, recorded in its config and README)
+
+**Phase 4 — cross-code validation (§12)**
+- [ ] **D1–D8 steered** — `runs/P4/README.md` decision register signed off
+- [ ] `deck.py` emits a `collisions:` block, in `--verify` (§12.3)
+- [ ] `deck.py` emits a hybrid solver block, in `--verify` (§12.3)
+- [ ] Collision-module gate: paper Appendix B `e-i` thermalisation vs Eq. (B1), and
+      Appendix C conductivity — **before** trusting `P4_lez_kin` (§12.8 risk 1)
+- [ ] `P4_lez_flash` deck + handoff note delivered to collaborator
+- [ ] FLASH outputs returned to shared; `t` = 0.1 ns snapshot in hand (D1)
+- [ ] `P4_lez_kin` ppc ladder 500 → 2000 → 10000, stopped on convergence
+- [ ] `P4_lez_hyb` (`electron_energy_mode = advected`) — control for §12.4
+- [ ] `scripts/xcode_compare.py` + the A1–A8 table
+- [ ] Verdict on the §12.6 hybrid prediction (passes A1/A4/A8, fails A2 at the front)
+
+---
+
+## 12. Phase 4 — cross-code validation against Lezhnin 2025 (`runs/P4/`)
+
+**The question.** Every result in Phases 0–3 is self-consistent: the operator is checked
+against its own upstream, and the physics against scalings derived here. Nothing has yet
+been checked against an **independent code solving different equations**. Phase 4 closes
+that, by replicating the benchmark of
+
+> K. V. Lezhnin et al., *Particle-in-cell simulations of expanding high energy density
+> plasmas with laser ray tracing*, Phys. Plasmas **32**, 022701 (2025)
+
+— which compared PSC (ray-traced PIC) against FLASH (radiation hydrodynamics) for
+long-pulse laser ablation of solid aluminium, and found agreement to 20 % in `n_e`, `T_e`,
+`T_i` and 10 % in flow speed.
+
+**The extension.** The paper is a two-way comparison (FLASH ↔ kinetic PIC). We run a
+**three-way** one, adding the hybrid solver in the middle:
+
+| Run | Model | Electrons | Ions | Why it is here |
+|---|---|---|---|---|
+| `P4_lez_flash` | FLASH rad-hydro | fluid, conducting | fluid | the independent reference |
+| `P4_lez_kin` | WarpX full PIC + ray tracing | kinetic | kinetic | the paper's PSC leg, in WarpX |
+| `P4_lez_hyb` | WarpX hybrid + ray tracing | fluid (Ohm's law) | kinetic | **the leg the paper does not have** |
+
+The hybrid leg is the scientifically new one. It sits exactly between the two published
+models, so if FLASH and full PIC agree and the hybrid does not, the disagreement localises
+to the electron closure — the one thing the hybrid changes. That is a sharper test of
+`feature/hybrid-laser` than any run we could design from scratch.
+
+### 12.1 The reference case, in numbers
+
+From the paper's §II, with the quantities we will compare against:
+
+| Quantity | Paper value | Derived here |
+|---|---|---|
+| Laser wavelength `λ₀` | 1.064 µm | `n_cr` = 9.848×10²⁶ m⁻³, `d_e,cr` = 0.1693 µm |
+| Intensity `I₀` | 10¹³ W/cm² | **1.0×10¹⁷ W/m²** |
+| Pulse | 0.9 ns flat-top + 0.1 ns linear rise | 1 ns total |
+| Target | solid Al, 2.7 g/cm³, `x` ∈ [0, 50] µm | fully ionised `Z` = 13, `T_e` = `T_i` = 290 K |
+| Ambient | Al vapour, 10⁻¹⁰ g/cm³ | FLASH only — PSC uses none |
+| FLASH domain | 800 µm, AMR level 4, CFL 0.4 | = 110 `d_i0` |
+| PSC domain | 1000 `d_e` = 100 `d_i0`, 5000 cells | 5 cells per `d_e` |
+| PSC target | 4.5 `d_i0` thick, capped at `n_max` = 10 `n_cr` | real solid Al is ~700 `n_cr` |
+| PSC particles | 10⁵ ppc per species **at** `n_cr` | resolves to 10⁻⁵ `n_cr` |
+| Reduced params | `m_p/m_e` = 100, `m_e c²` = 60 keV | so `m_Al/m_e` = 2698 |
+
+**The one analytic anchor worth stating up front.** The Manheimer steady-state ablation
+temperature, the paper's Eq. (15), is
+
+```
+T_e,SS = 5.94 µ^(1/3) Z^(-1/3) (λ₀/1 µm)^(4/3) (I/I₁₀)^(2/3)  eV,     I₁₀ = 10¹⁰ W/cm²
+```
+
+Note **`Z^(−1/3)`, not `Z^(+1/3)`** — the exponent is negative, and a text-layer extraction
+of the PDF drops the minus sign. With `µ` = 26.98, `Z` = 13, `λ₀` = 1.064 µm,
+`I` = 10¹³ W/cm² this gives
+
+```
+T_e,SS = 823 eV
+```
+
+which is the horizontal dashed line in the paper's Fig. 4(b) and matches the ~800 eV `T_e`
+plateau in Fig. 3(b). **Recovering 823 eV from the sign-correct formula is the cheapest
+possible check that we have read the paper right, and it is a hard target for all three
+runs.** The corresponding sound speed is `C_S` = 195 km/s, the proton skin depth at `n_cr`
+is `d_i0` = 7.256 µm, and the hydrodynamic ion response time is
+
+```
+d_i0 / C_S = 37.2 ps      =>   the 1 ns pulse is 26.9 ion response times
+```
+
+### 12.2 The unit map — the trap in this phase
+
+The paper carries **two different `d_i0`** and never says so in one place. Getting this
+wrong silently rescales every profile.
+
+- **In PSC's own units**, `m_p/m_e` = 100, so `d_i0` = 10 `d_e` and the 1000 `d_e` box is
+  100 `d_i0`. That is the number the deck sees.
+- **In the figures**, the top axis of Fig. 3 runs to 0.65 mm at `z/d_i` ≈ 85, i.e.
+  `d_i0` ≈ 7.6 µm — the **real** proton skin depth at `n_cr` (7.256 µm), not the reduced
+  one. That is also what makes the PSC box (726 µm) comparable to FLASH's 800 µm.
+
+**Rule for this phase: all three codes are compared in `(z/d_i0, t/(d_i0/C_S0))` with
+`d_i0` the *real* proton skin depth at `n_cr` = 7.256 µm, densities in `n_e/n_cr`, and
+temperatures in absolute eV.** Temperature is the one absolutely-scaled quantity, and it is
+absolute precisely because the laser pins it — which is the whole reason this benchmark
+bites. Any figure in this phase that plots a bare length in `d_e` is wrong by construction.
+
+A second consequence: WarpX has **real `c` and real `m_e`** and cannot reproduce PSC's
+`m_e c²` = 60 keV. We therefore match the *dimensionless* physics (`n_e/n_cr`, `T_e` in eV,
+`Z`, `m_p/m_e`) and accept a different `C_S/c` (0.00279 vs PSC's 0.00813). At 823 eV the
+flow is deeply non-relativistic, so `C_S/c` enters nothing but the step count — a cost
+parameter here, not a physics one.
+
+### 12.3 What must be built first (§12.0, a CODE sub-phase)
+
+Phase 4 cannot be generated by the current tooling. Two gaps, both real:
+
+1. **`deck.py` emits no collision block** (`grep -c collision src/laserprod/deck.py` = 0).
+   The paper is explicit that collisions are load-bearing — *"auxiliary simulations with
+   either collisions or laser heating turned off demonstrated drastically different plasma
+   evolution"* — so `P4_lez_kin` is meaningless without them. Needs a `collisions:` schema
+   block mapping to WarpX `collisions.*` (`BinaryCollision`, Coulomb, pairs `e-e`, `e-i`,
+   `i-i`).
+2. **`deck.py` emits no hybrid block.** `P4_lez_hyb` needs `algo.maxwell_solver = hybrid`,
+   `hybrid_pic_model.electron_energy_mode = advected`, and the three laser-deposition
+   hybrid swaps (`density_source = hybrid_rho`, `temperature_mode = hybrid_fluid`,
+   `deposit_to = fluid`) — all of which exist in the operator but have no config path.
+
+Both extend the existing `--verify` parse-back list, and both need tests in the style of
+`tests/test_profile_columns.py`.
+
+### 12.4 The known physics gap — no electron thermal conduction in the hybrid
+
+`hybrid_pic_model.electron_energy_mode = conducting` **aborts as unimplemented**; the
+message says so plainly: *"the energy equation is solved without a heat flux."* The
+available `advected` mode integrates
+
+```
+∂T_e/∂t + u_e·∇T_e = −(2/3) T_e ∇·u_e + (2/3) S/n_e
+```
+
+— advection, compression and the laser source, and **no ∇·q_e**.
+
+This matters more here than anywhere else in the project, because the paper's §III.C is
+*entirely* about heat flux: FLASH's ablation-front structure is set by Spitzer conduction
+with a Larsen flux limiter (`α_ele` = 0.06), and the paper's largest FLASH↔PSC discrepancy
+is exactly the conduction-controlled region between the solid interface and the critical
+surface. A hybrid run with no ∇·q_e should therefore **fail to reproduce the ablation-front
+temperature profile while still reproducing the underdense rarefaction**, since the
+rarefaction is advection-dominated.
+
+That prediction is worth measuring rather than assuming, so the phase runs `advected`
+first as a control. See decision **D2** in `runs/P4/README.md` for the two ways forward.
+
+### 12.5 The runs
+
+| Run | What it is | Cost |
+|---|---|---|
+| `P4_lez_flash` | FLASH 1D, `LaserSlab`-derived, paper parameters. **Deck only — we have no FLASH build.** Collaborator runs it and returns outputs to shared. | minutes (collaborator) |
+| `P4_lez_kin` | WarpX 1D full PIC + ray tracing + Coulomb collisions | ~0.1–1.8 GPU-h (ppc-dependent) |
+| `P4_lez_hyb` | WarpX 1D hybrid + ray tracing, `electron_energy_mode = advected` | ≪ the kinetic run (no electron macroparticles, no `ω_pe` step limit) |
+
+Sizing for `P4_lez_kin`, from `T_total` = 26.9 `d_i0/C_S0` = 96 600 `d_e/c`:
+
+| `dz/d_e` | CFL | cells | steps |
+|---|---|---|---|
+| 0.2 | 0.75 (paper) | 5000 | 644 000 |
+| 0.5 | 0.35 (project default) | 2000 | 552 000 |
+| 0.5 | 0.50 | 2000 | 386 000 |
+
+and at `dz/d_e` = 0.5, CFL 0.35:
+
+| ppc(e) at `n_cr` | particles | CPU-h | GPU-h |
+|---|---|---|---|
+| 500 | 0.53 M | 0.70 | 0.09 |
+| 2 000 | 2.13 M | 2.79 | 0.35 |
+| 10 000 | 10.7 M | 14.0 | 1.8 |
+
+The paper's 10⁵ ppc is ~18 GPU-h and buys only the 10⁻⁵ `n_cr` tail. **Run the ppc ladder
+500 → 2000 → 10000 and stop where the compared quantities stop moving** — the ladder is the
+deliverable, not the largest run.
+
+### 12.6 Acceptance — what "converge to the same effects" means
+
+Quantitative, using the paper's own tolerances so our agreement is comparable to theirs.
+All at `t` = 0.2, 0.4, 0.6, 0.8 ns, over the **underdense** region `n_e < n_cr`:
+
+| # | Quantity | Tolerance | Source |
+|---|---|---|---|
+| A1 | `n_e(z)/n_cr` | 20 % | paper §III.A |
+| A2 | `T_e(z)` [eV] | 20 % | paper §III.A |
+| A3 | `T_i(z)` [eV] | 20 % | paper §III.A |
+| A4 | `V_z(z)` | 10 % | paper §III.A |
+| A5 | `P_abs(z)/n_e` deposition profile | shape + integral | paper Fig. 3(e) |
+| A6 | `T_e` plateau vs `T_e,SS` = 823 eV | factor ~1; the paper's own runs exceed it late | Eq. (15) |
+| A7 | critical-surface speed | `V_z(z_cr)` ≈ 0.8 `C_S` (the paper's *measured* value, not the Mach-1 SS assumption) | paper §III.B |
+| A8 | rarefaction `n_e = n_cr e^(−z/C_S t)`, `V_z = C_S + z/t` | nominal agreement | Eqs. (16)–(17) |
+
+**Explicitly not required to agree**: the region inside the solid target (`n_e` > `n_cr`).
+The paper caps `n_max,PIC` at 10 `n_cr` against a true ~700 `n_cr`, so the overdense interior
+is a different physical object in PIC than in FLASH, and the paper says so. Claims in this
+phase are about the **ablated, underdense plasma** only.
+
+**The hybrid-specific expectation**, stated in advance so it can be falsified: `P4_lez_hyb`
+passes A1, A4, A8 (advection-dominated) and **fails A2 near the ablation front**
+(conduction-dominated), while `P4_lez_kin` passes both. If the hybrid passes A2 anyway then
+conduction is not setting the front at these parameters and §12.4's premise is wrong —
+which is a result worth having.
+
+### 12.7 Deliverables
+
+- `runs/P4/README.md` — the decision register (D1–D8) and the unit map
+- `runs/P4/P4_lez_flash/flash.par` + `README.md` + a collaborator-facing handoff note
+- `runs/P4/P4_lez_kin/config.yaml` + `README.md`
+- `runs/P4/P4_lez_hyb/config.yaml` + `README.md`
+- `src/laserprod/deck.py` — `collisions:` and hybrid-solver emission, in `--verify`
+- `scripts/xcode_compare.py` — reads FLASH output + both WarpX runs, emits the A1–A8 table
+  and the paper's Fig. 3 / Fig. 4 analogues on the common `(z/d_i0, t/(d_i0/C_S0))` axes
+- `RESULTS.md` entry with the A1–A8 verdicts
+
+### 12.8 Risks specific to this phase
+
+1. **Collision rates under a reduced mass ratio.** PSC implements a *special* correction to
+   match `e-i` and `i-i` rates when `m_p/m_e` and `c` are reduced (their Ref. 47). WarpX's
+   `BinaryCollision` is not known to have an equivalent. If it does not, the kinetic run's
+   transport is distorted in a way that is invisible unless checked — so **reproduce the
+   paper's Appendix B/C tests first**: `e-i` thermalisation against their Eq. (B1) in a
+   2 `d_i` periodic box, and the conductivity test. Cheap, and it is the gate on trusting
+   `P4_lez_kin` at all.
+2. **The initial-plasma problem.** The paper does not start PSC from a cold solid — it
+   starts from the FLASH `t` = 0.1 ns snapshot, because a sharp solid edge gives either
+   `n_e ≫ n_cr` or `n_e` = 0 along a ray and the tracer fully reflects. Our runs inherit
+   this exactly. See decision **D1**.
+3. **No pulse ramp.** The operator expresses a pulse only through
+   `intervals = start:stop:period`, i.e. flat-top. The paper's 0.1 ns linear rise cannot be
+   represented. Since PSC starts at `t` = 0.1 ns — *after* the ramp — this is consistent for
+   the WarpX legs, but the FLASH deck must keep the ramp or its snapshot will not match.
+4. **`lnΛ` is a global constant in the paper.** PSC applies a single `lnΛ` box-wide; our
+   operator computes it per cell (the `lnLambda` column). The paper flags this as a source
+   of its FLASH↔PSC heat-flux discrepancy. Our per-cell treatment is *better*, so we should
+   expect to differ from PSC here and agree with FLASH better. Do not "fix" this by forcing
+   a global value without recording both.
