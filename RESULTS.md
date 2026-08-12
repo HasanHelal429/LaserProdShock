@@ -2502,3 +2502,93 @@ density-weighted value here (370 vs 184 eV on axis in `P1_vac_2d_spot_abl`), whi
 `TEST_PLAN.md` §11 was also reconciled against what is on disk — nine items marked done or
 partial with evidence, two corrected rather than ticked (the planar-vs-1D comparison is open only
 because `P1_vac_2d_off` predates the clamp fix; `t_s` is retired rather than measured).
+
+---
+
+## 2026-08-12 — Phase 4 designed: three-way cross-code benchmark against Lezhnin 2025
+
+**No runs.** This entry records a phase design, two paper-reading findings that would each
+have produced a confidently wrong figure, and the code that closes the tooling gaps.
+
+**The phase.** Replicate Lezhnin et al., *Phys. Plasmas* **32**, 022701 (2025) — long-pulse
+(1 ns, 10¹³ W/cm², 1.064 µm) laser ablation of solid aluminium — as a **three-way**
+comparison where the paper ran a two-way one. FLASH (rad-hydro, collaborator-run) and full
+PIC are the paper's two models; the **hybrid** leg is new, and it sits exactly between them.
+Because it differs from the kinetic leg in *only* the electron closure (verified
+mechanically: the two configs agree on all 15 shared physics keys), a disagreement it shows
+against both bracketing models localises to the closure. Full spec in `TEST_PLAN.md` §12.
+
+**Finding 1 — the sign in Eq. (15) is negative, and a text extraction drops it.** The
+Manheimer steady-state ablation temperature carries **`Z^(−1/3)`**, not `Z^(+1/3)`. With
+`µ` = 26.98, `Z` = 13, `λ₀` = 1.064 µm, `I` = 10¹³ W/cm²:
+
+```
+T_e,SS = 823 eV
+```
+
+which matches the ~800 eV plateau in the paper's Fig. 3(b) and the dashed line in Fig. 4(b).
+The positive exponent gives 4.6 keV — off by 5.6×, and *plausible-looking*, which is the
+dangerous kind of wrong. Confirmed by reading the rendered PDF page rather than the text
+layer. This is now the phase's cheapest correctness check: any leg whose underdense `T_e`
+plateau is not within a factor of order one of 823 eV has a setup error.
+
+**Finding 2 — the paper carries two incompatible `d_i0`, and the gap is the mass-ratio
+reduction.** In PSC's deck `m_p/m_e` = 100, so `d_i0` = 10 `d_e` and the box is "100 `d_i0`".
+But Fig. 3's top axis runs to 0.65 mm at `z/d_i` ≈ 85, i.e. `d_i0` ≈ 7.6 µm — the **real**
+proton skin depth at `n_cr` (7.256 µm), which is what lets the paper set its box beside
+FLASH's 800 µm. **These are not compatible in physical units.** Our convention gives a
+1000 `d_e` box = **169.3 µm**, not 726 µm.
+
+Two rescalings follow, with *different powers*, which is the part most likely to be got
+wrong:
+
+| quantity | factor | why |
+|---|---|---|
+| length | `√(1836/100)` = **4.29** | `d_i0 ∝ √m_i` |
+| time | `1836/100` = **18.36** | `t ∼ L/v ∝ √m·√m = m` |
+
+So `P4_lez_kin`'s **54.66 ps is the paper's 1000 ps**. Rule adopted: compare in normalised
+units, each code with its own `d_i0`; densities in `n_e/n_cr`; temperatures in absolute eV.
+Never overlay two codes on a µm or ps axis in this phase.
+
+**Code — the §12.3 gaps are closed.** `deck.py` emitted neither collisions nor a hybrid
+block. Both now exist and are in `--verify`. Four things found in the doing, each of which
+would have produced a *running* simulation of the wrong problem:
+
+1. The operator's tokens are `species` | `electron_fluid`, **not** `particles` | `fluid`.
+   The schema now uses the operator's own spelling rather than a synonym.
+2. A hybrid deck must emit **no electron macroparticles at all** — the Ohm's-law solver
+   forms `J_e` by subtraction, so a stray electron species is counted as an ion and
+   subtracted twice. Nothing crashes.
+3. `laser_deposition.species` must be **omitted, not emptied**, in the fluid path: WarpX
+   aborts on a list nothing reads, because a stale list is how a deck comes to claim it
+   heats something it does not.
+4. A collisions pair naming a species the deck never creates aborts at WarpX **startup** —
+   after the queue has handed over the GPU. Pairs are now validated at config time against
+   the species that will actually be emitted.
+
+**Gates.** A hybrid run has no electron macroparticles, so the `ω_pe` and Debye constraints
+do not *exist* for it. G1/G2 now report `n/a` rather than `pass` — `pass` would read as
+"checked and fine", a different claim. G3 likewise, since grid heating is a macroparticle
+effect.
+
+**`P4_lez_kin_off` added, reversing an earlier decision.** The kinetic leg was first written
+with G3 declared unnecessary, on the argument that a cross-code comparison is a stronger
+attribution test than a laser-off control. That is wrong: G2 reports `dz/λ_D` = **113** in
+the cold dense target, so numerical grid heating is a live threat to `T_e` — the one
+quantity the whole benchmark turns on — and it would have corrupted both the measurement
+*and* our reading of any disagreement. At ~0.09 GPU-h it is the cheapest insurance in the
+phase. Its off-switch is `intensity = 0`, not `intervals = 0`: `config.py` detects a control
+by the former, so the latter left the pair looking un-controlled to the gates.
+
+**Also corrected before launch:** the `ray_cfl` ladder initially pointed at
+`studies/exit_overshoot`, which was measured on a 1.5 `n_cr` target with **no interior
+critical surface**. Phase 4 runs a 10 `n_cr` target (the paper's `n_max,PIC`), so the ray
+turns *inside* the plasma — precisely G4's non-monotonic regime. A fresh ladder at this
+density is required, and the deposition profile is acceptance criterion A5, so this is not
+bookkeeping.
+
+**State.** Four run directories written with geometry diagrams; three WarpX decks generate
+and round-trip through `--verify`; all gates clean; `tests/test_phase4_schema.py` adds 13
+checks, 271 in the suite. **Nothing launched** — D1 (initial condition), D2 (whether to
+implement `conducting`) and D8 (FLASH output format/location) are open and need steering.

@@ -7,10 +7,16 @@ whether they converge:
 |---|---|---|---|---|
 | `P4_lez_flash` | FLASH rad-hydro | fluid, conducting | fluid | **collaborator** (we have no FLASH build) |
 | `P4_lez_kin` | WarpX full PIC + ray tracing | kinetic | kinetic | us |
+| `P4_lez_kin_off` | G3 control (`intensity = 0`) | kinetic | kinetic | us |
 | `P4_lez_hyb` | WarpX hybrid + ray tracing | fluid (Ohm's law) | kinetic | us |
 
 Spec: `TEST_PLAN.md` §12. Reference: Phys. Plasmas **32**, 022701 (2025);
 PDF in the repo root.
+
+**Status (2026-08-12).** All four run directories written; the §12.3 tooling gaps are
+closed, so the three WarpX legs generate runnable decks that round-trip through
+`--verify`, with every gate clean. Nothing has been launched. What is still needed before
+anything runs is on you: **D1, D2 and D8** below.
 
 ---
 
@@ -108,7 +114,9 @@ about heat flux.
 difference between "our hybrid can drive shocks" and "our hybrid can model ablation". But
 doing it before (a) means building a solver with no baseline to prove it changed anything.
 
-**Currently configured:** `advected` (the control leg of c).
+**Currently configured:** `advected` (the control leg of c). The config path now exists —
+`electron_energy_mode = conducting` is refused at *config* time with the reason, rather
+than aborting inside WarpX after the queue has handed over the GPU.
 
 ---
 
