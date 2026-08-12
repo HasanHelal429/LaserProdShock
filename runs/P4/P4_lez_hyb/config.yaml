@@ -36,7 +36,7 @@ laser:
   # electron density or a per-cell kinetic temperature. It reads the fluid's instead.
   density_source: hybrid_rho        # n_e from the hybrid solver's rho, not from species
   temperature_mode: hybrid_fluid    # T_e from the Ohm's-law solver's temperature field
-  deposit_to: fluid                 # P_abs becomes a source term S in the electron
+  deposit_to: electron_fluid        # P_abs becomes a source term S in the electron
                                     # energy equation, NOT a momentum kick on particles
 
 solver:                       # ==== NOT YET EMITTED BY deck.py -- TEST_PLAN 12.3 ====
@@ -126,6 +126,9 @@ controls:
   laser_off: null
   sibling_kinetic: P4_lez_kin
   sibling_flash: P4_lez_flash
+  ray_cfl_ladder: studies/p4_ray_cfl (shared with P4_lez_kin -- the ray march is
+    identical in the two runs, and the 10 n_cr target puts the turning point INSIDE the
+    plasma, which is G4's non-monotonic regime. Same ladder, run once, applies to both.)
   step_zero_trap: hybrid WarpX writes step-0 diagnostics BEFORE rho is deposited -- never
     baseline on the step-0 dump (see project memory, and CLAUDE.md)
 

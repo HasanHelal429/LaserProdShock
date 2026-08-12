@@ -1,13 +1,14 @@
 meta:
-  run_id: P4_lez_kin
+  run_id: P4_lez_kin_off
   phase: 4
-  deck: inputs_P4_lez_kin
-  description: Phase-4 fully KINETIC leg of the three-way cross-code benchmark against
-    Lezhnin 2025 (Phys. Plasmas 32, 022701). Long-pulse (1 ns, 1e17 W/m^2, 1.064 um)
-    ray-traced ablation of a fully-ionised aluminium target into vacuum, 1D, with
-    Coulomb collisions ON -- the paper is explicit that collisions are load-bearing.
-    This is the WarpX counterpart of the paper's PSC run, and the arbiter for the
-    hybrid leg P4_lez_hyb, which differs from it ONLY in the electron closure.
+  deck: inputs_P4_lez_kin_off
+  description: G3 laser-off CONTROL for P4_lez_kin. Bit-identical to it in every
+    respect except that the laser never fires (laser.intervals = 0). Its purpose is to
+    measure what the electron temperature does with NO laser at all, so that the T_e
+    rise in P4_lez_kin can be attributed to inverse-bremsstrahlung absorption rather
+    than to numerical grid heating. G2 reports dz/lambda_D = 113 in the cold dense
+    target, so that heating is a real and expected effect, not a hypothetical one --
+    and T_e to 20 percent is the ENTIRE content of the Phase-4 benchmark.
   reference: TEST_PLAN.md 12; decision register runs/P4/README.md (D1-D8)
 
 reference:
@@ -22,7 +23,11 @@ reference:
 
 laser:
   wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
-  intensity: 1.0e17           # = 1e13 W/cm^2, the paper's value
+  intensity: 0.0              # LASER OFF -- the one and only difference from
+                              # P4_lez_kin. This is the project's established
+                              # lever: config.py detects a control by
+                              # intensity == 0, and the deck generator keys off
+                              # it too (intervals alone would not disable it).
   direction: z
   inject_side: hi
   incidence_angle_deg: 0.0
@@ -33,7 +38,8 @@ laser:
                               # TEST_PLAN 12.8 risk 4 -- record BOTH, do not silently
                               # switch.
   temperature_mode: local
-  intervals: 10
+  intervals: 10               # kept identical to P4_lez_kin so the decks differ
+                              # in exactly one number
   ray_cfl: 0.25               # gate G4
   profile_intervals: 27648
   beam:
@@ -130,26 +136,12 @@ gates:
   compression_factor: 2.0
 
 controls:
-  laser_off: P4_lez_kin_off   # REQUIRED here, and G3 is right to demand it. This run's
-                              # entire content is measuring T_e to 20%, and G2 reports
-                              # dz/lambda_D = 113 in the cold dense target -- badly
-                              # under-resolved, so numerical grid heating is a live threat
-                              # to the ONE quantity the benchmark turns on. The control is
-                              # 0.09 GPU-h. An earlier draft argued the cross-code
-                              # comparison substitutes for G3; it does not -- grid heating
-                              # would corrupt both the measurement AND our reading of the
-                              # disagreement.
-  sibling_hybrid: P4_lez_hyb  # identical physics, different electron closure
-  sibling_flash: P4_lez_flash
+  physics_run: P4_lez_kin      # the run this is the G3 control FOR
   ppc_ladder: [500, 2000, 10000]
-  ray_cfl_ladder: studies/p4_ray_cfl (TO BE RUN -- the existing studies/exit_overshoot
-    ladder was measured on a 1.5 n_cr target with NO interior critical surface. This run
-    is 10 n_cr, so the ray turns inside the plasma and G4's non-monotonicity warning
-    genuinely applies. The deposition profile is acceptance criterion A5, so the ladder
-    is not optional bookkeeping here -- rerun 0.05/0.10/0.25/0.50 at THIS target density
-    before the production run.)
-  collision_gate: paper Appendix B (e-i thermalisation vs Eq. B1) and Appendix C
-    (conductivity) MUST pass before this run is believed -- TEST_PLAN 12.8 risk 1
+  ray_cfl_ladder: studies/p4_ray_cfl (moot at intensity 0; declared so this deck stays
+    identical to P4_lez_kin in every respect the gates can see -- the same convention
+    P1_vac_1d_off uses)
+  collision_gate: paper Appendix B and C -- applies to the pair, see P4_lez_kin
 
 targets:
   # The hard, sign-checked anchor. Eq. (15) of the paper carries Z^(-1/3), NOT Z^(+1/3);

@@ -52,7 +52,14 @@ def test_every_config_loads_validates_and_renders(run_dir):
     lpconfig.validate(cfg)              # raises on a hard error
     sc = lpconfig.derive(cfg)
     text = lpdeck.render(cfg)
-    assert "laser_deposition.species" in text
+    # `species` must be OMITTED, not emptied, when the operator reads n_e from the fluid
+    # and deposits into it: WarpX aborts on a species list nothing would read, because a
+    # stale list is how a deck comes to claim it heats something it does not.
+    if str(cfg["laser"].get("deposit_to", "species")) == "electron_fluid":
+        assert "laser_deposition.species" not in text
+        assert "laser_deposition.deposit_to           = electron_fluid" in text
+    else:
+        assert "laser_deposition.species" in text
     assert f"geometry.dims     = {sc.dims}" in text
     # the operator needs verbose output for its LASERDEP diagnostic
     assert "warpx.verbose = 1" in text
@@ -212,11 +219,18 @@ def test_vacuum_runs_have_only_target_species():
         cfg = lpconfig.load(run_dir)
         d = lpdeck.parse_inputs_str(lpdeck.render(cfg))
         names = d["particles.species_names"].split()
+        # A hybrid run's electrons are a FLUID -- there are no electron macroparticles,
+        # and emitting some would double-count the charge the Ohm's-law solver already
+        # carries (it forms J_e by subtraction, so a stray electron species is counted
+        # as an ion and subtracted twice).
+        hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
         if lpconfig.is_vacuum(cfg):
-            assert names == ["targ_electrons", "targ_ions"], os.path.basename(run_dir)
+            expect = ["targ_ions"] if hybrid else ["targ_electrons", "targ_ions"]
+        elif hybrid:
+            expect = ["targ_ions", "amb_ions"]
         else:
-            assert names == ["targ_electrons", "targ_ions",
-                             "amb_electrons", "amb_ions"], os.path.basename(run_dir)
+            expect = ["targ_electrons", "targ_ions", "amb_electrons", "amb_ions"]
+        assert names == expect, os.path.basename(run_dir)
 
 
 def test_coulomb_log_mode_reaches_the_deck_and_is_verified():

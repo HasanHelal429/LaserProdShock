@@ -206,8 +206,79 @@ def validate(cfg: dict) -> list[str]:
                          f"({dims}), got {len(beam['focus_de'])}")
     if str(las.get("inject_side", "lo")) not in ("lo", "hi"):
         raise ValueError("laser.inject_side must be 'lo' or 'hi'")
-    if str(las.get("temperature_mode", "local")) not in ("local", "fixed"):
-        raise ValueError("laser.temperature_mode must be 'local' or 'fixed'")
+    # 'hybrid_fluid' is the third value: it reads T_e from the Ohm's-law solver's
+    # temperature field instead of measuring it from electron macroparticles -- which a
+    # hybrid run does not have. Only meaningful under a hybrid solver, and the operator
+    # itself asserts the same pairing with density_source.
+    tmode = str(las.get("temperature_mode", "local"))
+    if tmode not in ("local", "fixed", "hybrid_fluid"):
+        raise ValueError("laser.temperature_mode must be 'local', 'fixed' or "
+                         "'hybrid_fluid'")
+    solver = (cfg.get("solver") or {})
+    is_hybrid = str(solver.get("type", "em")) == "hybrid"
+    if tmode == "hybrid_fluid" and not is_hybrid:
+        raise ValueError("laser.temperature_mode = 'hybrid_fluid' requires "
+                         "solver.type = 'hybrid'")
+    dsrc = str(las.get("density_source", "species"))
+    if dsrc not in ("species", "hybrid_rho"):
+        raise ValueError("laser.density_source must be 'species' or 'hybrid_rho'")
+    if tmode == "hybrid_fluid" and dsrc != "hybrid_rho":
+        # mirrors the operator's own assert: the fluid T_e is read onto the same grid as
+        # the fluid n_e, so taking one without the other is incoherent.
+        raise ValueError("laser.temperature_mode = 'hybrid_fluid' requires "
+                         "laser.density_source = 'hybrid_rho'")
+    # Tokens are the OPERATOR's own ('species' | 'electron_fluid'), not a friendlier
+    # synonym: a translation layer here is one more place for the deck to drift from what
+    # WarpX actually parses.
+    dep = str(las.get("deposit_to", "species"))
+    if dep not in ("species", "electron_fluid"):
+        raise ValueError("laser.deposit_to must be 'species' or 'electron_fluid'")
+    if dep == "electron_fluid" and dsrc != "hybrid_rho":
+        raise ValueError("laser.deposit_to = 'electron_fluid' requires "
+                         "laser.density_source = 'hybrid_rho'")
+    if is_hybrid:
+        hyb = solver.get("hybrid") or {}
+        ee = str(hyb.get("electron_energy_mode", "none"))
+        if ee not in ("none", "source_only", "advected"):
+            # 'conducting' parses in WarpX only to abort with an explanation; refuse it
+            # here so the failure arrives at config time, not 500k steps in.
+            raise ValueError(
+                "solver.hybrid.electron_energy_mode must be none|source_only|advected"
+                + (" -- 'conducting' is NOT implemented in WarpX (it aborts: the energy "
+                   "equation is solved without a heat flux)" if ee == "conducting" else ""))
+        if ee == "advected" and hyb.get("gamma") is not None:
+            raise ValueError(
+                "solver.hybrid.gamma must be absent when electron_energy_mode = "
+                "'advected': that mode solves eps = (3/2) n kB Te, which fixes "
+                "gamma = 5/3, and applying the polytropic closure on top double-counts "
+                "compression heating")
+        if dep != "electron_fluid":
+            raise ValueError("solver.type = 'hybrid' requires laser.deposit_to = "
+                             "'electron_fluid' -- a hybrid run has no electron "
+                             "macroparticles to kick")
+
+    # --- collisions block (optional) ---
+    col = cfg.get("collisions") or {}
+    if col.get("enabled"):
+        if str(col.get("type", "coulomb")) != "coulomb":
+            raise ValueError("collisions.type must be 'coulomb'")
+        pairs = col.get("pairs")
+        if not isinstance(pairs, list) or not pairs:
+            raise ValueError("collisions.enabled requires a non-empty collisions.pairs "
+                             "list of [species_a, species_b]")
+        # Validate against the species that will ACTUALLY be emitted. A pair naming a
+        # species the deck never creates aborts inside WarpX at startup -- after the
+        # queue has handed over the GPU, which is the expensive place to find out.
+        from . import deck as _deck          # local import: deck imports config
+        known = set(_deck._species_table(cfg))
+        for pr in pairs:
+            if not (isinstance(pr, (list, tuple)) and len(pr) == 2):
+                raise ValueError(f"collisions.pairs entries must be [a, b] (got {pr!r})")
+            for nm in pr:
+                if str(nm) not in known:
+                    raise ValueError(
+                        f"collisions.pairs names unknown species {str(nm)!r}; "
+                        f"this run has {sorted(known)}")
     # lnLambda: a constant knob, or evaluated per cell from the local (n_e, T_e).
     # See units.coulomb_log_for for what each mode is and which one is physical.
     if str(las.get("coulomb_log_mode", "constant")) not in COULOMB_LOG_MODES:
@@ -302,12 +373,26 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
     g = (cfg.get("gates") or {})
     out: list[Gate] = []
 
+    # A hybrid run has NO electron macroparticles, so the omega_pe and Debye
+    # constraints do not exist for it -- not "are relaxed", do not exist. A config says
+    # so by setting the gate limit to null, and the gate then reports `n/a` rather than
+    # silently passing (which would read as "checked and fine").
+    hybrid_solver = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
+
     # --- G1: omega_pe*dt at the PEAK compressed density ---
-    lim = float(g.get("omega_pe_dt_max", 1.2))
+    if "omega_pe_dt_max" in g and g["omega_pe_dt_max"] is None:
+        out.append(Gate("G1", "omega_pe*dt at peak", "info", None,
+                        "n/a: no electron macroparticles to be resolved"
+                        if hybrid_solver else
+                        "n/a: gates.omega_pe_dt_max explicitly null"))
+        lim = None
+    else:
+        lim = float(g.get("omega_pe_dt_max", 1.2))
     comp = float(g.get("compression_factor", 2.0))
-    status = "pass" if sc.wpe_dt_peak <= lim else (
+    if lim is not None:
+      status = "pass" if sc.wpe_dt_peak <= lim else (
         "warn" if sc.wpe_dt_peak < 2.0 else "fail")
-    out.append(Gate(
+      out.append(Gate(
         "G1", f"omega_pe*dt at {comp:g}x compression", status, sc.wpe_dt_peak,
         f"initial {sc.wpe_dt_targ:.3f} at {sc.n_targ_over_ncr:.2f} n_cr; "
         f"{sc.wpe_dt_peak:.3f} at {comp:g}x; limit 2 reached at "
@@ -316,12 +401,20 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
         "about how dense the plasma is."))
 
     # --- G2: dz/lambda_D per region ---
-    lim2 = float(g.get("dz_over_lambdaD_max", 8.0))
+    if "dz_over_lambdaD_max" in g and g["dz_over_lambdaD_max"] is None:
+        out.append(Gate("G2", "dz/lambda_D per region", "info", None,
+                        "n/a: the hybrid does not resolve the Debye length by design"
+                        if hybrid_solver else
+                        "n/a: gates.dz_over_lambdaD_max explicitly null"))
+        lim2 = None
+    else:
+        lim2 = float(g.get("dz_over_lambdaD_max", 8.0))
     parts = [f"target(cold) {sc.dz_over_lD_targ:.0f}"]
     if sc.dz_over_lD_amb is not None:
         parts.append(f"ambient {sc.dz_over_lD_amb:.1f}")
-    amb_bad = sc.dz_over_lD_amb is not None and sc.dz_over_lD_amb > lim2
-    out.append(Gate(
+    if lim2 is not None:
+      amb_bad = sc.dz_over_lD_amb is not None and sc.dz_over_lD_amb > lim2
+      out.append(Gate(
         "G2", "dz/lambda_D per region", "warn" if amb_bad else "info",
         sc.dz_over_lD_targ,
         ", ".join(parts) + f" (ambient budget {lim2:g}). "
@@ -341,6 +434,14 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
         out.append(Gate("G3", "laser-off control", "pass" if exists else "warn", None,
                         f"declared control {off!r}"
                         + ("" if exists else " -- but that run directory does not exist")))
+    elif hybrid_solver:
+        # G3 exists to separate laser heating from GRID heating, and grid heating is an
+        # electron-macroparticle effect. A hybrid run has none, so the control does not
+        # buy what it buys elsewhere. Reported as info, never silently passed.
+        out.append(Gate("G3", "laser-off control", "info", None,
+                        "n/a: no electron macroparticles, so there is no particle "
+                        "grid-heating channel for a laser-off run to isolate. The "
+                        "energy question here is the electron energy equation (G6)."))
     else:
         out.append(Gate("G3", "laser-off control", "warn", None,
                         "no controls.laser_off declared. The cold target is Debye-"
@@ -364,7 +465,8 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
     # --- G5: ppc for local temperature mode ---
     ppc = (cfg["numerics"].get("ppc") or {})
     ppc_t = int(ppc.get("target", 0))
-    local = str(cfg["laser"].get("temperature_mode", "local")) == "local"
+    _tm = str(cfg["laser"].get("temperature_mode", "local"))
+    local = _tm == "local"
     lim5 = int(g.get("ppc_target_min", 200))
     status = "info" if not local else ("pass" if ppc_t >= lim5 else "warn")
     # Order-of-magnitude bias on <T^-3/2>: with N macroparticles per cell the
@@ -374,11 +476,16 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
     bias = (15.0 / 8.0) * (2.0 / (3.0 * ppc_t)) if ppc_t else float("nan")
     out.append(Gate(
         "G5", "ppc for local T_e", status, float(ppc_t),
-        f"target ppc {ppc_t}, mode {'local' if local else 'fixed'}. "
+        f"target ppc {ppc_t}, mode {_tm}. "
         + (f"Absorption bias <~{bias*100:.1f}% (upper bound; T^-3/2 is convex, so "
            f"per-cell noise biases K HIGH -- measured ~3% at 25 ppc, <0.1% at 800; "
            f"budget {lim5} ppc). Watch Tlocalfrac."
-           if local else "fixed mode: no ppc-driven absorption bias.")))
+           if local else
+           ("hybrid_fluid mode: T_e is a SOLVED FIELD, not a particle moment, so there "
+            "is no ppc-driven absorption bias -- and no Tlocalfrac to watch. The "
+            "accuracy question moves to the electron energy equation instead."
+            if _tm == "hybrid_fluid"
+            else "fixed mode: no ppc-driven absorption bias."))))
 
     # --- G6: energy closure (post-run) ---
     out.append(Gate("G6", "energy closure", "post", None,

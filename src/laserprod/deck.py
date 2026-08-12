@@ -97,12 +97,17 @@ def _species_table(cfg: dict) -> dict:
     functions. ``species_extra`` in the config can add per-species overrides.
     """
     Z = int(cfg["reference"].get("charge_state", 1))
-    tab = {
-        "targ_electrons": {"kind": "electron", "role": "target"},
-        "targ_ions": {"kind": "ion", "role": "target", "charge_state": Z},
-    }
+    # A hybrid run's electrons are a FLUID: there are no electron macroparticles at all,
+    # and emitting some would both cost the compute the hybrid exists to save and
+    # double-count the charge the Ohm's-law solver already carries.
+    hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
+    tab = {}
+    if not hybrid:
+        tab["targ_electrons"] = {"kind": "electron", "role": "target"}
+    tab["targ_ions"] = {"kind": "ion", "role": "target", "charge_state": Z}
     if not is_vacuum(cfg):
-        tab["amb_electrons"] = {"kind": "electron", "role": "ambient"}
+        if not hybrid:
+            tab["amb_electrons"] = {"kind": "electron", "role": "ambient"}
         tab["amb_ions"] = {"kind": "ion", "role": "ambient", "charge_state": Z}
     for name, over in (cfg.get("species_extra") or {}).items():
         tab.setdefault(name, {}).update(over)
@@ -371,6 +376,65 @@ def render(cfg: dict) -> str:
     a(f"boundary.particle_lo = {' '.join(plo_bc)}")
     a(f"boundary.particle_hi = {' '.join(phi_bc)}")
     a("")
+    # --- Coulomb collisions -----------------------------------------------
+    # Load-bearing for the Phase-4 benchmark: Lezhnin 2025 reports that turning off
+    # EITHER collisions or laser heating gives "drastically different plasma evolution".
+    col = cfg.get("collisions") or {}
+    if col.get("enabled"):
+        names, blocks = [], []
+        for pr in col["pairs"]:
+            a_s, b_s = str(pr[0]), str(pr[1])
+            # WarpX takes ONE name for intra-species collisions, two otherwise.
+            spec = a_s if a_s == b_s else f"{a_s} {b_s}"
+            nm = f"c_{a_s}_{b_s}" if a_s != b_s else f"c_{a_s}"
+            names.append(nm)
+            blocks.append((nm, spec))
+        a("")
+        a("# --- Coulomb collisions ----------------------------------------------")
+        a(f"collisions.collision_names = {' '.join(names)}")
+        for nm, spec in blocks:
+            a(f"{nm}.type    = pairwisecoulomb")
+            a(f"{nm}.species = {spec}")
+            if col.get("coulomb_log") is not None:
+                # One global lnLambda, matching the paper's own simplification. Note the
+                # laser operator can evaluate lnLambda PER CELL; the paper flags the
+                # global value as a source of its FLASH<->PSC heat-flux discrepancy, so
+                # the two settings are recorded separately rather than silently unified.
+                a(f"{nm}.CoulombLog = {_num(col['coulomb_log'])}")
+            if col.get("intervals") is not None:
+                a(f"{nm}.ndt_supercycle = {int(col['intervals'])}")
+        a("")
+
+    solver = (cfg.get("solver") or {})
+    if str(solver.get("type", "em")) == "hybrid":
+        hyb = solver.get("hybrid") or {}
+        a("")
+        a("# --- hybrid (Ohm's law) field solver ---------------------------------")
+        a("# Kinetic ions, fluid electrons. There are no electron macroparticles, which is")
+        a("# why the omega_pe and Debye gates report n/a for this run.")
+        a("algo.maxwell_solver = hybrid")
+        ee = str(hyb.get("electron_energy_mode", "none"))
+        a(f"hybrid_pic_model.electron_energy_mode = {ee}")
+        if ee == "advected":
+            # eps = (3/2) n kB Te fixes gamma = 5/3; WarpX aborts on a conflicting gamma,
+            # and config.validate() refuses one, so none is emitted here by construction.
+            a(f"hybrid_pic_model.electron_temp_init = "
+              f"{str(hyb.get('electron_temp_init', 'polytropic'))}")
+        if hyb.get("elec_temp") is not None:
+            a(f"hybrid_pic_model.elec_temp = {_num(hyb['elec_temp'])}")
+        if hyb.get("n0_ref_over_ncr") is not None:
+            a(f"hybrid_pic_model.n0_ref = {_num(float(hyb['n0_ref_over_ncr']) * sc.n_cr)}")
+        if hyb.get("plasma_resistivity") is not None:
+            a(f"hybrid_pic_model.plasma_resistivity(rho,J,t) = "
+              f"{_num(hyb['plasma_resistivity'])}")
+        if hyb.get("plasma_hyper_resistivity") is not None:
+            a(f"hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "
+              f"{_num(hyb['plasma_hyper_resistivity'])}")
+        if hyb.get("n_floor_over_ncr") is not None:
+            a(f"hybrid_pic_model.n_floor = {_num(float(hyb['n_floor_over_ncr']) * sc.n_cr)}")
+        if hyb.get("substeps") is not None:
+            a(f"hybrid_pic_model.substeps = {int(hyb['substeps'])}")
+        a("")
     a(f"algo.particle_shape = {int(num.get('particle_shape', 2))}")
     if num.get("random_seed") is not None:
         # Fixing the seed makes a run bit-reproducible AND lets a seed sweep measure the
@@ -433,7 +497,11 @@ def render(cfg: dict) -> str:
     a("# energy and produced a 0.06 c piston that crossed the domain in a fraction of a")
     a("# gyroperiod. Change them in small steps.")
     a("# " + "-" * 72)
-    a(f"laser_deposition.species              = {' '.join(heated)}")
+    # The operator ABORTS if `species` is present while density_source = hybrid_rho and
+    # deposit_to = electron_fluid: nothing would read it, and a stale list is how a deck
+    # comes to claim it heats something it does not. So omit the key, do not empty it.
+    if heated:
+        a(f"laser_deposition.species              = {' '.join(heated)}")
     a(f"laser_deposition.wavelength           = lam0")
     a(f"laser_deposition.intensity            = {_num(las['intensity'])}")
     a(f"laser_deposition.direction            = {str(las.get('direction', 'z'))}")
@@ -455,6 +523,15 @@ def render(cfg: dict) -> str:
           f"{str(las['coulomb_log_mode'])}")
     a(f"laser_deposition.electron_temperature = th_t")
     a(f"laser_deposition.temperature_mode     = {str(las.get('temperature_mode', 'local'))}")
+    # The three hybrid swaps. A hybrid run has no electron macroparticles, so the operator
+    # cannot form a CIC electron density or a per-cell kinetic temperature -- it reads the
+    # fluid's instead, and deposits into the fluid's energy equation rather than kicking
+    # particles. config.validate() enforces that these three move together.
+    if str(las.get("density_source", "species")) != "species":
+        a(f"laser_deposition.density_source       = "
+          f"{str(las['density_source'])}")
+    if str(las.get("deposit_to", "particles")) != "particles":
+        a(f"laser_deposition.deposit_to           = {str(las['deposit_to'])}")
     if las.get("temperature_floor_theta") is not None:
         a(f"laser_deposition.temperature_floor    = "
           f"{_num(las['temperature_floor_theta'])}")
@@ -722,6 +799,10 @@ def key_params(path: str) -> dict:
                     ("temperature_mode", str), ("coulomb_log_mode", str),
                     ("intervals", str),
                     ("beam_profile", str), ("profile_intervals", str),
+                    # The three hybrid swaps change WHAT is measured and WHERE the energy
+                    # goes, so a stale binary silently ignoring one would invalidate the
+                    # run exactly the way a stale `refraction` did (CLAUDE.md).
+                    ("density_source", str), ("deposit_to", str),
                     ("profile_prefix", str)):
         kk = f"laser_deposition.{k}"
         if kk in d:
@@ -753,6 +834,27 @@ def key_params(path: str) -> dict:
         if k in d:
             out[f"dens:{sp}"] = d[k].strip('"').replace(" ", "")
     out["species_names"] = d.get("particles.species_names", "").strip()
+    # --- hybrid solver + collisions ---
+    for k in ("algo.maxwell_solver",
+              "hybrid_pic_model.electron_energy_mode",
+              "hybrid_pic_model.electron_temp_init"):
+        if k in d:
+            out[k] = str(d[k]).strip().lower()
+    for k in ("hybrid_pic_model.elec_temp", "hybrid_pic_model.n0_ref",
+              "hybrid_pic_model.n_floor", "hybrid_pic_model.substeps",
+              "hybrid_pic_model.plasma_resistivity(rho,J,t)"):
+        if k in d:
+            out[k] = _eval(d[k], ns)
+    cn = d.get("collisions.collision_names", "").strip()
+    if cn:
+        out["collisions.collision_names"] = cn
+        for nm in cn.split():
+            for suf, conv in (("type", str), ("species", str),
+                              ("CoulombLog", None), ("ndt_supercycle", None)):
+                k = f"{nm}.{suf}"
+                if k in d:
+                    out[k] = (str(d[k]).strip() if conv is str
+                              else _eval(d[k], ns))
     for diag in ("EP", "FE", "PN", "diag1", "diag_fields", "diag_phase"):
         k = f"{diag}.intervals"
         if k in d:
