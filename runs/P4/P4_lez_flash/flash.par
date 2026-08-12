@@ -1,0 +1,207 @@
+# =====================================================================================
+#  P4_lez_flash -- FLASH 1D radiation-hydrodynamics leg of the Phase-4 cross-code
+#  benchmark. Replicates Lezhnin et al., Phys. Plasmas 32, 022701 (2025), Sec. II.A.
+#
+#  DERIVED FROM: the `LaserSlab` example problem, as the paper states.
+#
+#  !! UNVERIFIED AGAINST A BUILD !!  We have no FLASH installation. Every physical
+#  value below is taken from the paper and is believed correct; every FLASH KEYWORD is
+#  written from the FLASH4 parameter conventions and has NOT been checked against a
+#  running build. Items needing a second pair of eyes are marked  # CHECK.
+#  See README.md in this directory for the handoff note and the full check list.
+#
+#  Units are CGS throughout, as FLASH expects.
+# =====================================================================================
+
+# -------------------------------------------------------------------------------------
+# Simulation geometry and the target
+#   Paper: "solid aluminum target with mass density 2.7 g/cm^3 from x = 0 to 50 um.
+#   The target is fully ionized (Z = 13) and has an initially small temperature of
+#   Te = Ti = 290 K. The rest of the box is filled with aluminum vapor at a mass
+#   density of 1e-10 g/cm^3."
+# -------------------------------------------------------------------------------------
+geometry                = "cartesian"
+xmin                    = 0.0
+xmax                    = 0.08          # 800 um total domain (paper Sec. II.A)
+
+sim_targetHeight        = 5.0e-03       # 50 um solid Al slab
+sim_vacuumHeight        = 0.0           # target starts at x = 0, the PSC/FLASH interface
+
+# --- target: solid aluminium ---------------------------------------------------------
+sim_rhoTarg             = 2.7           # g/cm^3
+sim_teleTarg            = 290.0         # K  (NOT eV -- FLASH takes kelvin here)  # CHECK
+sim_tionTarg            = 290.0
+sim_tradTarg            = 290.0
+ms_targA                = 26.9815       # aluminium
+ms_targZ                = 13.0          # FULLY IONISED, fixed -- see `dynamic ionization`
+ms_targZMin             = 13.0          # pin Z so the run matches the PIC legs   # CHECK
+eos_targEosType         = "eos_tab"
+eos_targSubType         = "ionmix4"
+eos_targTableFile       = "al-imx-003.cn4"   # IONMIX Al table shipped with FLASH 4.6.2
+                                             # CHECK the exact filename in your tree
+
+# --- chamber: aluminium vapour -------------------------------------------------------
+#  The PIC legs have NO chamber gas -- the paper says so explicitly, because PIC cannot
+#  resolve 1e-10 g/cm^3. This is a REQUIRED difference, not an oversight, and it is why
+#  TEST_PLAN 12.6 confines the acceptance criteria to the underdense ABLATED plasma.
+sim_rhoCham             = 1.0e-10       # g/cm^3
+sim_teleCham            = 290.0
+sim_tionCham            = 290.0
+sim_tradCham            = 290.0
+ms_chamA                = 26.9815       # aluminium vapour, same species as the target
+ms_chamZ                = 13.0
+eos_chamEosType         = "eos_tab"
+eos_chamSubType         = "ionmix4"
+eos_chamTableFile       = "al-imx-003.cn4"
+
+# -------------------------------------------------------------------------------------
+# Laser
+#   Paper: "laser wavelength of 1.064 um, intensity of 1e13 W/cm^2, and pulse duration
+#   of 0.9 ns with the flat-top profile, preceded by a 0.1 ns linear rise time."
+#   Normally incident, spatially uniform intensity.
+#
+#   KEEP THE 0.1 ns RISE. The WarpX legs start from the t = 0.1 ns state and cannot
+#   represent a ramp (our operator's pulse gating is flat-top only), so the ramp lives
+#   here and only here -- it is what MAKES the 0.1 ns snapshot the paper hands to PIC.
+# -------------------------------------------------------------------------------------
+useEnergyDeposition     = .true.
+ed_maxRayCount          = 10000
+ed_gradOrder            = 2
+
+ed_numberOfBeams        = 1
+ed_numberOfPulses       = 1
+
+# Pulse: 0 -> 0.1 ns linear rise, then flat-top to 1.0 ns.
+# Power is in erg/s. For the 1D slab the beam cross-section is set by ed_semiaxis
+# below, so  power = intensity * area  must be made self-consistent:
+#   I = 1e13 W/cm^2 = 1.0e20 erg/s/cm^2 .
+# With the unit cross-section chosen below (1 cm^2) the numbers coincide.       # CHECK
+ed_numberOfSections_1   = 4
+ed_time_1_1             = 0.0
+ed_power_1_1            = 0.0
+ed_time_1_2             = 1.0e-10       # 0.1 ns -- end of the linear rise
+ed_power_1_2            = 1.0e20
+ed_time_1_3             = 1.0e-09       # 1.0 ns -- end of the flat top
+ed_power_1_3            = 1.0e20
+ed_time_1_4             = 1.001e-09     # switch off
+ed_power_1_4            = 0.0
+
+ed_pulseNumber_1        = 1
+ed_wavelength_1         = 1.064         # micron
+ed_crossSectionFunctionType_1 = "uniform"    # paper: "spatially uniform intensity"
+ed_gridType_1           = "regular1D"                                          # CHECK
+ed_numberOfRays_1       = 1024
+ed_lensX_1              = 0.09          # outside xmax, firing in -x
+ed_targetX_1            = 0.0
+ed_semiaxisMajorTorsionAngle_1 = 0.0
+ed_lensSemiAxisMajor_1  = 1.0           # unit cross-section, per the power note above
+ed_targetSemiAxisMajor_1 = 1.0
+ed_targetSemiAxisMinor_1 = 1.0
+
+# -------------------------------------------------------------------------------------
+# Physics modules
+#   Paper: radiation transport DISABLED and a fully ionised target at t = 0, "in order
+#   to directly compare with PSC, which currently lacks these features." Their Fig. 1
+#   shows this choice changes the profiles negligibly.
+# -------------------------------------------------------------------------------------
+useHydro                = .true.
+useDiffuse              = .true.
+useDiffuseTherm         = .true.
+useDiffuseVisc          = .false.
+useConductivity         = .true.
+useHeatexchange         = .true.        # exponential-relaxation e-i equilibration
+
+# RADIATION OFF -- the paper's configuration for the PSC comparison
+useRadTrans             = .false.
+rt_useMGD               = .false.
+
+# --- electron thermal conduction, Larsen flux limiter --------------------------------
+#   Paper: "Electron thermal transport is solved fully implicitly with the Larsen flux
+#   limiter and Neumann boundary conditions", with alpha_ele = 0.06.
+#   This is the single most important block for the benchmark: it is what the hybrid
+#   leg does NOT have (TEST_PLAN 12.4), and the paper's Sec. III.C is entirely about it.
+diff_useEleCond         = .true.
+diff_eleFlMode          = "fl_larsen"
+diff_eleFlCoef          = 0.06          # alpha_ele, the paper's adopted value
+diff_thetaImplct        = 1.0           # fully implicit
+diff_eleXlBoundaryType  = "neumann"
+diff_eleXrBoundaryType  = "neumann"
+
+# -------------------------------------------------------------------------------------
+# Hydro solver
+#   Paper: "unsplit hydro solver with third-order reconstruction, the minmod slope
+#   limiter, an HLLC Riemann solver, and outflow boundary conditions."
+# -------------------------------------------------------------------------------------
+order                   = 3
+slopeLimiter            = "minmod"
+RiemannSolver           = "HLLC"
+use_steepening          = .false.
+use_avisc               = .true.
+cvisc                   = 0.1
+use_hybridOrder         = .true.
+hy_fullSpecMsFluxHandling = .true.
+
+xl_boundary_type        = "outflow"
+xr_boundary_type        = "outflow"
+
+# -------------------------------------------------------------------------------------
+# Grid -- paper: "eight blocks containing 16 cells", AMR maximum level 4
+#   8 blocks x 16 cells = 128 cells at level 1; 4 levels of refinement gives an
+#   effective 1024 cells over 800 um = 0.78 um at the finest.
+# -------------------------------------------------------------------------------------
+nblockx                 = 8
+lrefine_max             = 4
+lrefine_min             = 1
+refine_var_1            = "dens"
+refine_var_2            = "tele"
+
+# -------------------------------------------------------------------------------------
+# Time stepping
+#   Paper: "The CFL number relative to the sound speed is 0.4 and the initial time step
+#   is set at dt = 1e-15 s to facilitate the slow start."
+#
+#   The SLOW START is not a numerical detail -- it is how FLASH solves the
+#   "initial plasma problem" (paper Sec. IV). A sharp solid edge gives either
+#   n_e >> n_cr or n_e = 0 along a ray, and the tracer fully reflects. The tiny initial
+#   dt exaggerates numerical diffusion until an ablation layer exists. THIS is why PSC
+#   is initialised from the FLASH 0.1 ns snapshot rather than from a cold solid, and it
+#   is the whole content of decision D1.
+# -------------------------------------------------------------------------------------
+cfl                     = 0.4
+dt_diff_factor          = 1.0e10        # let conduction be implicit, not dt-limiting
+dtinit                  = 1.0e-15
+dtmin                   = 1.0e-18
+dtmax                   = 1.0e-12
+tmax                    = 1.0e-09       # 1 ns, the full pulse
+nend                    = 10000000
+
+hx_dtFactor             = 1.0e10
+tstep_change_factor     = 1.10
+
+# -------------------------------------------------------------------------------------
+# Output
+#   WE NEED, at minimum, dumps at t = 0.1, 0.2, 0.4, 0.6, 0.8, 1.0 ns.
+#   0.1 ns is the one the WarpX legs may be initialised from (decision D1) -- please do
+#   not drop it. 0.2/0.4/0.6/0.8 ns are the paper's own comparison times.
+# -------------------------------------------------------------------------------------
+basenm                  = "lez1d_"
+checkpointFileIntervalTime = 1.0e-10    # every 0.1 ns -> 10 checkpoints
+plotFileIntervalTime       = 2.0e-11    # every 0.02 ns -> 50 plotfiles
+checkpointFileIntervalStep = 0
+plot_var_1              = "dens"
+plot_var_2              = "tele"        # electron temperature
+plot_var_3              = "tion"        # ion temperature
+plot_var_4              = "velx"        # flow speed
+plot_var_5              = "ye"
+plot_var_6              = "sumy"
+plot_var_7              = "depo"        # laser energy deposition -- REQUIRED for A5
+plot_var_8              = "nele"        # electron number density -- REQUIRED for A1
+
+# -------------------------------------------------------------------------------------
+# EOS
+# -------------------------------------------------------------------------------------
+eosMode                 = "dens_ie_recal_gather"
+eosModeInit             = "dens_temp_gather"
+smallt                  = 1.0
+smallx                  = 1.0e-99
+smlrho                  = 1.0e-12

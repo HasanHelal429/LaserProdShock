@@ -1629,20 +1629,32 @@ d_i0 / C_S = 37.2 ps      =>   the 1 ns pulse is 26.9 ion response times
 
 ### 12.2 The unit map — the trap in this phase
 
-The paper carries **two different `d_i0`** and never says so in one place. Getting this
-wrong silently rescales every profile.
+The paper carries **two different `d_i0`** and never reconciles them. Getting this wrong
+silently rescales every profile.
 
-- **In PSC's own units**, `m_p/m_e` = 100, so `d_i0` = 10 `d_e` and the 1000 `d_e` box is
-  100 `d_i0`. That is the number the deck sees.
+- **In PSC's deck**, `m_p/m_e` = 100, so the proton skin depth at `n_cr` is `d_i0` = 10 `d_e`
+  and the 1000 `d_e` box is "100 `d_i0`".
 - **In the figures**, the top axis of Fig. 3 runs to 0.65 mm at `z/d_i` ≈ 85, i.e.
-  `d_i0` ≈ 7.6 µm — the **real** proton skin depth at `n_cr` (7.256 µm), not the reduced
-  one. That is also what makes the PSC box (726 µm) comparable to FLASH's 800 µm.
+  `d_i0` ≈ 7.6 µm — the **real** proton skin depth at `n_cr`, 7.256 µm. That identification
+  is what lets the paper set its "100 `d_i0`" box beside FLASH's 800 µm = 110 `d_i0`.
 
-**Rule for this phase: all three codes are compared in `(z/d_i0, t/(d_i0/C_S0))` with
-`d_i0` the *real* proton skin depth at `n_cr` = 7.256 µm, densities in `n_e/n_cr`, and
-temperatures in absolute eV.** Temperature is the one absolutely-scaled quantity, and it is
+**Those two statements are not compatible in physical units**, and the gap between them is
+exactly the mass-ratio reduction, `√(1836/100)` = **4.29**.
+
+Our convention (`src/laserprod/units.py`) is the *real electron, light ion* one —
+`m_i = mass_ratio · m_e` at the **real** `m_e`, so `d_e,cr = λ₀/2π = 0.1693 µm` always. A
+1000 `d_e` box is therefore **169.3 µm of physical length**, not the 726 µm the paper's mm
+axis implies. FLASH, which has no such freedom, really is 800 µm.
+
+**Rule for this phase: compare in NORMALISED units — `(z/d_i0, t/(d_i0/C_S0))`, each code
+using its OWN `d_i0` — with densities in `n_e/n_cr` and temperatures in absolute eV. Never
+overlay two codes on a µm axis in this phase.**
+
+What survives the rescaling, and is therefore the actual content of the benchmark:
+`n_e/n_cr`, `T_e` and `T_i` in **eV**, the shape and integral of `P_abs`, and every
+dimensionless ratio in §12.6. Temperature is the one absolutely-scaled quantity, and it is
 absolute precisely because the laser pins it — which is the whole reason this benchmark
-bites. Any figure in this phase that plots a bare length in `d_e` is wrong by construction.
+bites, and why a scale-free heater run could never do this job.
 
 A second consequence: WarpX has **real `c` and real `m_e`** and cannot reproduce PSC's
 `m_e c²` = 60 keV. We therefore match the *dimensionless* physics (`n_e/n_cr`, `T_e` in eV,

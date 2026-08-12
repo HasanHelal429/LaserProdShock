@@ -23,7 +23,15 @@ The paper carries two different `d_i0` and never says so in one place.
 | `d_i0` **reduced** (`m_p/m_e` = 100) | 10 `d_e` = 1.693 µm | inside PSC's deck; the 1000 `d_e` box "= 100 `d_i0`" |
 | `d_i0` **real** (proton at `n_cr`) | **7.256 µm** | the mm axis of Fig. 3; what makes the box comparable to FLASH's 800 µm |
 
-**Rule: compare in `(z/d_i0, t/(d_i0/C_S0))` with the REAL `d_i0` = 7.256 µm.**
+Those two are **not compatible in physical units** — the gap is exactly the mass-ratio
+reduction, `√(1836/100)` = 4.29. Our convention (`src/laserprod/units.py`) is *real electron,
+light ion*: `m_i = mass_ratio · m_e` at the real `m_e`, so `d_e,cr = λ₀/2π = 0.1693 µm`
+always, and a 1000 `d_e` box is **169.3 µm** of physical length — not the 726 µm the paper's
+mm axis implies. FLASH, which has no such freedom, really is 800 µm.
+
+**Rule: compare in NORMALISED units — `(z/d_i0, t/(d_i0/C_S0))`, each code using its OWN
+`d_i0`. Never overlay two codes on a µm axis in this phase.**
+
 Densities in `n_e/n_cr`. Temperatures in **absolute eV** — temperature is the one
 absolutely-scaled quantity, and it is absolute because the laser pins it. That is the whole
 reason this benchmark bites, and it is why a scale-free heater run could never do this job.
