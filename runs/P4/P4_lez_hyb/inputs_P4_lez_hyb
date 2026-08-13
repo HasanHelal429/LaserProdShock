@@ -86,7 +86,7 @@ hybrid_pic_model.electron_temp_init = polytropic
 hybrid_pic_model.elec_temp = 100.
 hybrid_pic_model.n0_ref = 9.847700337883801e26
 hybrid_pic_model.plasma_resistivity(rho,J,t) = 1.8e-07
-hybrid_pic_model.n_floor = 9.847700337883801e22
+hybrid_pic_model.n_floor = 9.847700337883802e24
 
 algo.particle_shape = 2
 

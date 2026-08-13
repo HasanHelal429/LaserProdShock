@@ -56,16 +56,23 @@ solver:                       # ==== NOT YET EMITTED BY deck.py -- TEST_PLAN 12.
     plasma_resistivity: 1.8e-7      # Ohm.m: Spitzer at T_e = 823 eV, Z = 13, n_cr.
                                     # A T_e-dependent expression would be better and is
                                     # supported by WarpX; a constant is the honest first cut.
-    n_floor_over_ncr: 1.0e-4        # RESTORED to a physically clean value. This is now a
-                                    # pure "no plasma here" marker, not a CFL crutch: the
-                                    # 2026-08-12 WarpX fix ZEROES the advection velocity
-                                    # below the floor (no electrons, no advective
-                                    # transport) instead of dividing by a floored density,
-                                    # so the near-vacuum can no longer set the global CFL
-                                    # at all. The earlier 3e-3 value sat INSIDE the
-                                    # underdense range the paper compares (PSC resolves to
-                                    # 1e-5 n_cr) and would have floored the plume tail;
-                                    # that caveat is now retired.
+    n_floor_over_ncr: 1.0e-2        # NOT a pure vacuum guard any more -- with the
+                                    # 2026-08-12 operator change this threshold sets WHERE
+                                    # ELECTRON HEAT TRANSPORT IS TRUSTED: below it u_e is
+                                    # zeroed (no plasma, no advection). 1e-4 is the
+                                    # physically clean value and it ABORTS BY STEP 75; the
+                                    # advection CFL is set by (J_i - J) noise divided by a
+                                    # small n_e, and in a plume expanding into vacuum there
+                                    # is no natural cutoff. 1e-2 is the value being tested.
+                                    #
+                                    # THE COST, stated plainly: the paper compares down to
+                                    # 1e-5 n_cr. Electron heat transport below 1e-2 n_cr is
+                                    # switched off here, so the TENUOUS PLUME TAIL of this
+                                    # run must NOT be quoted against FLASH. The near-critical
+                                    # region -- where the laser deposits and the ablation
+                                    # front lives, i.e. what A5/A6/A7 test -- is unaffected.
+                                    # The proper fix is to keep J noise out of u_e in
+                                    # sub-floor cells; this is the affordable stand-in.
   # gamma is deliberately ABSENT: `advected` solves eps = (3/2) n kB Te, which fixes
   # gamma = 5/3, and WarpX aborts if a conflicting gamma is set. Applying the polytropic
   # closure on top would double-count compression heating.

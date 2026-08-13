@@ -2663,3 +2663,54 @@ resolves to 1e-5 `n_cr`. The plume tail below 3e-3 `n_cr` is floored in Ohm's la
 unaffected. If the tenuous tail turns out to matter for the comparison, the honest fix is
 in the code — exclude sub-floor cells from the CFL reduction, since they carry no plasma —
 not a further raise of the floor.
+
+---
+
+## 2026-08-12 (later still) — `P4_lez_hyb` FAILS, and the failure is physical, not numerical
+
+Five attempts, none completing. The last is the informative one.
+
+| attempt | setting | abort step | physical time (`d_e/c`) | % of target |
+|---|---|---|---|---|
+| 1 | `dt` = 10 | 0 | — | — |
+| 2 | `dt` = 0.35, floor 1e-3 | 54 801 | 19 180 | 19.9 % |
+| 3 | `dt` = 0.175, floor 3e-3 | 142 240 | 24 892 | 25.8 % |
+| 4 | zero-below 1e-4 | 75 | — | — |
+| 5 | zero-below **1e-2** | 116 894 | **40 913** | **42.4 %** |
+
+Target 96 560 `d_e/c`. Attempt 5 is the best by 1.64x and still aborts (CFL 1.196).
+
+**The decisive observation is not the CFL.** Laser absorption held at 0.42-0.53 of peak for
+most of the run and then collapsed to **0.001** — a 500x drop — immediately before the
+abort. In the paper, absorption persists through the full 1 ns pulse. So the corona had
+thinned below critical everywhere and the laser was passing straight through; the CFL
+runaway is *downstream* of that, since an evaporated corona is precisely where
+`(J_i − J)`/tiny `n_e` diverges. **Four attempts were spent treating a symptom.**
+
+Two candidate causes, not yet separated:
+
+1. Zeroing transport below 1e-2 `n_cr` starves the ablation front — the CFL "fix" may have
+   broken the physics it was protecting.
+2. The hybrid genuinely cannot hold this target: with **no** `∇·q_e` (the §12.4 limitation),
+   nothing carries heat back into the dense material, so the corona blows off once and is
+   gone.
+
+**Verdict, and it is the one §12.6 predicted in advance**: the hybrid leg fails this
+benchmark on electron heat transport. What was NOT predicted is that it fails *twice* — the
+conduction term it lacks, and the advection term it has proving unintegrable against
+vacuum. For the three-way comparison this is a positive result about the method: the model
+sitting between FLASH and full PIC cannot model laser ablation as configured.
+
+**Operator changes that stand regardless** (`warpx-cda`, `feature/particle-heater` →
+merged to `feature/hybrid-laser`): `9e9c4a75b` floored the divisor; `f8eb07e40` supersedes
+it by zeroing `u_e` below `n_floor`, which is both bounded by construction and the honest
+statement (no plasma, no advective transport). Both are real fixes to a real gap — the
+E-solve floors this quantity and the advection did not — and neither is sufficient here.
+
+**Not done**: the regression test `warpx-cda/CLAUDE.md` requires for a bug fix.
+`feature/particle-heater` is 10 commits ahead of origin, unpushed.
+
+**Recommended next**: run `electron_energy_mode = source_only` — comparing it against this
+`advected` failure isolates whether advection-without-conduction is worse than no transport
+at all — and treat implementing `conducting` (decision D2b) as now *justified by measurement*
+rather than by assertion. The kinetic and FLASH legs remain the benchmark's backbone.
