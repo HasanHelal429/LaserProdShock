@@ -15,7 +15,7 @@
 # Derived scales (1D, lengths in d_e,critical = 0.1693 um):
 #   n_cr = 9.848e+26 m^-3   d_e,cr = lam0/2pi = 0.1693 um
 #   target 10 n_cr (d_e = 0.0536 um)   ambient: VACUUM
-#   dt = 0.0989 fs   t_end = 1.0122 ps   n_cell = 2000
+#   dt = 0.0989 fs   t_end = 27.3302 ps   n_cell = 2000
 #   GATE G1 omega_pe*dt: 0.553 initial, 0.783 at compression; hits 2 at 130.61 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 113
 #   predicted absorption: tau(flat top) = 188, f_abs ~ 1.000
@@ -58,7 +58,8 @@ my_constants.zhi = 950.*de
 # past t ~ 0.1 gyroperiods was a measurement of that instability.
 #   here: omega_pe*dt = 0.553 initially, 0.783 at the assumed compression,
 #   and the limit of 2 is not touched until 130.61 n_cr.
-max_step      = 10240
+max_step      = 276480
+warpx.const_dt = 1.9770110696854765e-16   # 0.35 d_e/c
 warpx.cfl     = 0.35
 warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 
@@ -85,7 +86,7 @@ hybrid_pic_model.electron_temp_init = polytropic
 hybrid_pic_model.elec_temp = 100.
 hybrid_pic_model.n0_ref = 9.847700337883801e26
 hybrid_pic_model.plasma_resistivity(rho,J,t) = 1.8e-07
-hybrid_pic_model.n_floor = 9.847700337883801e22
+hybrid_pic_model.n_floor = 9.847700337883802e23
 
 algo.particle_shape = 2
 
@@ -138,7 +139,7 @@ laser_deposition.ray_cfl              = 0.25
 laser_deposition.intervals            = 10
 # per-cell (coords, n_e, H, P_abs) dump. ANALYSE THE STEP-0 TABLE: later
 # dumps drift as the kicks move electrons.
-laser_deposition.profile_intervals    = 512
+laser_deposition.profile_intervals    = 13824
 laser_deposition.profile_prefix       = diags/laserdep_profile
 
 # --- diagnostics ---
@@ -146,20 +147,20 @@ laser_deposition.profile_prefix       = diags/laserdep_profile
 # the particle energy is not, so their difference IS the grid-heating budget.
 warpx.reduced_diags_names = EP FE PN
 EP.type      = ParticleEnergy
-EP.intervals = 32
+EP.intervals = 864
 FE.type      = FieldEnergy
-FE.intervals = 32
+FE.intervals = 864
 PN.type      = ParticleNumber
-PN.intervals = 32
+PN.intervals = 864
 
 diagnostics.diags_names = diag1 diag_fields
 
 # diag1: fields + all particles (~20 frames)
-diag1.intervals = 512
+diag1.intervals = 13824
 diag1.diag_type = Full
 
 # diag_fields: field-only, high cadence (~80 frames) for streaks. Cheap: no particles.
-diag_fields.intervals     = 128
+diag_fields.intervals     = 3456
 diag_fields.diag_type     = Full
 diag_fields.write_species = 0
 diag_fields.fields_to_plot = Ez Ey By Bx jz rho rho_targ_ions

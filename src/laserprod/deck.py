@@ -317,6 +317,15 @@ def render(cfg: dict) -> str:
       f"{sc.wpe_dt_peak:.3f} at the assumed compression,")
     a(f"#   and the limit of 2 is not touched until {sc.n_over_ncr_at_wpe_dt_2:.2f} n_cr.")
     a(f"max_step      = {int(num['max_step'])}")
+    # The hybrid-PIC solver REQUIRES a fixed step: WarpX aborts with
+    # "warpx.const_dt must be specified with the hybrid-PIC solver". There is no electron
+    # macroparticle CFL for it to derive one from, so the step is a physics choice (the
+    # ion CFL and the T_e advection CFL, which WarpX checks and aborts on) rather than
+    # something the grid hands you.
+    cdt = num.get("const_dt_de_over_c")
+    if cdt is not None:
+        a(f"warpx.const_dt = {_num(float(cdt) * sc.de_ref / units.C)}"
+          f"   # {float(cdt):g} d_e/c")
     a(f"warpx.cfl     = {_num(num['cfl'])}")
     a("warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines")
     a("")
@@ -772,6 +781,8 @@ def key_params(path: str) -> dict:
     out = {f"const:{k}": v for k, v in c.items()}
     out["max_step"] = int(float(d["max_step"]))
     out["cfl"] = float(d["warpx.cfl"])
+    if "warpx.const_dt" in d:
+        out["warpx.const_dt"] = _eval(d["warpx.const_dt"], ns)
     out["dims"] = int(float(d.get("geometry.dims", "1")))
     out["particle_shape"] = int(float(d["algo.particle_shape"]))
     if "warpx.random_seed" in d:

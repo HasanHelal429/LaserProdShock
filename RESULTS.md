@@ -2592,3 +2592,55 @@ bookkeeping.
 and round-trip through `--verify`; all gates clean; `tests/test_phase4_schema.py` adds 13
 checks, 271 in the suite. **Nothing launched** — D1 (initial condition), D2 (whether to
 implement `conducting`) and D8 (FLASH output format/location) are open and need steering.
+
+---
+
+## 2026-08-12 (later) — `P4_lez_hyb` blocked, then unblocked, by a WarpX bug: no density floor on the electron-energy advection velocity
+
+**A code fix, found by trying to run.** The hybrid leg would not run at any time step. The
+cause is a real bug in `HybridPICModel::AdvectElectronInternalEnergy`, not a setup error.
+
+**The bug.** The advection velocity is `u_e = (J_i − J)/ρ`, guarded only against `ρ <= 0`.
+The E-solve floors exactly the same quantity for exactly the same `1/n` divergence
+(`HybridPICSolveE.cpp`: `std::max(rho_val, rho_floor)`); the advection did not. `n_floor`
+is documented as the vacuum guard for the `1/n_e` terms in Ohm's law, and the electron flow
+velocity is one of them.
+
+**Why it bites *this* problem specifically.** An ablation corona expanding into vacuum thins
+continuously, so `u_e` grows without bound and the donor-cell advection CFL assert aborts
+the run — at any `dt`. Measured on `P4_lez_hyb`:
+
+| | advection CFL |
+|---|---|
+| step 0, `dt` = 10 `d_e/c` | 13.4 |
+| step 68, `dt` = 0.35 `d_e/c` | **3080** (`u_e` ~ 154 c) |
+| step 68, same `dt`, **with the floor** | **1.95** — a factor **1580** lower |
+
+Confirmed it is not a step-size problem: `n_floor` at 1e-3 and 1e-2 `n_cr` gave CFL
+identical to six digits *before* the fix, because the parameter never reached this term.
+
+**Fix**: `warpx-cda` commit `9e9c4a75b` on `feature/particle-heater`, one floored divisor
+plus the localisation of `rho_floor` out of the member (a device lambda cannot capture
+`this`, which is why `q_e` is already localised two lines above).
+
+**Two run parameters are now MEASURED, not estimated**, and one of my earlier estimates was
+wrong by 29×:
+
+- `const_dt_de_over_c` = **0.35**, not 10. The binding constraint is not the ion CFL (which
+  would allow 179 `d_e/c`) but the electron internal-energy advection CFL.
+- `n_floor_over_ncr` = **1e-3**, not 1e-4. `u_e` in the floored region scales as
+  `1/n_floor`, and 1e-4 still left CFL at 1.95 > 1. Only the near-vacuum is affected, where
+  there is no real plasma to misrepresent.
+
+Consequence: **276 480 steps, not 10 240** — 27× more. Measured rate 0.0071 s/step on 8
+threads, so the run is **~32 minutes**, not the "under 5 minutes" I estimated. The estimate
+was wrong on its `dt` input, not its particle count.
+
+**A provenance trap, avoided.** The first production launch used a binary built from
+`feature/particle-heater` + the fix. But `feature/hybrid-laser` carries a *later* refactor
+of this same function — it moves the `T_e` seeding into `InitializeElectronTemperature` so
+the field is seeded **before** the first field advance, where the old code left everything
+that read `T_e` in the first step looking at a flat field. This run reads `T_e` through
+`temperature_mode = hybrid_fluid`, so that is physics, not cosmetics. The run was stopped at
+step ~7500/276480 and relaunched from the merged binary. The merge conflicted for this
+reason, and was resolved by keeping `hybrid-laser`'s refactor and adding the floor to it.
