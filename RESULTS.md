@@ -2751,8 +2751,11 @@ signature of `(J_i − J)` noise divided by small `n_e`, not of any boundary.
 
 | mode | outcome |
 |---|---|
-| `advected` | aborts at step 80 145, CFL 1.218 |
-| `source_only` | passes 88 383 and beyond, no CFL abort |
+| `advected` | aborts at step 80 145 (29 %), CFL 1.218 |
+| `source_only` | **276 480 / 276 480 COMPLETE**, no CFL abort, no SIGABRT, 1858 s |
+
+The `source_only` leg ran to completion, so this is not a "got further" comparison — it is
+one mode failing and the other finishing the identical problem.
 
 **So the electron internal-energy advection is the blocker**, independent of boundary
 condition and box size. `u_e = (J_i − J)/ρ` is unusable in a tenuous plume: with `B₀` = 0
