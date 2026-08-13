@@ -1,7 +1,7 @@
 meta:
-  run_id: P4_lez_hyb
+  run_id: P4_lez_hyb_bg4
   phase: 4
-  deck: inputs_P4_lez_hyb
+  deck: inputs_P4_lez_hyb_bg4
   description: Phase-4 HYBRID leg of the three-way cross-code benchmark against Lezhnin
     2025. Physically identical to P4_lez_kin -- same target, same laser, same box, same
     normalisation -- and differing in exactly ONE thing, the electron closure. Kinetic
@@ -84,7 +84,25 @@ plasma:
     shape: planar
     theta_e_init: 1.957e-4    # 100 eV; seeds the fluid Te field via electron_temp_init
     theta_i_init: 1.957e-5    # 10 eV; ions are still macroparticles here
-  ambient: null
+  ambient:                    # A TENUOUS BACKGROUND, tested as the physical alternative to
+                              # the numerical guards. u_e = (J_i - J)/rho diverges because
+                              # rho -> 0 in the plume's tenuous edge; a background means
+                              # rho is never near zero, because there are actually ions
+                              # there. Nothing is clamped (ue_cfl_max) and nothing has its
+                              # transport switched off (n_floor) -- the pathological
+                              # condition is removed instead of survived.
+                              #
+                              # COST, measured: at 1e-4 n_cr the areal density over the
+                              # 2500 d_e box is 0.035% of the plume's, i.e. mass loading two
+                              # orders of magnitude below the 20% tolerance the benchmark
+                              # is judged at.
+                              #
+                              # NOT a chamber gas in the FLASH sense: FLASH's 1e-10 g/cm^3
+                              # is 2.95e-14 n_cr, ten orders of magnitude too tenuous to
+                              # bound anything. This is our choice on its own terms.
+    density_over_ncr: 1.0e-4
+    theta_e: 1.957e-6         # ~1 eV -- cold, so it neither absorbs nor pressurises
+    theta_i: 1.957e-7
 
 field:
   orientation: none           # B0 = 0. The hybrid Ohm's law degenerates gracefully:
@@ -153,7 +171,7 @@ numerics:
                               # comparable at matched output times.
   ppc:
     target: 500               # IONS ONLY -- there are no electron macroparticles
-    ambient: 0
+    ambient: 50               # background macroparticles per cell
 
 diagnostics:
   plotfile_intervals: 13824   # 20 dumps, matching P4_lez_kin's 20

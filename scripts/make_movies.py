@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import numpy as np                          # noqa: E402
 
 from laserprod import config as lpconfig    # noqa: E402
+from laserprod import units                 # noqa: E402
 from laserprod import io as lpio            # noqa: E402
 from laserprod import plotting as lpp       # noqa: E402
 
@@ -236,9 +237,20 @@ def movie_phase(cfg, sc, rid, rd, fps, keep=False):
         for s in ions:
             z, uz, w = species_uz(ds, s, axis_last)
             if z.size:
-                v = uz / sc.mi / vunit
+                # `species_uz` returns MOMENTUM. p/m is the non-relativistic velocity and
+                # is wrong exactly where it matters: a laser-ablation run can produce a
+                # handful of runaway ions with p/(m c) of order 10, which p/m reports as
+                # 10 c. Invert properly -- u = p/(m c) is gamma*beta, so beta =
+                # u/sqrt(1+u^2), which saturates at c however large p gets.
+                u = uz / (sc.mi * units.C)
+                v = units.C * u / np.sqrt(1.0 + u * u) / vunit
                 data[s] = (z / sc.de_ref, v, w)
-                vmax = max(vmax, float(np.percentile(np.abs(v), 99.95)))
+                # 99.5, not 99.95: with ~1e5 macroparticles the 99.95th still sits inside
+                # the runaway tail (measured: 94 particles above 0.1 c, 5 above 0.5 c), so
+                # the axis stretched to relativistic speeds and squashed the entire plume
+                # into a couple of rows. The tail stays in the data and is clipped by the
+                # axis rather than deleted -- and the caption says how many fell outside.
+                vmax = max(vmax, float(np.percentile(np.abs(v), 99.5)))
         frames.append((float(ds.current_time), data))
 
     z_edges = np.linspace(sc.domain_lo / sc.de_ref, sc.domain_hi / sc.de_ref, 300)
@@ -246,7 +258,12 @@ def movie_phase(cfg, sc, rid, rd, fps, keep=False):
     d = lpp.movie_dir(rid, "phase")
     bc = lpconfig.boundary_faces(cfg)[str(cfg["geometry"].get("normal_axis", "z"))]
 
+    v_hi_lim = 1.05 * vmax
+    v_lo_lim = -0.5 * vmax
     for i, (tt, data) in enumerate(frames):
+        n_out = sum(int(((vv > v_hi_lim) | (vv < v_lo_lim)).sum())
+                    for (_zz, vv, _ww) in data.values())
+        n_tot = sum(int(vv.size) for (_zz, vv, _ww) in data.values())
         fig, ax = plt.subplots(figsize=(9.6, 4.2))
         rgb = np.zeros((len(v_edges) - 1, len(z_edges) - 1, 3))
         for s, (z, v, w) in data.items():
@@ -262,6 +279,13 @@ def movie_phase(cfg, sc, rid, rd, fps, keep=False):
         ax.set_ylabel(f"u$_z$  [{vname}]")
         ax.set_title(f"t = {tt*1e12:6.3f} ps   —   ion phase space, axis "
                      f"{bc[0]}/{bc[1]}", loc="left", fontweight="bold")
+        if n_out:
+            # Say it on the frame. A clipped axis that does not admit it is how a
+            # relativistic runaway population becomes invisible in the figure that was
+            # supposed to reveal it.
+            ax.text(0.995, 0.02, f"{n_out} of {n_tot} particles outside the axis",
+                    transform=ax.transAxes, ha="right", va="bottom", fontsize=7,
+                    color=lpp.INK, alpha=0.75)
         for j, s in enumerate(dict.fromkeys(ions)):
             if s in data:
                 ax.text(0.015 + 0.125 * j, 0.95, s, transform=ax.transAxes,

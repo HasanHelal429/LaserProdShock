@@ -1,8 +1,4 @@
 # WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_hyb
-# logging_started 2026-08-12T22:16:10  total_steps=276480  every=10%  poll=30s
+# logging_started 2026-08-13T12:58:34  total_steps=276480  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
-2026-08-12T22:16:40 | 3304/276480 ( 1.2%) | 0h00m | 0.0091 s/step(wall) | 0.0089 s/step(warpx) | ETA ~0h41m | x1.02 | load 3.3 | laser 0.456 of peak, Eabs 4.545e+04 J
-2026-08-12T22:20:40 | 30675/276480 (11.1%) | 0h04m | 0.0088 s/step(wall) | 0.0088 s/step(warpx) | ETA ~0h35m | x1.00 | load 8.0 | laser 0.633 of peak, Eabs 3.204e+05 J
-2026-08-12T22:24:11 | 55836/276480 (20.2%) | 0h08m | 0.0084 s/step(wall) | 0.0086 s/step(warpx) | ETA ~0h30m | x0.97 | load 8.1 | laser 0.544 of peak, Eabs 6.322e+05 J
-2026-08-12T22:42:44 | 80144/276480 (29.0%) | 0h26m | 0.0458 s/step(wall) | 0.0084 s/step(warpx) | ETA ~2h29m | x5.47 | load 8.1 | laser 0.747 of peak, Eabs 9.448e+05 J
-DONE 2026-08-12T22:42:44 | 80144/276480 (29.0%) | total wall 0h26m | mean 0.0199 s/step(wall) | STALLED (no progress)
+2026-08-13T12:59:04 | 924/276480 ( 0.3%) | 0h00m | 0.0325 s/step(wall) | 0.0317 s/step(warpx) | ETA ~2h29m | x1.02 | load 38.4 | laser 0.885 of peak, Eabs 1.59e+04 J
