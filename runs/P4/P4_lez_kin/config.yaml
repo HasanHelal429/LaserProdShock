@@ -86,6 +86,11 @@ geometry:
 numerics:
   cfl: 0.35
   particle_shape: 2
+  max_grid_size: 2000         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
+                              # is 7.9x faster with one box than with the default
+                              # decomposition, which is only 1.2x (project memory). The
+                              # default splits a 2000-cell domain into small boxes and the
+                              # per-box launch overhead dominates. Harmless on CPU.
   max_step: 552960            # T_total = 26.9 d_i0/C_S0 = 96560 d_e/c at dt = 0.175 d_e/c.
                               # 26.9 ion response times == the paper's 1 ns pulse.
                               #

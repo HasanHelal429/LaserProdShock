@@ -64,6 +64,7 @@ warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 # --- grid (dz = 0.5 d_e; z = propagation axis) ---
 amr.n_cell        = 2000
 amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)
+amr.max_grid_size = 2000
 geometry.dims     = 1
 geometry.prob_lo  = zlo
 geometry.prob_hi  = zhi
