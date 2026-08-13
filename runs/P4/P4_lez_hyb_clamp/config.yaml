@@ -1,0 +1,200 @@
+meta:
+  run_id: P4_lez_hyb_clamp
+  phase: 4
+  deck: inputs_P4_lez_hyb_clamp
+  description: Phase-4 HYBRID leg of the three-way cross-code benchmark against Lezhnin
+    2025. Physically identical to P4_lez_kin -- same target, same laser, same box, same
+    normalisation -- and differing in exactly ONE thing, the electron closure. Kinetic
+    electrons are replaced by an Ohm's-law fluid with an advected electron energy
+    equation. This is the leg the paper does not have. Because it sits between FLASH
+    (fluid, conducting electrons) and full PIC (kinetic electrons), any disagreement it
+    shows against BOTH localises to the closure rather than to the setup.
+  reference: TEST_PLAN.md 12, esp. 12.4; decision register runs/P4/README.md (D2)
+
+reference:
+  length_scale: critical
+  mass_ratio: 2698.0          # m_Al/m_e at the paper's reduced m_p/m_e = 100
+  charge_state: 13
+
+laser:
+  wavelength_um: 1.064
+  intensity: 1.0e17
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 13.0
+  coulomb_log: 6.3
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 13824
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+  # ==== the three hybrid swaps (operator supports these TODAY; deck.py does not
+  #      emit them yet -- TEST_PLAN 12.3) ====
+  # A hybrid run has NO electron macroparticles, so the operator cannot form a CIC
+  # electron density or a per-cell kinetic temperature. It reads the fluid's instead.
+  density_source: hybrid_rho        # n_e from the hybrid solver's rho, not from species
+  temperature_mode: hybrid_fluid    # T_e from the Ohm's-law solver's temperature field
+  deposit_to: electron_fluid        # P_abs becomes a source term S in the electron
+                                    # energy equation, NOT a momentum kick on particles
+
+solver:                       # ==== NOT YET EMITTED BY deck.py -- TEST_PLAN 12.3 ====
+  type: hybrid                # algo.maxwell_solver = hybrid
+  hybrid:
+    electron_energy_mode: advected
+    # `advected` integrates
+    #     dTe/dt + u_e.grad Te = -(2/3) Te div u_e + (2/3) S/n_e
+    # i.e. advection + compression + the laser source, and NO div.q_e.
+    # `conducting` ABORTS as unimplemented. That is the known gap [D2] and the reason
+    # this run is a CONTROL: TEST_PLAN 12.6 predicts it passes A1/A4/A8 (advection-
+    # dominated rarefaction) and FAILS A2 near the ablation front (conduction-dominated,
+    # which is exactly where the paper's own FLASH<->PSC discrepancy lives).
+    ue_cfl_max: 0.5                 # OPTION 2: cap |u_e| at half a cell per step. Donor-cell
+                                    # upwind cannot represent faster transport at all, so
+                                    # this converts the CFL abort into a bounded, documented
+                                    # approximation rather than inventing physics. Without
+                                    # it this deck aborts at step 80145 (CFL 1.218).
+    electron_temp_init: polytropic
+    elec_temp: 100.0                # eV -- matches P4_lez_kin's theta_e_init (100 eV)
+    n0_ref_over_ncr: 1.0
+    plasma_resistivity: 1.8e-7      # Ohm.m: Spitzer at T_e = 823 eV, Z = 13, n_cr.
+                                    # A T_e-dependent expression would be better and is
+                                    # supported by WarpX; a constant is the honest first cut.
+    n_floor_over_ncr: 1.0e-4        # The physically clean value -- a pure "no plasma here"
+                                    # marker, well below the 1e-5..1 n_cr range the paper
+                                    # compares, so nothing in the comparison is floored.
+                                    #
+                                    # This setting previously aborted by step 75 and was
+                                    # raised as far as 1e-2 to get a run at all. That was
+                                    # chasing a symptom: the deck was emitting the ION
+                                    # number density equal to the ELECTRON density while the
+                                    # ions carried Z = 13, so n_e = rho/e came out 130 n_cr
+                                    # against an intended 10. With the deck.py fix the run
+                                    # clears 20000 steps here with no CFL trouble, and the
+                                    # earlier "restricted comparison range" caveat is
+                                    # retired -- it was an artifact of the bug, not a real
+                                    # limitation of the method.
+  # gamma is deliberately ABSENT: `advected` solves eps = (3/2) n kB Te, which fixes
+  # gamma = 5/3, and WarpX aborts if a conflicting gamma is set. Applying the polytropic
+  # closure on top would double-count compression heating.
+
+plasma:
+  target:
+    density_over_ncr: 10.0
+    thickness_de: 45
+    center_de: -22.5
+    scale_length_de: 27       # same analytic IC as the kinetic leg [D1] -- the two runs
+                              # MUST start from the same profile or the comparison is void
+    shape: planar
+    theta_e_init: 1.957e-4    # 100 eV; seeds the fluid Te field via electron_temp_init
+    theta_i_init: 1.957e-5    # 10 eV; ions are still macroparticles here
+  ambient: null
+
+field:
+  orientation: none           # B0 = 0. The hybrid Ohm's law degenerates gracefully:
+  vA_over_c: 0.0              # E = eta*J - grad(Pe)/(e n_e), and it is the grad(Pe) term
+                              # that drives ambipolar expansion -- i.e. the ablation
+                              # physics this benchmark is about. No whistler CFL either.
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5             # identical grid to P4_lez_kin
+  axis:
+    # 2500 d_e total. The 1000 d_e box (the paper's) does not hold this run: the
+    # self-similar BULK stays well inside it -- A8 fits, with C_S rising from 0.39 to 0.90
+    # of the 823 eV steady-state value exactly as the paper describes -- but a sparse FAST
+    # TAIL runs ~290 d_e ahead of it (at 19.8 ps the fitted exponential puts 1e-3 n_cr at
+    # 605.6 d_e while the data reaches 893.8), touches the wall at ~19 ps of the 54.5 ps
+    # required, and the solve destabilises within ~340 steps of the bounce.
+    #
+    # 2500 d_e also happens to give 5000 cells at dz = 0.5 d_e, which is the paper's cell
+    # count -- though it reaches it with a bigger box rather than a finer grid.
+    lo_de: -50
+    hi_de: 2450
+  boundary:
+    axis:
+      # REFLECTING, matching the paper (Sec. II.B: "reflecting boundary conditions are
+      # used"). Phases 0-3 use `open` on Phase-0 precedent, and this run was first written
+      # that way as a deliberate deviation -- but with open walls the ablation plume simply
+      # LEAVES: measured front speed ~40 d_e/ps, jumping to ~200 d_e/ps as the tenuous
+      # leading edge ran off into empty grid, reaching 920.8 of 950 d_e at 16.4 ps and
+      # aborting there. n_e in the outer cells read exactly 0, and u_e = (J_i - J)/rho
+      # diverges on that. A 1000 d_e box cannot hold 54.5 ps of expansion with open ends;
+      # reflecting is how the paper runs 1 ns in the same box.
+      #
+      # Note what this means physically: the plume is CONFINED, so late-time profiles near
+      # the far wall are not free expansion. The paper accepts that, and the comparison is
+      # made on the ablation front and the underdense plume near the target, not at the
+      # box edge.
+      lo: reflecting
+      hi: reflecting
+
+numerics:
+  cfl: 0.35                   # unused when const_dt is set; kept for the gate arithmetic
+  const_dt_de_over_c: 0.35    # MEASURED. The binding constraint is the electron
+                              # internal-energy advection CFL, not the ion CFL (which
+                              # would allow 179 d_e/c). 0.35 matches the kinetic leg.
+                              # Two earlier attempts died to a runaway vacuum u_e --
+                              # 0.35/1e-3 at step 54801 and 0.175/3e-3 at step 142240 --
+                              # before the cause was fixed in the operator rather than
+                              # tuned around here. The hybrid has no electron
+                              # macroparticles and B0 = 0, so neither the omega_pe nor the
+                              # whistler constraint applies, and the ION CFL would allow
+                              # dt < 179 d_e/c. The BINDING constraint is the electron
+                              # internal-energy advection CFL (donor-cell upwind on T_e),
+                              # which WarpX checks and aborts on. An earlier estimate of
+                              # 10 d_e/c was wrong by ~29x: measured CFL 13.4 at dt = 10.
+                              # 0.35 matches the kinetic leg's step and runs stably.
+  particle_shape: 2
+  max_step: 276480            # T_total = 96560 d_e/c at dt = 0.35 d_e/c -> 275886.
+                              # Same PHYSICAL duration as P4_lez_kin (26.9 ion response
+                              # times = the paper's 1 ns), which is what makes the two
+                              # comparable at matched output times.
+  ppc:
+    target: 500               # IONS ONLY -- there are no electron macroparticles
+    ambient: 0
+
+diagnostics:
+  plotfile_intervals: 13824   # 20 dumps, matching P4_lez_kin's 20
+  field_intervals: 3456
+  reduced_intervals: 864
+  # phase_intervals deliberately absent: there is no electron distribution function to
+  # diagnose. The paper's Fig. 8 non-Maxwellian result is STRUCTURALLY unavailable in the
+  # hybrid, which is itself part of what this leg demonstrates.
+
+gates:
+  omega_pe_dt_max: null       # no electron macroparticles -- the constraint does not exist
+  dz_over_lambdaD_max: null   # ditto; the hybrid does not resolve the Debye length by design
+  ppc_target_min: 500
+  compression_factor: 2.0
+
+controls:
+  laser_off: null
+  sibling_kinetic: P4_lez_kin
+  sibling_flash: P4_lez_flash
+  ray_cfl_ladder: studies/p4_ray_cfl (shared with P4_lez_kin -- the ray march is
+    identical in the two runs, and the 10 n_cr target puts the turning point INSIDE the
+    plasma, which is G4's non-monotonic regime. Same ladder, run once, applies to both.)
+  step_zero_trap: hybrid WarpX writes step-0 diagnostics BEFORE rho is deposited -- never
+    baseline on the step-0 dump (see project memory, and CLAUDE.md)
+
+targets:
+  T_e_SS_eV: 823.0
+  C_S_km_s: 195.0
+  d_i0_real_um: 7.256
+  pulse_in_response_times: 26.9
+  tol_n_e: 0.20
+  tol_T_e: 0.20
+  tol_V_z: 0.10
+  # The prediction, stated in ADVANCE so it can be falsified (TEST_PLAN 12.6):
+  predict_pass: [A1, A4, A8]
+  predict_fail: [A2]
+  predict_na: [A3]            # no kinetic electrons -> T_i is still available (ions are
+                              # macroparticles), but e-i equilibration is a closure choice
+                              # here, not a measured collisional process
+  note: If this run PASSES A2 anyway, then thermal conduction is not what sets the
+    ablation front at these parameters, TEST_PLAN 12.4's premise is wrong, and the case
+    for implementing `conducting` weakens. That is a result worth having either way --
+    which is why this control runs BEFORE any conduction solver is written [D2c].

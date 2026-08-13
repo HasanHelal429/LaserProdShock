@@ -443,6 +443,15 @@ def render(cfg: dict) -> str:
             a(f"hybrid_pic_model.n_floor = {_num(float(hyb['n_floor_over_ncr']) * sc.n_cr)}")
         if hyb.get("substeps") is not None:
             a(f"hybrid_pic_model.substeps = {int(hyb['substeps'])}")
+        # The two bounded alternatives to aborting on the electron-energy advection CFL.
+        # Both change what the solver DOES, so both belong in --verify: a stale binary that
+        # silently ignored one would run the unbounded scheme while the deck claimed
+        # otherwise, which is how `refraction = 0` was lost for 2000 steps (CLAUDE.md).
+        if hyb.get("ue_cfl_max") is not None:
+            a(f"hybrid_pic_model.ue_cfl_max = {_num(hyb['ue_cfl_max'])}")
+        if hyb.get("n_trust_over_ncr") is not None:
+            a(f"hybrid_pic_model.n_trust = "
+              f"{_num(float(hyb['n_trust_over_ncr']) * sc.n_cr)}")
         a("")
     a(f"algo.particle_shape = {int(num.get('particle_shape', 2))}")
     if num.get("random_seed") is not None:
@@ -863,6 +872,7 @@ def key_params(path: str) -> dict:
             out[k] = str(d[k]).strip().lower()
     for k in ("hybrid_pic_model.elec_temp", "hybrid_pic_model.n0_ref",
               "hybrid_pic_model.n_floor", "hybrid_pic_model.substeps",
+              "hybrid_pic_model.ue_cfl_max", "hybrid_pic_model.n_trust",
               "hybrid_pic_model.plasma_resistivity(rho,J,t)"):
         if k in d:
             out[k] = _eval(d[k], ns)

@@ -53,6 +53,45 @@ def _laser_curve(cfg, sc, rd):
     return np.asarray(hist.t) * 1e12, np.asarray(hist.f_abs(P))
 
 
+def _one_macroparticle_density(cfg):
+    """Smallest n_e/n_cr a single ion macroparticle can represent, or None.
+
+    Particles are created down to ``density_min = 1e-4 * nt`` (see ``deck.py``), and a cell
+    initialised at ion density ``n_i`` splits it into ``ppc`` particles of weight
+    ``n_i dV / ppc``. One such particle alone in a cell therefore deposits an ELECTRON
+    density ``Z n_i / ppc``. Using the SMALLEST birth density gives the floor below which
+    no whole particle can appear.
+    """
+    try:
+        Z = int(cfg["reference"].get("charge_state", 1))
+        ppc = int((cfg["numerics"].get("ppc") or {}).get("target", 0))
+        nt = float(cfg["plasma"]["target"]["density_over_ncr"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if ppc <= 0 or nt <= 0:
+        return None
+    return Z * 1.0e-4 * nt / ppc
+
+
+def _contiguous_front(n, z_de, floor, k=5):
+    """Furthest z where the density stays above `floor` for `k` CONSECUTIVE cells.
+
+    A density contour is the wrong front for a PIC plume. Out in the tail a single
+    macroparticle alone in a cell produces the same density as a fully sampled cell, so the
+    contour jumps when one particle crosses a cell boundary and stalls until the next one
+    does -- an apparent front advancing in fits and starts that is pure discreteness. A real
+    plume edge is CONTIGUOUS, so requiring a run of `k` cells rejects lone particles without
+    hiding them or touching the density scale.
+    """
+    above = n > floor
+    if not above.any():
+        return float("nan")
+    # rightmost index that begins (looking left) a run of k consecutive `above` cells
+    run = np.convolve(above.astype(int), np.ones(k, dtype=int), mode="same")
+    ok = run >= k
+    return float(z_de[ok].max()) if ok.any() else float("nan")
+
+
 def movie_fields(cfg, sc, rid, rd, fps, keep=False):
     """n_e(z) + B_y(z) lineouts, with f_abs(t) tracking underneath."""
     import matplotlib.pyplot as plt
@@ -71,8 +110,24 @@ def movie_fields(cfg, sc, rid, rd, fps, keep=False):
     lt, lf = _laser_curve(cfg, sc, rd)
 
     # --- fixed limits from ALL frames ---
+    #
+    # THE LOWER LIMIT IS A PHYSICS DECISION, NOT A COSMETIC ONE. A percentile of the
+    # nonzero data puts the axis floor wherever the sparsest shape-factor skirt happens to
+    # land -- 1e-9 n_cr in a laser-ablation run -- and then a handful of lone macroparticles
+    # flying ahead of the plume are drawn with the same visual weight as the plume itself.
+    # That is how a PIC discreteness artifact gets read as a physical fast front: the
+    # apparent leading edge jumps when one particle crosses into a new cell and stalls
+    # between arrivals, which looks exactly like a front advancing in fits and starts.
+    #
+    # `n_1p` is the smallest density a WHOLE macroparticle can represent: an ion born where
+    # the density function was smallest still carries w = n_i dV / ppc, so alone in a cell
+    # it deposits Z n_i / ppc. Anything below that is a fraction of one particle spread by
+    # the shape factor -- countable noise, not plasma.
+    n_1p = _one_macroparticle_density(cfg)
     pos = ne[ne > 0]
     n_lo = max(float(np.percentile(pos, 0.5)), 1e-6)
+    if n_1p is not None:
+        n_lo = max(n_lo, n_1p / 3.0)      # a little headroom so the floor itself is visible
     n_hi = float(np.nanmax(ne)) * 1.6
     b_lo, b_hi = ((float(np.nanpercentile(b, 0.2)), float(np.nanpercentile(b, 99.8)))
                   if have_B else (0, 1))
@@ -88,7 +143,21 @@ def movie_fields(cfg, sc, rid, rd, fps, keep=False):
         fig, axes = plt.subplots(nrow, 1, figsize=(9.6, 2.5 * nrow + 0.5),
                                  sharex=False)
         ax = axes[0]
+        if n_1p is not None and n_1p > n_lo:
+            # Everything in this band is at most one macroparticle in a cell. Shading it
+            # rather than clipping keeps the data honest while removing its visual claim.
+            ax.axhspan(n_lo, n_1p, color=lpp.INK, alpha=0.10, lw=0, zorder=0)
+            ax.axhline(n_1p, color=lpp.INK, ls="--", lw=0.9, alpha=0.55, zorder=1)
+            ax.text(0.004, n_1p, " 1 macroparticle/cell — below: PIC noise",
+                    transform=ax.get_yaxis_transform(), va="top", ha="left",
+                    fontsize=7, color=lpp.INK, alpha=0.8, zorder=6)
         ax.plot(z_de, ne[i], color=lpp.C_TARGET, lw=1.8)
+        if n_1p is not None:
+            zf = _contiguous_front(ne[i], z_de, n_1p, k=5)
+            if zf == zf:
+                ax.axvline(zf, color=lpp.C_LASER, ls="-.", lw=1.2, alpha=0.8, zorder=5)
+                ax.text(zf, 0.97, " contiguous front ", transform=ax.get_xaxis_transform(),
+                        va="top", ha="left", fontsize=7, color=lpp.C_LASER, alpha=0.9)
         ax.axhline(1.0, color=lpp.INK, ls=":", lw=1.0)
         ax.text(0.004, 1.0, " n$_{cr}$", transform=ax.get_yaxis_transform(),
                 va="bottom", fontsize=8, color=lpp.INK)
