@@ -79,7 +79,7 @@ geometry:
                               # and the first rung of the resolution ladder
   axis:
     lo_de: -50                # ~5 d_i0 behind the interface, holding the 45 d_e target
-    hi_de: 950                # total 1000 d_e = 100 d_i0, the paper's box
+    hi_de: 2450             # matches P4_lez_kin (see its config for why 2500 d_e)
   boundary:
     axis:
       lo: open                # paper uses REFLECTING. We use the Phase-0 validated `open`
@@ -92,6 +92,7 @@ geometry:
 numerics:
   cfl: 0.35
   particle_shape: 2
+  max_grid_size: 5000         # matches P4_lez_kin (whole domain: 12x on GPU)
   max_step: 552960            # T_total = 26.9 d_i0/C_S0 = 96560 d_e/c at dt = 0.175 d_e/c.
                               # 26.9 ion response times == the paper's 1 ns pulse.
                               #

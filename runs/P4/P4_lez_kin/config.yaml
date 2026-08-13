@@ -73,7 +73,16 @@ geometry:
                               # and the first rung of the resolution ladder
   axis:
     lo_de: -50                # ~5 d_i0 behind the interface, holding the 45 d_e target
-    hi_de: 950                # total 1000 d_e = 100 d_i0, the paper's box
+    hi_de: 2450             # 2500 d_e total. The paper's 1000 d_e box does NOT hold
+                              # this run: MEASURED 2026-08-13, the front reaches 949.8
+                              # of 950 d_e at 24.6 ps -- 45% through -- and is pinned
+                              # there for the remaining 30 ps. Before that it is clean
+                              # (T_e passes 866 eV at 24.6 ps, within 5% of the 823 eV
+                              # steady state); after, T_e climbs to 2.9x SS because the
+                              # confined plasma cannot expand and the critical surface
+                              # collapses to 3.2 d_e. The paper's comparison times
+                              # 0.2/0.4/0.6/0.8 ns map to 10.9/21.9/32.8/43.7 ps here,
+                              # so 1000 d_e delivers only the first TWO of four.
   boundary:
     axis:
       lo: open                # paper uses REFLECTING. We use the Phase-0 validated `open`
@@ -86,7 +95,7 @@ geometry:
 numerics:
   cfl: 0.35
   particle_shape: 2
-  max_grid_size: 2000         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
+  max_grid_size: 5000         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
                               # is 7.9x faster with one box than with the default
                               # decomposition, which is only 1.2x (project memory). The
                               # default splits a 2000-cell domain into small boxes and the
