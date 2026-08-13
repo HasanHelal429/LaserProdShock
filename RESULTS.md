@@ -2644,3 +2644,22 @@ that read `T_e` in the first step looking at a flat field. This run reads `T_e` 
 `temperature_mode = hybrid_fluid`, so that is physics, not cosmetics. The run was stopped at
 step ~7500/276480 and relaunched from the merged binary. The merge conflicted for this
 reason, and was resolved by keeping `hybrid-laser`'s refactor and adding the floor to it.
+
+**The first full attempt still failed, at step 54801 (19.8 %), CFL 1.005** — the floor
+bounds `u_e` but does not stop it growing as the plume fills the box. The diagnosis that
+matters is a physical one: a real quasineutral flow at `C_S` ~ 0.003 c gives an advection
+CFL of ~**0.007** on this grid. A CFL of order 1 therefore is *not* plasma motion — it is
+`(J_i − J)` noise divided by a tiny `ρ` in the near-vacuum, and the implied `u_e` ~ 1.4 c
+says so outright. So the floor, not `dt`, is the lever that addresses the cause; cutting
+`dt` alone treats the symptom at 5–10× the cost.
+
+Second attempt: `n_floor` 1e-3 → **3e-3** `n_cr` *and* `dt` 0.35 → **0.175** `d_e/c`,
+which together put the CFL near 0.17 where it previously hit 1.005. 552 960 steps.
+
+**A caveat this creates, recorded before the run finishes so it cannot be quietly
+forgotten:** 3e-3 `n_cr` sits *inside* the underdense range the paper compares — PSC
+resolves to 1e-5 `n_cr`. The plume tail below 3e-3 `n_cr` is floored in Ohm's law and
+**must not be quoted against FLASH**. The A1–A8 criteria at and above ~1e-2 `n_cr` are
+unaffected. If the tenuous tail turns out to matter for the comparison, the honest fix is
+in the code — exclude sub-floor cells from the CFL reduction, since they carry no plasma —
+not a further raise of the floor.
