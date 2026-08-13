@@ -79,7 +79,7 @@ boundary.particle_hi = absorbing
 # --- Coulomb collisions ----------------------------------------------
 collisions.collision_names = c_targ_electrons c_targ_electrons_targ_ions c_targ_ions
 c_targ_electrons.type    = pairwisecoulomb
-c_targ_electrons.species = targ_electrons
+c_targ_electrons.species = targ_electrons targ_electrons
 c_targ_electrons.CoulombLog = 6.3
 c_targ_electrons.ndt_supercycle = 10
 c_targ_electrons_targ_ions.type    = pairwisecoulomb
@@ -87,7 +87,7 @@ c_targ_electrons_targ_ions.species = targ_electrons targ_ions
 c_targ_electrons_targ_ions.CoulombLog = 6.3
 c_targ_electrons_targ_ions.ndt_supercycle = 10
 c_targ_ions.type    = pairwisecoulomb
-c_targ_ions.species = targ_ions
+c_targ_ions.species = targ_ions targ_ions
 c_targ_ions.CoulombLog = 6.3
 c_targ_ions.ndt_supercycle = 10
 
