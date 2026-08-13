@@ -97,8 +97,17 @@ geometry:
   normal_axis: z
   dz_over_de: 0.5             # identical grid to P4_lez_kin
   axis:
+    # 2500 d_e total. The 1000 d_e box (the paper's) does not hold this run: the
+    # self-similar BULK stays well inside it -- A8 fits, with C_S rising from 0.39 to 0.90
+    # of the 823 eV steady-state value exactly as the paper describes -- but a sparse FAST
+    # TAIL runs ~290 d_e ahead of it (at 19.8 ps the fitted exponential puts 1e-3 n_cr at
+    # 605.6 d_e while the data reaches 893.8), touches the wall at ~19 ps of the 54.5 ps
+    # required, and the solve destabilises within ~340 steps of the bounce.
+    #
+    # 2500 d_e also happens to give 5000 cells at dz = 0.5 d_e, which is the paper's cell
+    # count -- though it reaches it with a bigger box rather than a finer grid.
     lo_de: -50
-    hi_de: 950
+    hi_de: 2450
   boundary:
     axis:
       # REFLECTING, matching the paper (Sec. II.B: "reflecting boundary conditions are
