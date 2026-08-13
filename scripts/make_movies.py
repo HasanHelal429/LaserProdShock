@@ -213,7 +213,17 @@ def movie_phase(cfg, sc, rid, rd, fps, keep=False):
     ions = [s for s in _species_table(cfg) if s.endswith("ions")]
     paths = lpio.plotfiles(rd, "diag_phase")
     if not paths:
-        print("  (no diag_phase plotfiles)")
+        # Fall back to the full plotfile series. `diag_phase` is a trimmed particle dump
+        # written at its own cadence, but `diag1` carries position, momentum and weight
+        # too, so phase space is recoverable without re-running. A hybrid deck in
+        # particular has no reason to declare `phase_intervals` -- it has no electron
+        # macroparticles -- yet its IONS are still particles and are exactly what a fast
+        # tail would show up in.
+        paths = lpio.plotfiles(rd, "diag1")
+        if paths:
+            print(f"  (no diag_phase; using {len(paths)} diag1 plotfiles for phase space)")
+    if not paths:
+        print("  (no plotfiles with particle data)")
         return None
     vunit, vname = ((sc.vA, "v$_A$") if sc.vA else (sc.Cs_targ, "C$_s$(target)"))
 

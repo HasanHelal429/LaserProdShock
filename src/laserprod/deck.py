@@ -393,8 +393,12 @@ def render(cfg: dict) -> str:
         names, blocks = [], []
         for pr in col["pairs"]:
             a_s, b_s = str(pr[0]), str(pr[1])
-            # WarpX takes ONE name for intra-species collisions, two otherwise.
-            spec = a_s if a_s == b_s else f"{a_s} {b_s}"
+            # WarpX wants exactly TWO names always; intra-species is expressed by naming
+            # the same species twice, and BinaryCollision infers it via
+            # `m_isSameSpecies = (names[0] == names[1])`. The documentation says "provide
+            # only one name for intra-species collisions", which this version aborts on:
+            # "Binary collision <name> must have exactly two species."
+            spec = f"{a_s} {b_s}"
             nm = f"c_{a_s}_{b_s}" if a_s != b_s else f"c_{a_s}"
             names.append(nm)
             blocks.append((nm, spec))

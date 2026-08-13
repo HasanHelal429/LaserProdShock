@@ -178,3 +178,22 @@ def test_Z_equals_one_is_unchanged():
         assert ni == ne, f"{p}: Z=1 must emit identical densities (no /1 suffix)"
         checked += 1
     assert checked >= 10, f"expected many Z=1 runs, checked {checked}"
+
+
+def test_intra_species_collisions_name_the_species_TWICE():
+    """WarpX wants exactly two names always; intra-species is `A A`, not `A`.
+
+    The documentation says "provide only one name for intra-species collisions", and this
+    version of WarpX aborts on that: "Binary collision <name> must have exactly two
+    species." It infers intra-species from `names[0] == names[1]`. Following the docs made
+    every kinetic deck in this phase unable to start -- caught only when P4_lez_kin was
+    first executed, which was after the deck had been committed and reviewed.
+    """
+    d = lpdeck.parse_inputs_str(lpdeck.render(lpconfig.load(KIN)))
+    for nm in d["collisions.collision_names"].split():
+        names = d[f"{nm}.species"].split()
+        assert len(names) == 2, f"{nm}.species must have exactly two entries, got {names}"
+    # and the intra-species ones must be a repeated name, not two different species
+    intra = [d[f"{nm}.species"].split() for nm in d["collisions.collision_names"].split()
+             if len(set(d[f"{nm}.species"].split())) == 1]
+    assert len(intra) == 2, "expected e-e and i-i intra-species pairs"
