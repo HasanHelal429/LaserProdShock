@@ -101,8 +101,21 @@ geometry:
     hi_de: 950
   boundary:
     axis:
-      lo: open
-      hi: open
+      # REFLECTING, matching the paper (Sec. II.B: "reflecting boundary conditions are
+      # used"). Phases 0-3 use `open` on Phase-0 precedent, and this run was first written
+      # that way as a deliberate deviation -- but with open walls the ablation plume simply
+      # LEAVES: measured front speed ~40 d_e/ps, jumping to ~200 d_e/ps as the tenuous
+      # leading edge ran off into empty grid, reaching 920.8 of 950 d_e at 16.4 ps and
+      # aborting there. n_e in the outer cells read exactly 0, and u_e = (J_i - J)/rho
+      # diverges on that. A 1000 d_e box cannot hold 54.5 ps of expansion with open ends;
+      # reflecting is how the paper runs 1 ns in the same box.
+      #
+      # Note what this means physically: the plume is CONFINED, so late-time profiles near
+      # the far wall are not free expansion. The paper accepts that, and the comparison is
+      # made on the ablation front and the underdense plume near the target, not at the
+      # box edge.
+      lo: reflecting
+      hi: reflecting
 
 numerics:
   cfl: 0.35                   # unused when const_dt is set; kept for the gate arithmetic

@@ -70,11 +70,11 @@ geometry.dims     = 1
 geometry.prob_lo  = zlo
 geometry.prob_hi  = zhi
 
-# boundaries: z open/open
+# boundaries: z reflecting/reflecting
 boundary.field_lo    = pec
 boundary.field_hi    = pec
-boundary.particle_lo = absorbing
-boundary.particle_hi = absorbing
+boundary.particle_lo = reflecting
+boundary.particle_hi = reflecting
 
 
 # --- hybrid (Ohm's law) field solver ---------------------------------
