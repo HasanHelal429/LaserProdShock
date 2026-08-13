@@ -92,13 +92,20 @@ def test_collisions_reach_the_deck():
         assert float(d[f"{nm}.CoulombLog"]) == pytest.approx(6.3)
 
 
-def test_intra_species_collisions_take_one_name():
-    """WarpX wants ONE species for intra-species collisions, two otherwise."""
+def test_every_collision_names_exactly_two_species():
+    """Superseded an earlier test that asserted the DOCUMENTED one-name form.
+
+    That test passed while every kinetic deck was unable to start, which is the worst
+    property a test can have: it pinned what the manual said instead of what the code does.
+    The replacement is `test_intra_species_collisions_name_the_species_TWICE` below; this
+    one keeps the weaker invariant that the count is always two.
+    """
     d = lpdeck.parse_inputs_str(lpdeck.render(lpconfig.load(KIN)))
     by = {nm: d[f"{nm}.species"].split()
           for nm in d["collisions.collision_names"].split()}
-    assert any(len(v) == 1 for v in by.values()), "no intra-species pair emitted"
-    assert any(len(v) == 2 for v in by.values()), "no inter-species pair emitted"
+    assert all(len(v) == 2 for v in by.values()), by
+    assert any(len(set(v)) == 1 for v in by.values()), "no intra-species pair emitted"
+    assert any(len(set(v)) == 2 for v in by.values()), "no inter-species pair emitted"
 
 
 def test_a_pair_naming_an_unknown_species_is_refused():
