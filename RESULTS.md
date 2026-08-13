@@ -2714,3 +2714,59 @@ E-solve floors this quantity and the advection did not — and neither is suffic
 `advected` failure isolates whether advection-without-conduction is worse than no transport
 at all — and treat implementing `conducting` (decision D2b) as now *justified by measurement*
 rather than by assertion. The kinetic and FLASH legs remain the benchmark's backbone.
+
+---
+
+## 2026-08-12 (final) — the `P4_lez_hyb` blocker is the electron-energy ADVECTION, isolated by controlled experiment
+
+Three mechanisms proposed and **all three falsified by cheap tests**, which is the useful
+part of this entry. The answer came from a discriminating experiment, not from reasoning
+about a correlated observable.
+
+**Root cause found and fixed first (`deck.py`).** Ions were emitted with the ELECTRON
+number density while carrying charge `Z e`. At `Z` = 1 that is correct — which is why 20
+runs across P0/P1 never showed it — but at Phase 4's `Z` = 13 the kinetic deck carried
+`12 e n_t` of uncompensated charge and the hybrid deck ran at `n_e` = 130 `n_cr` against an
+intended 10. Found by rendering a movie to check an absorption-collapse claim: `max(n_e)`
+opened at 130. Fixed; 3 tests pin it, including that every `Z` = 1 deck stays byte-identical.
+
+**With the density correct, the ablation is right.** Density opens at exactly 10.000 `n_cr`;
+absorption holds at 0.54–0.72 of peak with no collapse; and **A8 passes** — fitting Eq. 16
+per frame gives `C_S` climbing from 0.39 to 0.90 of the 823 eV steady-state value, i.e. the
+plasma starts colder than `T_e,SS` and heats toward it, exactly as the paper describes.
+
+**Three wrong mechanisms, each killed by a test:**
+
+| claim | test | verdict |
+|---|---|---|
+| corona thinned below critical, laser passed through | movie: `max(n_e)` stays 9.6 `n_cr`, cells above `n_cr` *rise* 211 → 1327 | **false** |
+| plume outruns the paper's expansion | A8 fit: `C_S` is 0.39–0.90 of SS, i.e. *slower* than predicted | **false** |
+| the front hits the wall and the bounce destabilises | enlarge 950 → 2450 `d_e`: aborted EARLIER, 15.8 ps vs 21.9 ps, plume nowhere near the wall | **false** |
+
+The box result is the informative one: **more vacuum, earlier failure**. That is the
+signature of `(J_i − J)` noise divided by small `n_e`, not of any boundary.
+
+**The discriminating experiment.** Same deck, same box, same `dt`, only
+`electron_energy_mode` overridden:
+
+| mode | outcome |
+|---|---|
+| `advected` | aborts at step 80 145, CFL 1.218 |
+| `source_only` | passes 88 383 and beyond, no CFL abort |
+
+**So the electron internal-energy advection is the blocker**, independent of boundary
+condition and box size. `u_e = (J_i − J)/ρ` is unusable in a tenuous plume: with `B₀` = 0
+and quasineutrality a real flow gives an advection CFL ~0.007, so anything near 1 is noise.
+
+**Operator changes that stand** (`feature/particle-heater` → `feature/hybrid-laser`):
+`9e9c4a75b` floored the divisor; `f8eb07e40` supersedes it by zeroing `u_e` below `n_floor`.
+Both close a real gap — the E-solve floors this quantity and the advection did not — and
+neither is sufficient, because the noise lives in cells *above* any physically acceptable
+floor.
+
+**Next**: filter or damp `J` in sub-floor cells so noise never enters `u_e`. Now
+evidence-backed rather than speculative. Until then the hybrid leg can run `source_only`
+(no transport) but not `advected`. The kinetic and FLASH legs are unaffected.
+
+**Still not done**: the regression test `warpx-cda/CLAUDE.md` requires for a bug fix;
+`feature/particle-heater` is 10 commits ahead of origin, unpushed.
