@@ -75,7 +75,7 @@ hybrid_pic_model.elec_temp = 100.       # 100
 hybrid_pic_model.electron_energy_mode = advected
 hybrid_pic_model.electron_temp_init = polytropic
 hybrid_pic_model.n0_ref = 9.847700337883801e26    # 9.8477003378838013e+26
-hybrid_pic_model.n_floor = 9.847700337883802e24    # 9.8477003378838018e+24
+hybrid_pic_model.n_floor = 9.847700337883801e22    # 9.8477003378838011e+22
 hybrid_pic_model.plasma_resistivity(rho,J,t) = 1.8e-07
 laser_deposition.Z_eff = 13.            # 13
 laser_deposition.coulomb_log = 6.3      # 6.2999999999999998
@@ -125,7 +125,7 @@ particles.particles_nfiles = 1024
 particles.species_names = targ_ions
 particles.use_comms_arena = false
 targ_ions.charge = 13*q_e               # 2.0828296241999997e-18
-targ_ions.density_function(x,y,z) = "nt*((z<=zt)*(z>=zt-wt) + (z>zt)*exp(-((z-zt)/Ln)^2))"
+targ_ions.density_function(x,y,z) = "(nt*((z<=zt)*(z>=zt-wt) + (z>zt)*exp(-((z-zt)/Ln)^2)))/13"
 targ_ions.density_min = 1.e-4*nt        # 9.8477003579620706e+23
 targ_ions.injection_style = "NUniformPerCell"
 targ_ions.mass = Mi                     # 2.45771172601022e-27

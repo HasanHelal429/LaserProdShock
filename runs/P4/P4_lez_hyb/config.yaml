@@ -56,23 +56,20 @@ solver:                       # ==== NOT YET EMITTED BY deck.py -- TEST_PLAN 12.
     plasma_resistivity: 1.8e-7      # Ohm.m: Spitzer at T_e = 823 eV, Z = 13, n_cr.
                                     # A T_e-dependent expression would be better and is
                                     # supported by WarpX; a constant is the honest first cut.
-    n_floor_over_ncr: 1.0e-2        # NOT a pure vacuum guard any more -- with the
-                                    # 2026-08-12 operator change this threshold sets WHERE
-                                    # ELECTRON HEAT TRANSPORT IS TRUSTED: below it u_e is
-                                    # zeroed (no plasma, no advection). 1e-4 is the
-                                    # physically clean value and it ABORTS BY STEP 75; the
-                                    # advection CFL is set by (J_i - J) noise divided by a
-                                    # small n_e, and in a plume expanding into vacuum there
-                                    # is no natural cutoff. 1e-2 is the value being tested.
+    n_floor_over_ncr: 1.0e-4        # The physically clean value -- a pure "no plasma here"
+                                    # marker, well below the 1e-5..1 n_cr range the paper
+                                    # compares, so nothing in the comparison is floored.
                                     #
-                                    # THE COST, stated plainly: the paper compares down to
-                                    # 1e-5 n_cr. Electron heat transport below 1e-2 n_cr is
-                                    # switched off here, so the TENUOUS PLUME TAIL of this
-                                    # run must NOT be quoted against FLASH. The near-critical
-                                    # region -- where the laser deposits and the ablation
-                                    # front lives, i.e. what A5/A6/A7 test -- is unaffected.
-                                    # The proper fix is to keep J noise out of u_e in
-                                    # sub-floor cells; this is the affordable stand-in.
+                                    # This setting previously aborted by step 75 and was
+                                    # raised as far as 1e-2 to get a run at all. That was
+                                    # chasing a symptom: the deck was emitting the ION
+                                    # number density equal to the ELECTRON density while the
+                                    # ions carried Z = 13, so n_e = rho/e came out 130 n_cr
+                                    # against an intended 10. With the deck.py fix the run
+                                    # clears 20000 steps here with no CFL trouble, and the
+                                    # earlier "restricted comparison range" caveat is
+                                    # retired -- it was an artifact of the bug, not a real
+                                    # limitation of the method.
   # gamma is deliberately ABSENT: `advected` solves eps = (3/2) n kB Te, which fixes
   # gamma = 5/3, and WarpX aborts if a conflicting gamma is set. Applying the polytropic
   # closure on top would double-count compression heating.

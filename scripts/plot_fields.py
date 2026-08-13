@@ -51,7 +51,11 @@ def load_series(run_dir, prefix, sc, species):
     paths = lpio.plotfiles(run_dir, prefix)
     if not paths:
         return None, None, {}
-    want = ["By", "Bx", "Ez", "jz"] + [f"rho_{s}" for s in species]
+    # `rho` is requested unconditionally: a HYBRID run has no electron macroparticles, so
+    # there is no rho_<...>electrons to sum and the plasma electron density has to come from
+    # the solver's own charge density (which is what the laser operator reads under
+    # density_source = hybrid_rho).
+    want = ["By", "Bx", "Ez", "jz", "rho"] + [f"rho_{s}" for s in species]
     t, rows = [], {k: [] for k in want}
     z = None
     for p in paths:
@@ -102,6 +106,14 @@ def electron_density(rows, species, sc):
             continue
         n = np.abs(a) / lpp_qe()
         tot = n if tot is None else tot + n
+    if tot is None:
+        # HYBRID: electrons are a fluid, so no electron species exists to sum. Quasineutrality
+        # makes the solver's total charge density the electron density -- n_e = rho/e -- and
+        # this is the same quantity the operator uses under density_source = hybrid_rho, so
+        # the plot and the physics agree by construction rather than by coincidence.
+        a = rows.get("rho")
+        if a is not None:
+            tot = np.abs(a) / lpp_qe()
     return tot
 
 

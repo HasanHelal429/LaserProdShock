@@ -126,3 +126,55 @@ def test_the_new_keys_round_trip_through_verify(tmp_path, run):
     p = tmp_path / "inputs"
     p.write_text(lpdeck.render(cfg))
     assert lpdeck.verify(cfg, str(p)) == []
+
+
+# ------------------------------------------------------------------ charge neutrality
+def _dens_of(text, sp):
+    for line in text.splitlines():
+        if line.startswith(f"{sp}.density_function"):
+            return line.split("=", 1)[1].strip().strip('"')
+    return None
+
+
+def test_ions_carry_n_e_over_Z_so_the_plasma_is_neutral():
+    """The density expressions are ELECTRON densities (n_cr is defined on electrons), so an
+    ion of charge Z e needs n_i = n_e / Z.
+
+    Emitting the same number density for both is correct ONLY at Z = 1 and otherwise leaves
+    a net charge of (Z - 1) e n_e -- 12x e n_e at the Z = 13 of these runs. Every earlier run
+    in this project used Z = 1, which is exactly why this survived to Phase 4.
+    """
+    cfg = lpconfig.load(KIN)
+    assert int(cfg["reference"]["charge_state"]) == 13
+    text = lpdeck.render(cfg)
+    ne = _dens_of(text, "targ_electrons")
+    ni = _dens_of(text, "targ_ions")
+    assert ne is not None and ni is not None
+    assert ni != ne, "ions must not carry the electron NUMBER density when Z != 1"
+    assert ni == f"({ne})/13"
+
+
+def test_hybrid_ion_density_is_also_divided():
+    """A hybrid deck has no electron species, so n_e = rho/e = Z n_i. The same slip makes the
+    electron density come out Z times too LARGE -- 130 n_cr against an intended 10."""
+    text = lpdeck.render(lpconfig.load(HYB))
+    ni = _dens_of(text, "targ_ions")
+    assert ni is not None and ni.endswith("/13")
+
+
+def test_Z_equals_one_is_unchanged():
+    """The Z = 1 runs must be byte-identical -- 20 of them predate this fix."""
+    import glob
+    z1 = sorted(glob.glob(os.path.join(ROOT, "runs", "P?", "*", "config.yaml")))
+    checked = 0
+    for p in z1:
+        cfg = lpconfig.load(os.path.dirname(p))
+        if int(cfg["reference"].get("charge_state", 1)) != 1:
+            continue
+        text = lpdeck.render(cfg)
+        ne, ni = _dens_of(text, "targ_electrons"), _dens_of(text, "targ_ions")
+        if ne is None or ni is None:
+            continue
+        assert ni == ne, f"{p}: Z=1 must emit identical densities (no /1 suffix)"
+        checked += 1
+    assert checked >= 10, f"expected many Z=1 runs, checked {checked}"

@@ -483,7 +483,17 @@ def render(cfg: dict) -> str:
         a(f'{name}.injection_style = "NUniformPerCell"')
         a(f"{name}.num_particles_per_cell_each_dim = {_ppc_str(cfg, role)}")
         a(f"{name}.profile = parse_density_function")
-        a(f'{name}.density_function(x,y,z) = "{dens}"')
+        # The density expressions are ELECTRON densities -- `plasma.*.density_over_ncr` is
+        # quoted in n_cr, and n_cr is defined on the electrons. An ion carrying charge Z e
+        # therefore needs n_i = n_e / Z for the plasma to be neutral. Emitting the SAME
+        # number density for both is only correct at Z = 1, and silently gives a net charge
+        # of (Z - 1) e n_e otherwise -- 12x e n_e at the Z = 13 of the Phase-4 aluminium
+        # runs. In a hybrid deck, which has no electron species at all, the same slip makes
+        # n_e = rho/e = Z n_i come out Z times too LARGE. Both were live bugs found by
+        # reading a movie of P4_lez_hyb (RESULTS 2026-08-12).
+        ion_dens = dens if int(spec.get("charge_state", 1)) == 1 else \
+            f"({dens})/{int(spec.get('charge_state', 1))}"
+        a(f'{name}.density_function(x,y,z) = "{dens if kind == "electron" else ion_dens}"')
         a(f"{name}.density_min = 1.e-4*{floor}")
         a(f"{name}.momentum_distribution_type = maxwellian")
         a(f'{name}.maxwellian_u_std_distribution_type = "constant"')
