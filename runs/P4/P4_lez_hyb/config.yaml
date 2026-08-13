@@ -26,7 +26,7 @@ laser:
   coulomb_log: 6.3
   intervals: 10
   ray_cfl: 0.25
-  profile_intervals: 27648
+  profile_intervals: 13824
   beam:
     profile: uniform
     rays_per_cell: 1
@@ -56,29 +56,16 @@ solver:                       # ==== NOT YET EMITTED BY deck.py -- TEST_PLAN 12.
     plasma_resistivity: 1.8e-7      # Ohm.m: Spitzer at T_e = 823 eV, Z = 13, n_cr.
                                     # A T_e-dependent expression would be better and is
                                     # supported by WarpX; a constant is the honest first cut.
-    n_floor_over_ncr: 3.0e-3        # vacuum guard for the 1/n_e terms in Ohm's law --
-                                    # INCLUDING u_e = (J_i - J)/rho in the Te advection,
-                                    # which was unguarded until the 2026-08-12 fix on
-                                    # feature/particle-heater. Raised 1e-4 -> 1e-3 because
-                                    # u_e in the floored region scales as 1/n_floor, and
-                                    # 1e-4 still left the advection CFL at 1.95 > 1, and
-                                    # 1e-3 reached 1.005 at step 54801 (19.8% in) as the
-                                    # plume filled the box. RAISED AGAIN to 3e-3.
-                                    #
-                                    # WHY THE FLOOR RATHER THAN A SMALLER dt: a real
-                                    # quasineutral flow at C_S ~ 0.003 c gives an advection
-                                    # CFL ~0.007 here. A CFL near 1 is therefore NOT plasma
-                                    # motion -- it is (J_i - J) noise divided by a tiny rho
-                                    # in the near-vacuum, and the implied u_e ~ 1.4 c says
-                                    # so outright. Cutting dt treats the symptom at 5-10x
-                                    # the cost; the floor addresses the cause.
-                                    #
-                                    # CAVEAT, and it is a real one: 3e-3 n_cr sits inside
-                                    # the underdense range the paper compares (it resolves
-                                    # to 1e-5 n_cr). The tenuous PLUME TAIL below 3e-3 n_cr
-                                    # is therefore floored in Ohm's law and must NOT be
-                                    # quoted against FLASH. The A1-A8 criteria near and
-                                    # above 1e-2 n_cr are unaffected.
+    n_floor_over_ncr: 1.0e-4        # RESTORED to a physically clean value. This is now a
+                                    # pure "no plasma here" marker, not a CFL crutch: the
+                                    # 2026-08-12 WarpX fix ZEROES the advection velocity
+                                    # below the floor (no electrons, no advective
+                                    # transport) instead of dividing by a floored density,
+                                    # so the near-vacuum can no longer set the global CFL
+                                    # at all. The earlier 3e-3 value sat INSIDE the
+                                    # underdense range the paper compares (PSC resolves to
+                                    # 1e-5 n_cr) and would have floored the plume tail;
+                                    # that caveat is now retired.
   # gamma is deliberately ABSENT: `advected` solves eps = (3/2) n kB Te, which fixes
   # gamma = 5/3, and WarpX aborts if a conflicting gamma is set. Applying the polytropic
   # closure on top would double-count compression heating.
@@ -115,9 +102,13 @@ geometry:
 
 numerics:
   cfl: 0.35                   # unused when const_dt is set; kept for the gate arithmetic
-  const_dt_de_over_c: 0.175   # MEASURED, not derived. Halved from 0.35 after the
-                              # step-54801 abort; combined with the 3x floor this
-                              # puts CFL ~0.17 where it previously hit 1.005. The hybrid has no electron
+  const_dt_de_over_c: 0.35    # MEASURED. The binding constraint is the electron
+                              # internal-energy advection CFL, not the ion CFL (which
+                              # would allow 179 d_e/c). 0.35 matches the kinetic leg.
+                              # Two earlier attempts died to a runaway vacuum u_e --
+                              # 0.35/1e-3 at step 54801 and 0.175/3e-3 at step 142240 --
+                              # before the cause was fixed in the operator rather than
+                              # tuned around here. The hybrid has no electron
                               # macroparticles and B0 = 0, so neither the omega_pe nor the
                               # whistler constraint applies, and the ION CFL would allow
                               # dt < 179 d_e/c. The BINDING constraint is the electron
@@ -126,7 +117,7 @@ numerics:
                               # 10 d_e/c was wrong by ~29x: measured CFL 13.4 at dt = 10.
                               # 0.35 matches the kinetic leg's step and runs stably.
   particle_shape: 2
-  max_step: 552960            # T_total = 96560 d_e/c at dt = 0.175 d_e/c -> 551771.
+  max_step: 276480            # T_total = 96560 d_e/c at dt = 0.35 d_e/c -> 275886.
                               # Same PHYSICAL duration as P4_lez_kin (26.9 ion response
                               # times = the paper's 1 ns), which is what makes the two
                               # comparable at matched output times.
@@ -135,9 +126,9 @@ numerics:
     ambient: 0
 
 diagnostics:
-  plotfile_intervals: 27648   # 20 dumps, matching P4_lez_kin's 20
-  field_intervals: 6912
-  reduced_intervals: 1728
+  plotfile_intervals: 13824   # 20 dumps, matching P4_lez_kin's 20
+  field_intervals: 3456
+  reduced_intervals: 864
   # phase_intervals deliberately absent: there is no electron distribution function to
   # diagnose. The paper's Fig. 8 non-Maxwellian result is STRUCTURALLY unavailable in the
   # hybrid, which is itself part of what this leg demonstrates.
