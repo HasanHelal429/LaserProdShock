@@ -2909,3 +2909,56 @@ closes.** The conduction proposal (D2b) is premature for the same reason. The ki
 looks sound — it conserves to 0.9 % — but note it reaches 1387 eV against the 823 eV
 Manheimer steady state and is still rising, which points at something both legs share, most
 likely the analytic initial ramp (decision D1) that the paper replaces with a FLASH snapshot.
+
+---
+
+## 2026-08-14 (later) — **RETRACTION: the hybrid does not create energy.** It conserves to 4 %
+
+The entry above claimed the hybrid solver creates energy at 5.56x the laser input. **That is
+wrong.** The error was the baseline, and it is the trap this project already had written down.
+
+`electron_temp_init = polytropic` seeds `T_e = elec_temp (n/n0_ref)^(γ−1)` on the **first
+field advance** — 464 eV in a 10 `n_cr` target against the 100 eV `elec_temp`. The step-0
+diagnostic is written *before* that, recording a uniform 100 eV field the run never
+integrates. Differencing against it books the initialisation as a gain: measured, the fluid
+energy jumps 2.77e6 → 1.178e7 J in the first dump interval and is **flat** thereafter.
+
+| baseline | fluid `dU` | ion `dE` | sum | `E_abs` | ratio |
+|---|---|---|---|---|---|
+| step-0 dump (wrong) | +1.86e6 | +9.21e6 | 1.11e7 | 1.99e6 | 5.57 |
+| **first post-init dump** | **−6.99e6** | +9.02e6 | 2.04e6 | 1.95e6 | **1.04** |
+
+**The hybrid conserves to 4 %**, against 0.9 % for full PIC. The sign is the tell: with the
+correct baseline the fluid term is **negative** — the electron fluid does PdV work on the
+ions, which is the ablation mechanism, not a leak.
+
+### What survives
+
+The primitive-form advection **is** non-conservative in principle. Summed against the
+density, `T^{n+1} = T − dt(u·∇T + (2/3)T∇·u)` telescopes only for uniform `n`; a minimal
+200-step test with a uniform velocity (`∇·u` = 0) and fixed non-uniform `n` drifts **+12.9 %**,
+while the same test with uniform `n` is exact to machine precision. The defect is real — it
+is simply not what dominates, since the production budget closes to 4 % with it in place.
+
+A conservative flux-form rewrite (advect `w = ρT_e`, carry `ρ` through the same operator so a
+uniform temperature is preserved) was implemented, tested, and **reverted**: it drives the
+advection CFL past 1 at step ~2293 where the primitive scheme reaches 40 000, with `T_e`
+healthy throughout, and over the window both survive the two give **identical** budgets.
+Full account in `warpx-cda/hybrid_electrons/ELECTRON_CLOSURE.md` §5.1b.
+
+### Consequence
+
+The hybrid's departure from the kinetic leg — peak density 0.40x, critical surface 3.4x
+further out, `T_e` plateauing at 424 eV against 1387 eV — is **closure physics, not a solver
+bug**. The missing `∇·q_e` is back as the leading explanation, so decision **D2b**
+(implementing `conducting`) is live again rather than premature.
+
+### Standing corrections from this session
+
+1. The `deck.py` ion thermal-momentum bug (ions `m_i/m_e` = 2698x too hot) is **real and
+   fixed** — that finding is unaffected.
+2. "The hybrid creates energy" is now **retracted for the third and final time**. The
+   resolution is clean: with a correct baseline the budget closes, and the fluid does work
+   rather than gaining it.
+3. The `eta = 0` and `source_only` comparisons that appeared to implicate the advection were
+   all differencing the same bad baseline, which is why they seemed to discriminate.
