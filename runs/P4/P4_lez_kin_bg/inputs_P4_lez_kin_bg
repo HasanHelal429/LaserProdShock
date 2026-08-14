@@ -127,9 +127,9 @@ targ_ions.density_function(x,y,z) = "(nt*((z<=zt)*(z>=zt-wt) + (z>zt)*exp(-((z-z
 targ_ions.density_min = 1.e-4*namb
 targ_ions.momentum_distribution_type = maxwellian
 targ_ions.maxwellian_u_std_distribution_type = "constant"
-targ_ions.ux_std = sqrt(th_ti)
-targ_ions.uy_std = sqrt(th_ti)
-targ_ions.uz_std = sqrt(th_ti)
+targ_ions.ux_std = sqrt((th_ti)/mass_ratio)
+targ_ions.uy_std = sqrt((th_ti)/mass_ratio)
+targ_ions.uz_std = sqrt((th_ti)/mass_ratio)
 
 # --- ambient electrons ---
 amb_electrons.species_type = electron
@@ -154,9 +154,9 @@ amb_ions.density_function(x,y,z) = "(namb*((z>zt)+(z<zt-wt)))/13"
 amb_ions.density_min = 1.e-4*namb
 amb_ions.momentum_distribution_type = maxwellian
 amb_ions.maxwellian_u_std_distribution_type = "constant"
-amb_ions.ux_std = sqrt(th_ai)
-amb_ions.uy_std = sqrt(th_ai)
-amb_ions.uz_std = sqrt(th_ai)
+amb_ions.ux_std = sqrt((th_ai)/mass_ratio)
+amb_ions.uy_std = sqrt((th_ai)/mass_ratio)
+amb_ions.uz_std = sqrt((th_ai)/mass_ratio)
 
 # ------------------------------------------------------------------------
 # --- LASER DEPOSITION (ray tracing) -- the operator under test ---

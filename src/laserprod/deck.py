@@ -510,8 +510,18 @@ def render(cfg: dict) -> str:
         a(f"{name}.density_min = 1.e-4*{floor}")
         a(f"{name}.momentum_distribution_type = maxwellian")
         a(f'{name}.maxwellian_u_std_distribution_type = "constant"')
+        # WarpX's u_std is the spread in u = gamma v/c, so for a species of mass m it is
+        # sqrt(kT/(m c^2)). Our theta is normalised on the ELECTRON mass -- theta = kT/(m_e
+        # c^2) -- so an ION needs sqrt(theta * m_e/m_i) = sqrt(theta/mass_ratio). Emitting
+        # sqrt(theta) for both made the ion thermal momentum too large by sqrt(m_i/m_e) and
+        # its energy by m_i/m_e: measured 40.57 keV mean initial ion KE against the 15 eV
+        # the config asked for, a ratio of 2704.6 against mass_ratio = 2698. That is every
+        # ion in every run this project has produced (factor 100 at the Z=1 decks,
+        # 2698 here), and it is what made the Phase-4 ions look numerically heated.
+        u_std = f"sqrt({theta})" if kind == "electron" else \
+            f"sqrt(({theta})/mass_ratio)"
         for comp in ("ux_std", "uy_std", "uz_std"):
-            a(f"{name}.{comp} = sqrt({theta})")
+            a(f"{name}.{comp} = {u_std}")
         a("")
 
     # --- the laser -------------------------------------------------------

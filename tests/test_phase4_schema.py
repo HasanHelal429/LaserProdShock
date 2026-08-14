@@ -204,3 +204,44 @@ def test_intra_species_collisions_name_the_species_TWICE():
     intra = [d[f"{nm}.species"].split() for nm in d["collisions.collision_names"].split()
              if len(set(d[f"{nm}.species"].split())) == 1]
     assert len(intra) == 2, "expected e-e and i-i intra-species pairs"
+
+
+# ------------------------------------------------- thermal momentum normalisation
+def test_ion_u_std_uses_the_ION_mass_not_the_electron_mass():
+    """WarpX's u_std is the spread in u = gamma v/c, so it is sqrt(kT/(m c^2)).
+
+    Our theta is normalised on the ELECTRON mass, so an ion needs
+    sqrt(theta * m_e/m_i) = sqrt(theta/mass_ratio). Emitting sqrt(theta) for both made the
+    ion thermal ENERGY too large by m_i/m_e -- measured 40.57 keV mean initial ion KE
+    against the 15 eV asked for, ratio 2704.6 against mass_ratio 2698. Every ion in every
+    run this project had produced started ~2700x too hot (100x at the Z=1 decks).
+
+    Nothing caught it: the gates check omega_pe*dt and dz/lambda_D, not the initial
+    temperature; --verify round-trips the deck against the config, and the deck faithfully
+    expressed the WRONG formula. It surfaced only from an energy budget.
+    """
+    text = lpdeck.render(lpconfig.load(KIN))
+    ion = [l for l in text.splitlines() if l.startswith("targ_ions.ux_std")]
+    ele = [l for l in text.splitlines() if l.startswith("targ_electrons.ux_std")]
+    assert ion and ele
+    assert "mass_ratio" in ion[0], f"ion u_std must carry /mass_ratio, got: {ion[0]}"
+    assert "mass_ratio" not in ele[0], f"electron u_std must NOT, got: {ele[0]}"
+
+
+@pytest.mark.parametrize("run", [KIN, HYB], ids=["kin", "hyb"])
+def test_ion_thermal_energy_matches_the_requested_temperature(run):
+    """Evaluate the emitted expression and check the implied energy, in eV.
+
+    A string check alone would pass on any expression containing `mass_ratio`; this pins
+    the NUMBER, which is what was wrong.
+    """
+    cfg = lpconfig.load(run)
+    d = lpdeck.parse_inputs_str(lpdeck.render(cfg))
+    mr = float(cfg["reference"]["mass_ratio"])
+    th_ti = float(d["my_constants.th_ti"])
+    # u_std^2 = theta/mass_ratio  =>  (3/2) m_i c^2 u_std^2 = (3/2) kT_i
+    u2 = th_ti / mr
+    ke_eV = 1.5 * u2 * mr * 511e3          # (3/2) kT in eV, via m_i c^2 = mr * m_e c^2
+    want = 1.5 * th_ti * 511e3
+    assert ke_eV == pytest.approx(want, rel=1e-9), (
+        f"implied ion KE {ke_eV:.3f} eV != requested {want:.3f} eV")

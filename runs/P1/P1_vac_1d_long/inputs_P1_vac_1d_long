@@ -109,9 +109,9 @@ targ_ions.density_function(x,y,z) = "nt*((z<=zt)*(z>=zt-wt) + (z>zt)*exp(-((z-zt
 targ_ions.density_min = 1.e-4*nt
 targ_ions.momentum_distribution_type = maxwellian
 targ_ions.maxwellian_u_std_distribution_type = "constant"
-targ_ions.ux_std = sqrt(th_ti)
-targ_ions.uy_std = sqrt(th_ti)
-targ_ions.uz_std = sqrt(th_ti)
+targ_ions.ux_std = sqrt((th_ti)/mass_ratio)
+targ_ions.uy_std = sqrt((th_ti)/mass_ratio)
+targ_ions.uz_std = sqrt((th_ti)/mass_ratio)
 
 # ------------------------------------------------------------------------
 # --- LASER DEPOSITION (ray tracing) -- the operator under test ---
