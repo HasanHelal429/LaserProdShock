@@ -2830,3 +2830,82 @@ global and interior peaks now coincide at every dump.
   memory silently paged — 0.0032 s/step for 70 % of the run, then 10×, then **40×**, ending
   at 3h26m instead of 28 min. Physics unaffected (0 errors). Set
   `amrex.the_arena_is_managed=0` to fail loudly, and cut the background ppc.
+
+---
+
+## 2026-08-14 — **The hybrid solver creates energy.** Two deck bugs fixed; the Phase-4 comparison is not yet quotable
+
+Answering "why does the hybrid depart from the kinetic run so much more than before?" — the
+answer turned out to be a solver bug that two deck bugs had been hiding.
+
+### The deck bug that was masking everything
+
+`deck.py` emitted `targ_ions.ux_std = sqrt(theta)` using the **electron** mass
+normalisation. WarpX's `u_std` is the spread in `u = γv/c`, so an ion needs
+`sqrt(theta · m_e/m_i)`. Ion thermal ENERGY was therefore too large by `m_i/m_e` —
+**2698× here, 100× in every `Z` = 1 run this project has ever done.** Measured: 40.57 keV
+mean initial ion KE against the 15 eV the config asked for, ratio 2704.6 against
+`mass_ratio` = 2698. Fixed; two tests pin it (one on the expression, one on the implied
+energy in eV, since a string check passes on anything containing `mass_ratio`).
+
+**Why the legs used to agree.** Both carried an ion thermal reservoir **15.7× the total
+laser energy**, so both targets exploded under their own ion pressure at 0.00443 c — 1.22×
+the kinetic sound speed and 2.21× the hybrid's. Same driver, same rate, both runs. The
+laser was a **6.4 % perturbation**, and the closure barely entered. The "A1 passes at
+0.96–1.09" result of 2026-08-13 is **RETRACTED**: it was agreement for the wrong reason.
+
+### With cold ions, the real problem is visible
+
+| | kinetic | hybrid |
+|---|---|---|
+| `E_abs` supplied | 4.21e6 | 1.99e6 |
+| ion energy gain | 69.1 % of `E_abs` | **461.8 %** |
+| total particles | **100.9 %** | 462.8 % |
+| electron fluid ΔU | — | +1.86e6 |
+| **accounted / supplied** | **1.009** | **5.56** |
+
+**The full-PIC run conserves energy to 0.9 %. The hybrid creates ~9e6 J from nothing.**
+That surplus, not the missing `∇·q_e`, is what drives the hybrid's extra expansion (peak
+density 0.40× the kinetic, critical surface 3.4× further out, `T_e` plateauing at 424 eV
+against 1387 eV).
+
+### Which term, isolated (40 000 steps, fixed IC)
+
+| variant | `dE_ions` | fluid `dU` | sum/`E_abs` |
+|---|---|---|---|
+| `advected` | 1.936e6 | **7.242e6** | **50.5** |
+| `advected`, `eta` = 0 | 1.936e6 | 7.241e6 | **50.9** |
+| `source_only` | 1.971e6 | 3.881e5 | **8.7** |
+
+- **Not Ohmic heating** — `eta` = 0 is identical to four digits.
+- **The advection is implicated** — `source_only` is 5.8× better, and the difference is
+  entirely in `dU` (18.7×). The ion gain is the same in all three, i.e. insensitive to the
+  electron closure.
+- **97.8 % of the excess appears in 219 cells at `n_e` > `n_cr`**, where `P_abs` is exactly
+  zero. That is the opposite end of the density range from the `u_e` divergence chased on
+  2026-08-12/13, so they are separate problems.
+
+**Hypothesis, untested**: the equation is integrated in non-conservative primitive form for
+`T_e` while `n_e` comes from the PIC ions, so `(3/2) n_e k_B T_e` is conserved by neither
+discrete continuity, with the error largest where the compression term is largest — the
+compressing overdense region, which is where the binning puts it. Full treatment in
+`warpx-cda/hybrid_electrons/ELECTRON_CLOSURE.md` §5.1b.
+
+### Retractions
+
+1. **"A1 passes"** (2026-08-13) — agreement produced by the shared ion-IC artifact.
+2. **"The hybrid creates energy"** was retracted on 2026-08-13 and is now **reinstated**.
+   The retraction was wrong: the ion-IC bug was a *separate* real bug, and removing it left
+   the energy creation intact and cleanly demonstrated against a conserving control.
+3. **"Not Ohmic, not the advection"** (2026-08-13) — those tests had **no power**. With the
+   ion reservoir dominating `dE`, neither knob could have shown up. Redone here with the
+   fixed IC, the advection *is* implicated. Same trap as the CUDA-reproducibility control in
+   CLAUDE.md: a control that fails identically proves nothing.
+
+### Standing consequence
+
+**No hybrid-vs-kinetic number is quotable as a closure result until the energy budget
+closes.** The conduction proposal (D2b) is premature for the same reason. The kinetic leg
+looks sound — it conserves to 0.9 % — but note it reaches 1387 eV against the 823 eV
+Manheimer steady state and is still rising, which points at something both legs share, most
+likely the analytic initial ramp (decision D1) that the paper replaces with a FLASH snapshot.
