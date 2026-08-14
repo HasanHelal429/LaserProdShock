@@ -1710,6 +1710,14 @@ macroparticle effect, so a laser-off control does not buy there what it buys els
 
 ### 12.4 The known physics gap — no electron thermal conduction in the hybrid
 
+> **Design record**: `warpx-cda/hybrid_electrons/ELECTRON_CLOSURE.md` carries the full
+> treatment — the closure ladder and its derivations, the measured failure modes with their
+> numbers, the implementation proposal (flux-limited Spitzer, implicit 1D tridiagonal, plus
+> the e–i equilibration term the model also lacks), the LSP/Chicago precedent, and why this
+> is a *verification* test against FLASH's closure rather than a validation of the physics.
+> Read it before acting on decision **D2**.
+
+
 `hybrid_pic_model.electron_energy_mode = conducting` **aborts as unimplemented**; the
 message says so plainly: *"the energy equation is solved without a heat flux."* The
 available `advected` mode integrates
