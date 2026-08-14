@@ -128,26 +128,22 @@ geometry:
     hi_de: 2450
   boundary:
     axis:
-      # OPEN, reverting the switch to `reflecting` -- which matched the paper but
-      # MANUFACTURED the failure mode. Measured on the reflecting run: a density SLIT
-      # opens between the plume and the wall material (contrast up to 1e10x, n_e down to
-      # 1e-13 n_cr), and beyond it the ions counterstream -- 44% of ions in the outer
-      # 150 d_e travel BACKWARDS at a mean -32 C_s while the plume streams out at +12.
+      # ASYMMETRIC, and both faces are deliberate.
       #
-      # Kinetic ions interpenetrate happily; the ELECTRONS cannot. They are a single fluid
-      # with one density and one velocity u_e = (J_i - J)/rho, which cannot represent two
-      # counterstreaming populations -- it reports their mass-weighted mean, describing
-      # neither. And u_e carries 1/rho, so the slit (rho -> 1e-13 n_cr) is precisely where
-      # the advection CFL has been diverging all along. The reflecting wall CREATES the
-      # condition that the clamp and n_trust were invented to survive.
+      # lo = REFLECTING (the target REAR). The target spans -45..0 d_e with the wall at
+      # -50, so only 4.5 d_e sit behind it. With an ABSORBING rear the laser-driven
+      # compression reaches the wall and PILES UP: measured on P4_lez_kin_bg, the global
+      # max(n_e) sat at z = -48.2 d_e from ~7 ps on (3.05 n_cr against a plume peak of
+      # 1.14), nearly charge-neutral, so compressed target material rather than a sheath.
+      # Quoting it as a plume density inverted the A1 verdict -- raw peak ratio 0.37 where
+      # the interior ratio is 0.98. Reflecting stands for the rest of a thicker target
+      # (the paper's choice) and removes the artificial rear mass loss.
       #
-      # The paper gets away with reflecting because PSC's plume never reaches its wall in
-      # 1 ns. Ours does, so the boundary is load-bearing here and open is the honest
-      # choice: the fast tail LEAVES instead of turning around, so no counterstreaming and
-      # no slit. At 2500 d_e the wall should barely be reached at all.
-      lo: open
+      # hi = OPEN (the plume side). Reflecting there turns the fast tail around and makes
+      # counterstreaming the single electron fluid cannot represent: 44% returning ions
+      # behind a density slit of 1e10x contrast. The plume must be allowed to leave.
+      lo: reflecting
       hi: open
-
 numerics:
   cfl: 0.35                   # unused when const_dt is set; kept for the gate arithmetic
   const_dt_de_over_c: 0.35    # MEASURED. The binding constraint is the electron

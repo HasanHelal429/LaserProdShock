@@ -655,6 +655,14 @@ def render(cfg: dict) -> str:
         fvars = ["Ez", "Ex", "By", "Bx", "jz", "rho"] if dims > 1 else \
                 ["Ez", "Ey", "By", "Bx", "jz", "rho"]
         fvars += [f"rho_{sp}" for sp in species]
+        # A hybrid run's DEFINING quantity is the electron fluid temperature, and it was
+        # not being dumped at all: the Phase-4 diagnosis of the density spike at the
+        # critical surface had to recover T_e from the laser operator's own
+        # `laserdep_profile` text dumps, which are written on a different cadence and only
+        # where the ray reached. `Te` (eV) and `Pe` (Pa) are already exposed by
+        # FullDiagnostics; they simply have to be asked for.
+        if str((cfg.get("solver") or {}).get("type", "em")) == "hybrid":
+            fvars += ["Te", "Pe"]
         a("")
         a(f"# diag_fields: field-only, high cadence "
           f"(~{int(num['max_step'])//field_int} frames) for streaks. Cheap: no particles.")

@@ -163,4 +163,4 @@ diag1.diag_type = Full
 diag_fields.intervals     = 3456
 diag_fields.diag_type     = Full
 diag_fields.write_species = 0
-diag_fields.fields_to_plot = Ez Ey By Bx jz rho rho_targ_ions
+diag_fields.fields_to_plot = Ez Ey By Bx jz rho rho_targ_ions Te Pe

@@ -70,10 +70,10 @@ geometry.dims     = 1
 geometry.prob_lo  = zlo
 geometry.prob_hi  = zhi
 
-# boundaries: z open/open
+# boundaries: z reflecting/open
 boundary.field_lo    = pec
 boundary.field_hi    = pec
-boundary.particle_lo = absorbing
+boundary.particle_lo = reflecting
 boundary.particle_hi = absorbing
 
 

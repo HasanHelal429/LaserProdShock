@@ -85,13 +85,22 @@ geometry:
                               # so 1000 d_e delivers only the first TWO of four.
   boundary:
     axis:
-      lo: open                # paper uses REFLECTING. We use the Phase-0 validated `open`
-                              # because the paper itself reports "unphysical particle
-                              # reflection from the simulation boundary" as an artifact of
-                              # its low-n_max runs (Appendix A). Deviation recorded; if the
-                              # rear drains, revisit.
+      # ASYMMETRIC, and both faces are deliberate.
+      #
+      # lo = REFLECTING (the target REAR). The target spans -45..0 d_e with the wall at
+      # -50, so only 4.5 d_e sit behind it. With an ABSORBING rear the laser-driven
+      # compression reaches the wall and PILES UP: measured on P4_lez_kin_bg, the global
+      # max(n_e) sat at z = -48.2 d_e from ~7 ps on (3.05 n_cr against a plume peak of
+      # 1.14), nearly charge-neutral, so compressed target material rather than a sheath.
+      # Quoting it as a plume density inverted the A1 verdict -- raw peak ratio 0.37 where
+      # the interior ratio is 0.98. Reflecting stands for the rest of a thicker target
+      # (the paper's choice) and removes the artificial rear mass loss.
+      #
+      # hi = OPEN (the plume side). Reflecting there turns the fast tail around and makes
+      # counterstreaming the single electron fluid cannot represent: 44% returning ions
+      # behind a density slit of 1e10x contrast. The plume must be allowed to leave.
+      lo: reflecting
       hi: open
-
 numerics:
   cfl: 0.35
   particle_shape: 2
