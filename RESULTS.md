@@ -2773,3 +2773,60 @@ evidence-backed rather than speculative. Until then the hybrid leg can run `sour
 
 **Still not done**: the regression test `warpx-cda/CLAUDE.md` requires for a bug fix;
 `feature/particle-heater` is 10 commits ahead of origin, unpushed.
+
+---
+
+## 2026-08-13 — Phase 4 controlled comparison: **A1 passes, A2 fails**, confirming the §12.6 prediction
+
+Both legs at 2500 `d_e`, **reflecting rear / open front**, 10⁻³ `n_cr` background, differing
+in **one** thing: the electron closure.
+
+| t [ps] | `n_e` kin | `n_e` hyb | **ratio** | `T_e` kin | `T_e` hyb | **ratio** | `z_cr` kin | `z_cr` hyb |
+|---|---|---|---|---|---|---|---|---|
+| 10.9 | 5.66 | 5.42 | **0.96** | 581 | 417 | 0.72 | 138 | 152 |
+| 21.9 | 2.84 | 2.89 | **1.02** | 1036 | 537 | **0.52** | 238 | 279 |
+| 32.8 | 1.92 | 2.09 | 1.09 | 1305 | 682 | **0.52** | 318 | 394 |
+| 43.7 | 1.42 | 1.55 | 1.09 | 1346 | 817 | 0.61 | 294 | 500 |
+| 54.66 | 1.23 | 1.32 | 1.08 | 1323 | 948 | 0.72 | 258 | 596 |
+
+- **A1 (density) PASSES** — agreement 0.96–1.09, comfortably inside the paper's 20 %.
+- **A2 (temperature) FAILS** — the hybrid runs **28–48 % cooler**, worst at mid-run.
+- The critical surfaces diverge *qualitatively*: kinetic peaks at 318 `d_e` and **recedes**
+  to 258; hybrid marches **monotonically** to 596.
+
+**This confirms §12.6's advance prediction** — hybrid passes the advection-dominated
+criteria and fails on temperature — and the mechanism is the one in
+`warpx-cda/hybrid_electrons/ELECTRON_CLOSURE.md` §5.2: with no `∇·q_e`, absorbed heat cannot
+reach the overdense material, so the front compresses instead of ablating, and the critical
+surface runs away outward instead of settling.
+
+### RETRACTION of the 2026-08-13 (earlier) comparison
+
+The previous entry reported the **opposite** — A1 failing at ratio 0.35–0.46, A2 passing —
+and concluded the prediction had inverted. **That was a boundary artifact, not physics.**
+
+With an *absorbing* rear only 4.5 `d_e` behind the target, the laser-driven compression
+piled against the wall: the global `max(n_e)` sat at `z` = −48.2 `d_e` from ~7 ps onward
+(3.05 `n_cr` against a plume peak of 1.14), nearly charge-neutral, i.e. compressed target
+material. The reported "hybrid holds only 35 % of kinetic density" was a wall feature
+measured against a plume. Excluding `z` < −40 already gave 0.98; with a reflecting rear the
+global and interior peaks now coincide at every dump.
+
+**Found by watching the comparison movie** — no gate, gate-check or test caught it.
+
+### Also this session
+
+- **`deck.py` charge-neutrality bug**: ions carried the ELECTRON number density while
+  charged `Z e`. Invisible at `Z` = 1 (all 20 prior runs), catastrophic at `Z` = 13 —
+  12 `e n_t` uncompensated charge kinetic, 130 `n_cr` instead of 10 hybrid. 3 tests pin it.
+- **Intra-species collisions** must name the species twice; the docs say once and this
+  version aborts. Every kinetic deck was unstartable. The old test asserted the *docs*, so it
+  passed while the deck was broken.
+- **Background species** (this session's fix for the hybrid `u_e` divergence) converged:
+  10⁻³ and 10⁻⁴ `n_cr` give the same answer (peak `n_e` within 0.1–5 %, `T_e` within 3–7 %).
+- **`Te`/`Pe` now dumped** for hybrid runs — previously absent, so the closure diagnosis had
+  to scrape `laserdep_profile`.
+- **GPU memory**: the kinetic+background run reached 11 826 / 12 282 MiB and AMReX's managed
+  memory silently paged — 0.0032 s/step for 70 % of the run, then 10×, then **40×**, ending
+  at 3h26m instead of 28 min. Physics unaffected (0 errors). Set
+  `amrex.the_arena_is_managed=0` to fail loudly, and cut the background ppc.
