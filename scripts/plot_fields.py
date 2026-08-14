@@ -55,7 +55,10 @@ def load_series(run_dir, prefix, sc, species):
     # there is no rho_<...>electrons to sum and the plasma electron density has to come from
     # the solver's own charge density (which is what the laser operator reads under
     # density_source = hybrid_rho).
-    want = ["By", "Bx", "Ez", "jz", "rho"] + [f"rho_{s}" for s in species]
+    # `Te`/`Pe` exist only in hybrid dumps; load_series zero-fills anything absent, so
+    # asking unconditionally is safe and means a hybrid run's DEFINING field is available
+    # to every caller rather than only to whoever remembers to ask for it.
+    want = ["By", "Bx", "Ez", "jz", "rho", "Te", "Pe"] + [f"rho_{s}" for s in species]
     t, rows = [], {k: [] for k in want}
     z = None
     for p in paths:
