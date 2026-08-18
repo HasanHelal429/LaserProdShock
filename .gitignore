@@ -64,3 +64,4 @@ studies/psc_absorption_xcheck.py
 # evidence of what the void binary actually parsed, and progress.log.aborted-* is its
 # cost record. Both are provenance and belong in the repo.
 runs/**/run.log.*
+studies/collision_gate/scratch/

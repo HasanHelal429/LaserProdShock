@@ -1,0 +1,127 @@
+# =====================================================================================
+#  D3 COLLISION GATE -- base config. One variant per (n_e, T_i, collision cadence).
+#  Generated into scratch/<variant>/config.yaml by make_variants.py; never launched
+#  directly. See README.md.
+#
+#  This reproduces Lezhnin 2025 Appendix B: a spatially uniform, periodic, LASER-OFF box
+#  of Maxwellian electrons and aluminium ions with T_e = 1.1 T_i, in which electron-ion
+#  collisions are the only process that can move energy between the species. The measured
+#  T_i(t) is compared against their Eq. (B1).
+# =====================================================================================
+
+meta:
+  run_id: PLACEHOLDER          # set per variant
+  phase: 4
+  deck: PLACEHOLDER
+  description: PLACEHOLDER
+  reference: TEST_PLAN.md 12.8 risk 1; runs/P4/README.md D3; Lezhnin 2025 Appendix B
+
+reference:
+  # IDENTICAL to P4_lez_kin_bg -- the whole point is to test the collision module at the
+  # production run's mass ratio, charge state and lnLambda, not at generic values.
+  length_scale: critical
+  mass_ratio: 2698.0           # m_Al/m_e at the paper's reduced m_p/m_e = 100
+  charge_state: 13
+
+laser:
+  # OFF. intervals = 0 is the ONLY way to disable the operator (an IntervalsParser period
+  # contains step 0, so a huge period still fires) -- the same mechanism P4_lez_kin_off
+  # uses. intensity is still required by the schema and is inert here.
+  wavelength_um: 1.064         # pins n_cr = 9.848e26 m^-3 and d_e = 0.1693 um
+  intensity: 1.0e17
+  intervals: 0                 # <-- the laser never fires
+  direction: z
+  inject_side: hi
+  Z_eff: 13.0
+  coulomb_log: 6.3
+  temperature_mode: local
+  profile_intervals: 0
+  beam:
+    profile: uniform
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5              # the PRODUCTION value. The paper uses 0.2 (5 cells/d_e);
+                               # matching our run matters more than matching theirs,
+                               # because the question is whether OUR numerics resolve the
+                               # collision rate.
+  axis:
+    lo_de: -10                 # 20 d_e = 2 d_i0 (the paper's box), d_i0 = 10 d_e being
+    hi_de: 10                  # the PROTON skin depth at n_cr. 40 cells.
+  boundary:
+    axis:
+      # PERIODIC both faces. The problem is spatially uniform and 0-dimensional in
+      # substance; periodicity removes every boundary effect so the only physics left is
+      # the collision operator.
+      lo: periodic
+      hi: periodic
+
+plasma:
+  target:
+    # A flat top spanning the WHOLE box: thickness = 20 d_e with the face at +10 d_e and
+    # inject_side = hi puts the slab at [-10, +10], i.e. everywhere. scale_length_de = 0
+    # suppresses the corona, so the density is exactly uniform.
+    density_over_ncr: PLACEHOLDER
+    thickness_de: 20
+    center_de: 0
+    scale_length_de: 0
+    shape: planar
+    theta_e_init: PLACEHOLDER  # T_e = 1.1 T_i
+    theta_i_init: PLACEHOLDER
+  # No ambient: a single uniform population, so `is_vacuum` is true and only
+  # targ_electrons / targ_ions exist. Nothing else can carry energy.
+
+field:
+  orientation: none
+
+numerics:
+  cfl: 0.35                    # PRODUCTION value -> dt = 0.175 d_e/c = 0.0989 fs
+  particle_shape: 2            # PRODUCTION value
+  max_grid_size: 64
+  max_step: PLACEHOLDER
+  ppc:
+    target: 2000               # 40 cells x 2000 = 8e4 macroparticles per species.
+                               # Temperature noise ~ sqrt(2/3N) = 0.29 %, against a total
+                               # T_i rise of 9.29 %. The noise floor is not assumed: the
+                               # coll_off arm MEASURES it, which is a second reason that
+                               # control arm exists.
+                               #
+                               # NOT 5000: at 5000 the ladder costs 42 h. This problem is
+                               # 40 cells, so on a GPU it is kernel-launch-latency bound
+                               # (21 FillBoundary calls/step, collisions only 2.8 % of the
+                               # step) and runs at 0.133 s/step; on 8 CPU threads it runs
+                               # at 0.011 s/step. RUN THIS STUDY ON CPU -- the opposite of
+                               # the production run's 12x GPU advantage, and for the same
+                               # reason: cell count, not particle count, decides.
+    ambient: 1
+
+collisions:
+  enabled: PLACEHOLDER         # false for the control arm
+  type: coulomb
+  intervals: PLACEHOLDER       # ndt_supercycle: 1 or 10 (10 = production)
+  coulomb_log: 6.3             # PINNED, and pinned to the same value in the analytic
+                               # formula, so lnLambda is removed as a confound. This is a
+                               # test of the OPERATOR, not of a lnLambda model.
+  pairs:
+    - [targ_electrons, targ_electrons]
+    - [targ_electrons, targ_ions]
+    - [targ_ions, targ_ions]
+
+diagnostics:
+  # EP (ParticleEnergy) + PN (ParticleNumber) are the whole measurement: for a Maxwellian
+  # at rest T = (2/3) E_kin / N. Dense and cheap. No plotfiles are needed at all.
+  plotfile_intervals: 0
+  field_intervals: 0
+  phase_intervals: 0
+  reduced_intervals: PLACEHOLDER
+
+gates:
+  omega_pe_dt_max: 2.0
+  dz_over_lambdaD_max: 200.0   # WILL be violated (dz/lambda_D ~ 98 at n_cr, 13 eV) and
+                               # that is exactly why every point has a COLLISIONLESS
+                               # CONTROL: numerical grid heating raises BOTH species,
+                               # collisional equilibration moves energy from e to i, so
+                               # the control separates them instead of assuming it away.
+  ppc_target_min: 500
+  compression_factor: 1.0
