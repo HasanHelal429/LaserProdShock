@@ -3060,3 +3060,57 @@ caught it. Also: target macroparticle weights span **seven decades** (1.7e10 …
 the exponential initial ramp is loaded at fixed ppc, so every moment here is weight-weighted
 and single-particle extrema are meaningless. Cross-checks: binned particle `n_e` reproduces the
 field `n_e` to 0.14%, and the ambient floor recovers 9.80e-4 against the configured 1e-3.
+
+### 2026-08-18, later — CORRECTION: the kinetic leg is not slow, and FLASH↔kinetic passes
+
+The entry above says the kinetic leg is "30% short and 36% slow against FLASH" and needs
+explaining. **That was a normalisation artifact and is retracted.** `v/C_S0` divides by the
+sound speed at 823 eV, but the kinetic run's plume is at 347 eV. Dividing instead by the
+sound speed at each code's *measured* `T_e`:
+
+| τ | FLASH `v/(C_S0√(T_e/823))` | kinetic | ratio |
+|---|---|---|---|
+| 6.7 | 2.820 | 2.911 | 1.032 |
+| 13.5 | 2.954 | 3.287 | 1.113 |
+| 20.3 | 2.846 | 3.192 | 1.122 |
+| 27.0 | **2.954** | **2.961** | **1.002** |
+
+The rarefaction coefficient is the same number in both codes — 0.2% at τ = 27, within 12%
+throughout. Renormalising lengths the same way, `L_n/(τ√(T_e/823))` agrees to **5%** (0.786
+vs 0.827) and the plume front to **11%**, both converging with τ. So the plume is slow and
+short *only because it is cool*, and it is cool because `T_e,SS ∝ μ^(1/3)` and μ is 18.363×
+smaller. **The rarefaction physics is identical.**
+
+Combined with absorbed fraction 0.870 vs 0.769 and plume `T_e` at 1.02× / 1.11× of each
+code's own Manheimer value, **the FLASH↔kinetic benchmark passes.** That is the Phase-4
+deliverable: the ray-traced deposition operator reproduces a real radiation-hydro ablation.
+
+### The differences that remain, ranked
+1. **`T_e` SHAPE — the only unexplained one.** FLASH is a flat plateau across the plume
+   (diffusive flux-limited conduction); the kinetic rises outward with a hot tenuous tail
+   (5.3 keV in the far field). Either genuine non-local kinetic transport — in which case it
+   is a *result* — or wrong collision rates under the reduced mass ratio. **Decision D3 is
+   the test that distinguishes these, and it has still never been run.**
+2. **Mass reservoir, 337×** (D5). Areal electron density 3.86e25 m⁻² (FLASH) vs 1.14e23
+   (kinetic). By τ = 27 FLASH has moved **0.275%** of its reservoir into the underdense plume
+   and its overdense column has *grown* to 1.005 of initial (shock compression); the kinetic
+   has moved **14.9%** and its overdense column has fallen to **0.845**. So FLASH is
+   quasi-steady ablation against an effectively infinite reservoir and the kinetic is a
+   slowly disassembling foil. It has **not** broken the agreement at τ = 27, but it bounds how
+   far the comparison can be extended.
+3. Overdense interior and critical-surface position — incomparable, `n_max` 10 vs 795 n_cr.
+
+### On D1 (initialise from the FLASH snapshot)
+Worth doing, but **not as a fix — there is no residual discrepancy left for it to fix**, and
+it cannot import the one real structural difference (PIC cannot carry 795 n_cr, so capping
+the snapshot returns approximately the analytic IC). What it *does* buy is early-time
+agreement: the front-position ratio runs 1.69 at τ = 6.7 → 1.11 at τ = 27, and that early
+excess is the signature of starting **from rest** when FLASH's 0.1 ns state already carries a
+velocity ramp to 980 km/s (5 C_S0 at its tip). It also retires the free parameter
+`scale_length_de = 27`. The analytic IC is now *shown* not to have biased the late-time
+result, which is worth recording as a positive check on the choice.
+
+Cost is not a constraint on any of this: the kinetic leg is **36 min on one GPU** (552 960
+steps at 0.0040 s/step). G1 permits `n_max` up to ~50 n_cr at the present dt (ω_pe·dt = 1.24,
+leaving room for 2.6× compression before the 2.0 limit) and raising `n_max` at fixed ppc costs
+**no extra macroparticles**.
