@@ -31,6 +31,8 @@ python scripts/<script>.py <run_dir> [options]
 | `phase_space.py` | **The arbiter** — ion (z, u_z), reflected-ion population | `config.yaml`, plotfiles | `media/<ID>/phase_space.png` | **built** |
 | `make_movies.py` | Movies: evolving lineouts + laser cursor, phase space, 2D map | `config.yaml`, plotfiles | `media/<ID>/movie_*.mp4` | **built** |
 | `compare_runs.py` | Cross-run overlay — the controlled-comparison evidence | several run dirs | `media/<name>/compare.png` | **built** |
+| `xcode_compare.py` | **Three-way FLASH / kinetic / hybrid comparison** on the normalised axes, plus the A1-A8 table | FLASH delivery + two run dirs | `media/xcode/{profiles,history}.png` | **built** |
+| `talk_xcode.py` | The same series, two or three large panels for a slide. Imports `xcode_compare`, so it cannot drift from it | same | `media/xcode/talk_ablation.png` | **built** |
 | `plot_ablation.py` | Vacuum ablation: plume profiles, `v_p`, `T_e(t)`, energy budget | `config.yaml`, plotfiles | `media/<ID>/ablation_*.png` | Phase 1 |
 | `tune_shock.py` | Fit `v_sh` + front **by eye** → `shock_fit.yaml` | `config.yaml`, plotfiles | `<run_dir>/shock_fit.yaml` | Phase 2 |
 | `make_figures.py` | Schaeffer criteria + `criteria.json` | `config.yaml`, plotfiles, `shock_fit.yaml` | `media/<ID>/*.png` | Phase 2 |
