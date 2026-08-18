@@ -105,8 +105,67 @@ it, but locally complete. **Every Z ≠ 1 run this project has produced carries 
 = **26.96 `d_i0/C_S0`** — the same normalised duration as FLASH's 1 ns and every other
 Phase-4 leg.
 
-## Result
-_Pending._
+## Result — ran 2026-08-18, 774 144 steps, 1 h 27 m on one GPU, no NaN
+
+**The initial corona did describe most of the discrepancy, and the energy budget is now
+right. What is left is absorption, and that part cannot be fixed at a reduced mass ratio.**
+
+### Against FLASH at τ = 27 (ratio to FLASH; 1.000 = perfect)
+| | old analytic IC | **this run** |
+|---|---|---|
+| peak `n_e` | 1.74 `n_cr` — **disassembled** | **37.8 `n_cr`** — survives, 5.4 % consumed |
+| `ζ_cr` | −4.13 (collapsed) | 7.87 (**1.89×**) |
+| plume front | **2.03×** | 0.50× |
+| `v` at 0.1 `n_cr` | 1.37× | 0.24× |
+| `L_n` | 1.82× | 0.41× |
+| plume `T_e` | 0.56× | 0.20× |
+
+### The energy budget, which is the thing that was actually wrong
+| | absorbed per TARGET electron | per ABLATED electron |
+|---|---|---|
+| FLASH | 13.4 eV | 4872 eV |
+| old analytic IC | **243 eV — 18× too much** | 248 eV |
+| this run | **9.2 eV — 0.69×** | 170 eV |
+
+The old run over-coupled by **18×**, which is the whole reason its plume ran 2× too far and
+1.4× too fast. Two causes, both in the initial corona: it was 3.8× too cold, and inverse
+bremsstrahlung goes as `T^(-3/2)`, so it absorbed **7.3×** too strongly; and its reservoir
+was 11.7× too small, so that energy landed in far too little mass. Measured optical depth
+through the corona in absolute metres confirms it directly — the old run reaches **5.68×**
+FLASH's by τ = 27, this run **0.53×**.
+
+### This run is now SELF-CONSISTENT, which the old one was not
+`T_e,SS ∝ I_abs^(2/3)`, and against each leg's own reduced-mass Manheimer value (312 eV):
+
+| | `f_abs` | `T_e` its absorption supports | measured | ratio |
+|---|---|---|---|---|
+| FLASH | 0.870 | 823 eV | 839 | **1.019** |
+| old analytic IC | 0.813 | 298 eV | 473 | **1.587** |
+| this run | 0.358 | 173 eV | 168 | **0.974** |
+
+The old leg sat 1.6× above what its absorption could support — a target being volumetrically
+cooked rather than ablated. This one sits at 0.97 of its own prediction: it is doing the
+right physics, just under-driven.
+
+### What is left, and why it is not fixable here
+The entire residual is the absorbed FRACTION, 0.358 against FLASH's 0.870. Absorption
+integrates `κ` over **metres**; the hydrodynamics scales with `d_i0`. The reduced mass ratio
+separates the two, and `d_i0` is **4.29× smaller** in WarpX — so a corona matched in
+normalised units is 4.29× shorter in absolute length and cannot carry FLASH's optical depth.
+Matching the absorption instead would require a corona 4.29× longer in `d_i0`, which would
+then be the wrong hydrodynamic profile. **At a reduced mass ratio you can match the
+ablation dynamics or the absorption, not both.** This is a limitation of the paper's whole
+approach, not of this deck, and is probably why PSC also reduced `c` — which moves `n_cr`
+and rescales the absorption with it. WarpX has real `c` and cannot.
+
+### Caveat on a diagnostic
+`Tlocalfrac` reads 1.2e-7 here against ~1.0 in the old run, which looks alarming and is not:
+it is `n_e²`-weighted over **all** cells, so the opaque 40 `n_cr` slab outweighs the corona
+~45 000:1 and the number describes the slab, which absorbs nothing. The absorbing plasma
+demonstrably used its own per-cell temperature — `A × T_e^{1.5}` is constant to four
+decimals across all 447 absorbing cells, and every `laserdep_profile` dump has `theta_e > 0`
+in 100 % of corona cells. **Do not read `Tlocalfrac` on a run whose target is much denser
+than its corona.**
 
 ## Retracted
 _Nothing yet._

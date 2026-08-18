@@ -3196,3 +3196,85 @@ outstanding.**
   zeroed the slope, reporting "no equilibration at all" for a run whose `T_i` had visibly
   moved. Time is now scaled to O(1) before the fit. The tell was the inconsistency between
   the fitted rate and the raw endpoint, not anything in the fit's own diagnostics.
+
+---
+
+## 2026-08-18 — D1 executed: the corona explained the no-background discrepancy, and the residual is unfixable at a reduced mass ratio
+
+`runs/P4/P4_lez_kin_flashic` (new, 774 144 steps, 1 h 27 m, no NaN). No background species,
+initial condition fitted to the delivered FLASH run at t = 0.1 ns. See its README for the
+full parameter table; this entry records what it settles.
+
+### The question
+`P4_lez_kin` (no background) departs from FLASH badly: plume front **2.03×** too far,
+outflow **1.37×** too fast, `L_n` **1.82×** too long, and the target disassembles from 10 to
+1.74 `n_cr`. How much of that is the initial corona?
+
+### The corona differences, measured against FLASH's 0.1 ns snapshot
+| | `P4_lez_kin` | FLASH |
+|---|---|---|
+| corona form | **Gaussian** | **exponential** |
+| `n_cr` surface | 40.6 `d_e` | **2.31 `d_e`** |
+| corona `T_e` | 100 eV | **378 eV, isothermal** |
+| initial flow | **at rest** | ramp to 4–5 `C_S0` |
+| peak `n_e` | 10 `n_cr` | 795 `n_cr` |
+
+The root cause is the **functional form**: fitted over 1e-3…1 `n_cr`, an exponential gives
+rms(ln n) = 0.107 against the Gaussian's 0.361 — and a Gaussian cannot be tuned into the
+right shape, because its local scale length `L²/(2z)` varies through the corona, so matching
+`L_n` at 0.1 `n_cr` forces the critical surface to 24–42 `d_e`. `deck.py` had only ever
+written a Gaussian.
+
+### Answer: yes, and the evidence is the energy budget
+| | absorbed per TARGET electron | optical depth vs FLASH (τ = 27) |
+|---|---|---|
+| FLASH | 13.4 eV | 1.00 |
+| `P4_lez_kin` | **243 eV — 18× too much** | **5.68×** |
+| `P4_lez_kin_flashic` | **9.2 eV — 0.69×** | 0.53× |
+
+The old run over-coupled by 18×: its corona was 3.8× too cold and `K ∝ T^(-3/2)`, so it
+absorbed 7.3× too strongly, into a reservoir 11.7× too small. That is the whole explanation
+for a plume 2× too far and 1.4× too fast. With the corona fixed the target **survives**
+(peak 40 → 37.8, 5.4 % consumed) and the budget lands within 1.5× of FLASH.
+
+### The new leg is self-consistent; the old one was not
+`T_e,SS ∝ I_abs^(2/3)`, against each leg's own reduced-mass Manheimer value (312 eV):
+FLASH **1.019**, `P4_lez_kin` **1.587**, `P4_lez_kin_flashic` **0.974**. The old leg sat
+60 % above what its own absorption could support — volumetric cooking of a foil, not
+ablation. The new one sits where its absorption puts it, and is simply under-driven.
+
+### The residual is absorption, and it CANNOT be fixed at a reduced mass ratio
+The whole remaining gap is `f_abs` = 0.358 against FLASH's 0.870. Absorption integrates `κ`
+over **metres**; hydrodynamics scales with `d_i0`; and `d_i0` is **4.29× smaller** in WarpX.
+A corona matched in normalised units is therefore 4.29× shorter in absolute length and
+cannot carry FLASH's optical depth, while a corona matched in absolute length would be the
+wrong hydrodynamic profile. **At a reduced mass ratio one can match the ablation dynamics or
+the absorption, not both.** This is a limitation of the paper's approach, not of this deck,
+and is likely why PSC also reduced `c` — which moves `n_cr` and rescales absorption with it.
+WarpX has real `c` and cannot follow.
+
+**Consequence for Phase 4:** the FLASH↔kinetic comparison should be read on the quantities
+that survive the rescaling (which pass, see the earlier 2026-08-18 entry) and on the
+*self-consistency* of each leg against its own absorbed flux — not on absolute agreement in
+plume energetics, which is out of reach by construction.
+
+### Tooling
+* `deck.py` gains `corona_profile: exponential`, `corona_density_over_ncr`,
+  `corona_offset_de`, `theta_e_solid`/`theta_i_solid` (via WarpX's
+  `maxwellian_u_std_distribution_type = parser`) and `drift_uz_de` (via
+  `maxwellian_u_mean_distribution_type = parser`). All default to the previous behaviour.
+* **BUG FIX.** `density_min` was applied identically to both species although the ion
+  density function is `(n_e expression)/Z`, so ions were culled a factor **Z = 13** in
+  density earlier than electrons — leaving an 18 `d_e` shell at the plume tip with net
+  charge **−1.000** of the local density. 7.5e-5 of the total charge, which is why no energy
+  budget ever caught it; locally complete. **Every Z ≠ 1 run this project has produced
+  carries it.** Found by the smoke test, fixed, regression test added.
+* **`Tlocalfrac` is unreliable when the target is much denser than the corona.** It is
+  `n_e²`-weighted over all cells, so a 40 `n_cr` slab outweighs the corona ~45 000:1 and the
+  number describes the slab, which absorbs nothing. It read 1.2e-7 here while every
+  absorbing cell demonstrably used its own temperature (`A × T_e^{1.5}` constant to four
+  decimals over 447 cells).
+* `strings <binary> | grep -x <key>` — CLAUDE.md's provenance test — **gives false
+  negatives**: the compiler merges string literals, so `uz_mean_function(x,y,z)` appears
+  only inside `ux_mean_functionuy_mean_functionuz_mean_function`. Use a substring search, or
+  better, check WarpX's own `Unused ParmParse` list after a smoke run.
