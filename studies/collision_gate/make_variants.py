@@ -49,16 +49,37 @@ CFL = 0.35
 DZ_OVER_DE = 0.5
 DT = CFL * DZ_OVER_DE * DE / C          # 0.0989 fs
 
+# The Appendix B matrix is an explicit LIST, not a cross product, because one corner is
+# dropped: (0.01 n_cr, 120 eV). At tau = 62 ps it needs ~237 000 steps to raise T_i to 10x
+# the measured noise floor, and shortening it to an affordable 24 000 steps leaves
+# signal/noise ~ 1.2 -- a number that would look like a measurement and be nothing of the
+# kind. It is also the least informative point: its sigma_max cap touches 0.5 % of the
+# distribution, and (0.1 n_cr, 120 eV) at 1.5 % already brackets the production plume's
+# 1.4 %. Recorded here rather than silently omitted.
+CASES = ((1.0, 12.0), (1.0, 120.0), (0.1, 12.0), (0.1, 120.0), (0.01, 12.0))
+DROPPED = ((0.01, 120.0, "tau = 62 ps: needs ~237k steps for S/N = 10; unaffordable, and "
+                         "its 0.5 % cap fraction is bracketed by (0.1 n_cr, 120 eV)"),)
 NE_CASES = (1.0, 0.1, 0.01)
 TI_CASES = (12.0, 120.0)
 ARMS = (("coll_off", False, 1), ("c1", True, 1), ("c10", True, 10))
 
-MAX_STEP_CAP = 120_000                  # affordability cap; see README.
-# The cap only bites on the two least-collisional points, and it bites hardest on
-# (0.01 n_cr, 120 eV), which reaches only 0.19 tau. That point is also the one where the
-# production cadence is most trivially safe (nu_ei*dt_coll = 0.0015), so it carries the
-# least weight; its rate is fitted from the initial ramp and reported with a wider error
-# bar rather than quietly presented as equal to the others.
+# CONFIRMATION variants: a pinned lnLambda that WarpX would NOT compute for itself, at
+# conditions where the sigma_max cap cannot bind. This is what discriminates "WarpX honours
+# CoulombLog" from "WarpX silently computes its own":
+#   at n_e = n_cr, T_e = 132 eV the self-consistent lnLambda is 4.06, and sigma_max/sigma_C
+#   is 2.9 even at lnLambda = 20, so the cap is inactive. Pinning 20 therefore predicts
+#   R_meas/R_pred(20) ~ 1 if the input is honoured, and 4.06/20 = 0.20 if it is ignored.
+# (name, ne_frac, Ti, lnLambda, ndt)
+CONFIRM = (("D3_confirm_lnL20_n1_Ti120_c1", 1.0, 120.0, 20.0, 1),)
+
+MAX_STEP_CAP = 24_000                  # affordability cap; see README.
+# Only the two 120 eV low-density points hit this cap. They do NOT need 2 tau: the rate is
+# fitted from the initial ramp, and at 24 000 steps the T_i rise is still ~10x the measured
+# noise floor. Cutting them from 120 000 to 24 000 steps is what makes the ladder affordable
+# (they were 9 h each at 3-way contention), and they are the points that matter MOST for the
+# production run, because their sigma_max cap fraction (1.5 % and 0.5 %) brackets the
+# production plume's (1.4 % and 0.4 %). Their t_run/tau is reported in the table and their
+# error bars are wider than the rest; that is stated rather than smoothed over.
 
 
 def nu_eps_ei(ni, Te_eV, Ti_eV, mi):
@@ -113,8 +134,8 @@ def table():
     print(f"{'ne/ncr':>7} {'Ti':>6} {'Te':>6} {'T_eq':>8} | {'tau_B1[ps]':>11} "
           f"{'nu_brag[1/s]':>13} {'nu_brag*dt':>11} {'*dt(x10)':>10} | "
           f"{'max_step':>9} {'t_run/tau':>10}")
-    for ne_frac in NE_CASES:
-        for Ti in TI_CASES:
+    for ne_frac, Ti in CASES:
+        if True:
             p = case_physics(ne_frac, Ti)
             ms = min(int(round(2.0 * p["tau"] / DT)), MAX_STEP_CAP)
             ms = max(ms, 400)
@@ -146,8 +167,8 @@ def main():
     assert base["laser"]["intervals"] == 0, "the laser must be OFF in every variant"
 
     n = 0
-    for ne_frac in NE_CASES:
-        for Ti in TI_CASES:
+    for ne_frac, Ti in CASES:
+        if True:
             p = case_physics(ne_frac, Ti)
             ms = max(min(int(round(2.0 * p["tau"] / DT)), MAX_STEP_CAP), 400)
             for arm, enabled, ndt in ARMS:
@@ -193,6 +214,58 @@ def main():
                 with open(os.path.join(d, "README.md"), "w") as fh:
                     fh.write(readme(name, p, arm, enabled, ndt, ms))
                 n += 1
+    # --- confirmation variants -----------------------------------------------------
+    for name, nf, Ti, lnL, ndt in CONFIRM:
+        p = case_physics(nf, Ti)
+        # tau scales as 1/lnLambda, so rescale the step budget from the pinned value
+        tau = p["tau"] * LNL / lnL
+        ms = max(int(round(2.0 * tau / DT)), 400)
+        d = os.path.join(HERE, "scratch", name)
+        os.makedirs(d, exist_ok=True)
+        cfg = yaml.safe_load(yaml.safe_dump(base))
+        cfg["meta"]["run_id"] = name
+        cfg["meta"]["deck"] = f"inputs_{name}"
+        cfg["meta"]["description"] = (
+            f"D3 CONFIRMATION run: {nf} n_cr, T_i = {Ti} eV, lnLambda PINNED at {lnL} "
+            f"(not 6.3). Discriminates whether WarpX honours collisions.coulomb_log or "
+            f"silently computes its own -- see CONFIRM in make_variants.py.")
+        cfg["meta"]["expect_wrap"] = True
+        cfg["meta"]["expect_face_plasma"] = True
+        cfg["plasma"]["target"]["density_over_ncr"] = float(nf)
+        cfg["plasma"]["target"]["theta_e_init"] = float(p["Te"] / ME_C2_EV)
+        cfg["plasma"]["target"]["theta_i_init"] = float(Ti / ME_C2_EV)
+        cfg["numerics"]["max_step"] = int(ms)
+        cfg["collisions"]["enabled"] = True
+        cfg["collisions"]["intervals"] = int(ndt)
+        cfg["collisions"]["coulomb_log"] = float(lnL)
+        cfg["diagnostics"]["reduced_intervals"] = max(1, ms // 400)
+        cfg["diagnostics"]["plotfile_intervals"] = int(ms)
+        with open(os.path.join(d, "config.yaml"), "w") as fh:
+            yaml.safe_dump(cfg, fh, sort_keys=False, default_flow_style=False)
+        with open(os.path.join(d, "README.md"), "w") as fh:
+            fh.write(f"""# {name} — D3 confirmation run
+
+**Auto-generated by `studies/collision_gate/make_variants.py`. Do not edit; regenerate.**
+
+Not part of the Appendix B matrix. This run exists to answer one question: **does WarpX
+honour `collisions.coulomb_log`, or does it compute `lnΛ` itself?**
+
+`n_e` = {nf:g} `n_cr`, `T_e` = {p['Te']:.1f} eV, `T_i` = {Ti:.1f} eV, `lnΛ` **pinned at
+{lnL:g}**, collisions every step, {ms} steps = 2 τ at that `lnΛ`.
+
+At these conditions the self-consistent `lnΛ` is **4.06**, and the `σ_max` cross-section cap
+(`ElasticCollisionPerez.H`, `sigma_max = 1/(n·r_min)`) has `σ_max/σ_C` = 2.9 even at
+`lnΛ` = 20 — so the cap is **inactive** and cannot confound the answer.
+
+| outcome | meaning |
+|---|---|
+| `R_meas/R_pred(20)` ≈ 1 | the pinned value is honoured |
+| `R_meas/R_pred(20)` ≈ 0.20 | the input is ignored and `lnΛ` = 4.06 was used |
+
+## Result
+_To be filled in by `analyze.py`._
+""")
+        n += 1
     print(f"wrote {n} variants under {os.path.join(HERE, 'scratch')}")
     return 0
 
