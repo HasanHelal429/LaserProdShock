@@ -2962,3 +2962,101 @@ bug**. The missing `∇·q_e` is back as the leading explanation, so decision **
    rather than gaining it.
 3. The `eta = 0` and `source_only` comparisons that appeared to implicate the advection were
    all differencing the same bad baseline, which is why they seemed to discriminate.
+
+---
+
+## 2026-08-18 — Phase 4 three-way comparison: FLASH vs kinetic vs hybrid, and a corrected temperature reference
+
+`scripts/xcode_compare.py` (new), `media/xcode/{profiles,history}.png`. FLASH legs are the
+delivered Ploegstra runs (see `runs/P4/P4_lez_flash/DELIVERY.md`); WarpX legs are
+`P4_lez_kin_bg` and `P4_lez_hyb_bg3`.
+
+### The unit map closes, and it was worth deriving rather than assuming
+Only the ION mass differs between the codes (m_Al/m_e = 49542 real, 2698 in WarpX), so
+WarpX keeps real `c`, `m_e`, `λ₀`, `n_cr` and `d_e`. The flow is nevertheless rescaled:
+`C_S ∝ m_i^(-1/2)`, `d_i0 ∝ m_i^(1/2)`, `d_i0/C_S0 ∝ m_i`. Measuring `z` in each code's own
+`d_i0` and `t` in its own `d_i0/C_S0` absorbs all of it. Derived independently, FLASH's time
+unit is 37.098 ps and WarpX's 2.0277 ps (ratio 18.30 against the mass ratio 18.363, 0.4%),
+and **both codes independently land at τ = 26.96** — they span the same normalised duration
+to 0.3%. That is a genuine validation of the run design, not a coincidence.
+
+### RETRACTION: the 823 eV reference was wrong for the WarpX legs
+`T_e,SS = 5.94 μ^(1/3) Z^(-1/3) λ^(4/3) I^(2/3)` goes as **μ^(1/3)**, and the WarpX legs run
+μ 18.363× lighter. Their correct steady-state target is **823 / 18.363^(1/3) = 312 eV**, not
+823 eV. Density-weighted `T_e` over the underdense plume (1e-2 ≤ n_e/n_cr ≤ 1) at τ = 27,
+each against its OWN Manheimer value:
+
+| leg | T_e | own T_e,SS | ratio |
+|---|---|---|---|
+| FLASH | 839.0 eV | 823 eV | **1.019** |
+| kinetic | 347.1 eV | 312 eV | **1.113** |
+| hybrid | 423.4 eV | 312 eV | **1.357** |
+
+All three sit near their own prediction, FLASH to 2%. **The "hybrid reaches only 0.31× the
+kinetic's T_e" and "the kinetic overshoots to 1387 eV" claims are both retracted**: they
+compared raw eV against the real-mass value, and used unweighted maxima over a band that
+includes the tenuous background where the kinetic's hot tail runs to 5.3 keV. The 823 eV
+annotation is now corrected in `compare_movie3.py` and `compare_deposition.py`.
+
+### What actually differs: the SHAPE of T_e, not its magnitude
+FLASH's `T_e` is a **flat plateau across the whole plume**, cut off sharply at the front —
+the signature of strong flux-limited conduction. The hybrid's is a localised **hump** peaking
+near ζ ≈ 30–50 and falling either side; the kinetic's **rises outward** with a hot tenuous
+tail. So the missing `∇·q_e` is real and visible, but it shows up as the absence of the
+conduction plateau, **not** as a wrong peak temperature. Anyone judging the closure on peak
+`T_e` alone will conclude the opposite of the truth.
+
+### Plume hydrodynamics: the hybrid tracks FLASH, the kinetic does not
+At τ = 27, as a ratio to FLASH: plume front `ζ(1e-2 n_cr)` kinetic **0.71×**, hybrid
+**0.98×**; `v_z/C_S0` at 0.1 n_cr kinetic **0.64×**, hybrid **0.96×**; density scale length
+kinetic **0.68×**, hybrid **0.83×**. In `history.png` the FLASH and hybrid front and velocity
+curves overlay for the whole run. **This inverts the phase's working assumption** that the
+kinetic leg is the arbiter and the hybrid the deficient one.
+
+### …but the hybrid's agreement must not be quoted yet — two disqualifiers
+1. **It absorbs 2.1× less laser and is still hotter and faster.** Time-integrated `f_abs`:
+   FLASH 0.870, kinetic 0.769, hybrid **0.364**, and the hybrid's instantaneous `f_abs`
+   *collapses* 0.940 → 0.369 over the run while the kinetic holds 0.953 → 0.935. A leg that
+   couples half the energy yet expands faster has an energy-partition problem; `T_e,SS ∝
+   I_abs^(2/3)` puts the hybrid at 2.7× its absorbed-flux expectation against FLASH's 1.12×.
+   (Absorption is *not* the explanation for the FLASH↔WarpX temperature gap: 0.884^(2/3) =
+   0.92, an 8% effect, against the mass factor's 2.6×.)
+2. **It is not robust to the background density**, which was justified as a numerical crutch
+   costing "0.35% mass loading". bg3 (1e-3) vs bg4 (1e-4) at τ = 27: plume front 92.4 → 168.1
+   (**1.8×**), `L_n` 17.8 → 40.4 (**2.3×**), peak n_e 1.93 → 0.95, and bg4 loses its critical
+   surface entirely. bg3's near-exact match to FLASH therefore rests on a parameter chosen for
+   stability, and reads as coincidence until a background-independent run says otherwise.
+
+By contrast the **FLASH reference is robust**: radiation on vs off moves the plume front 1.8%,
+plume `T_e` 2.5% and `L_n` 2.7%.
+
+### Not comparable, by design
+Peak density (FLASH 4141 n_cr and *compressing*; WarpX 5.7 and 1.9 and *decompressing* from
+10) and critical-surface position (`ζ_cr` FLASH 4.16, kinetic 9.39, hybrid 31.96) are set by
+`n_max` = 795 vs 10 n_cr — **decision D5**, already excluded by TEST_PLAN 12.6. The 3.4×
+hybrid/kinetic `ζ_cr` ratio measured on 2026-08-13 reproduces exactly (31.96/9.39 = 3.40).
+
+### Consequences
+- **D2b (implementing `conducting`) stays live**, and now has a specific target: reproduce
+  FLASH's flat plume `T_e` plateau, not a higher peak.
+- **The kinetic leg is now the one to explain** — 30% short and 36% slow against FLASH on
+  quantities that survive the rescaling. Leading suspect is the **never-executed D3 gate**
+  (collision rates under a reduced mass ratio, TEST_PLAN 12.8 risk 1: PSC applies a special
+  correction, WarpX's `BinaryCollision` is not known to).
+- **The hybrid's absorption collapse (0.94 → 0.37) is a new, unexplained finding** and is the
+  most concrete hybrid defect this comparison produced. Note it contradicts nothing earlier:
+  the 2026-08-13 movie showed the density staying overdense, which does not prevent `f_abs`
+  falling, since `K ∝ n_e² T_e^(-3/2)` and `T_e` rose.
+- A background-independent hybrid run is the prerequisite for any "hybrid matches FLASH"
+  claim.
+
+### Tooling bug fixed along the way
+`xcode_compare.py` first read the ion drift from `particle_momentum_x`. **In 1D WarpX the
+geometry axis is z**; yt exposes the single spatial coordinate as `particle_position_x`, but
+momentum keeps its three physical components, so the longitudinal one is `momentum_z`. Using
+`_x` reports the transverse thermal spread (0.13 `C_S0`) in place of the outflow (up to 9.9),
+and it looked plausible — the plume front moved while the "velocity" read zero, which is what
+caught it. Also: target macroparticle weights span **seven decades** (1.7e10 … 1.3e17) because
+the exponential initial ramp is loaded at fixed ppc, so every moment here is weight-weighted
+and single-particle extrema are meaningless. Cross-checks: binned particle `n_e` reproduces the
+field `n_e` to 0.14%, and the ambient floor recovers 9.80e-4 against the configured 1e-3.

@@ -36,6 +36,14 @@ from laserprod import io as lpio            # noqa: E402
 from laserprod import plotting as lpp       # noqa: E402
 
 
+# The Manheimer steady state T_e,SS = 5.94 mu^(1/3) Z^(-1/3) lambda^(4/3) I^(2/3) is 823 eV
+# for REAL aluminium. These runs use the paper's REDUCED mass ratio (m_Al/m_e = 2698 rather
+# than 49542), and T_e,SS ~ mu^(1/3), so the value a WarpX leg should be judged against is
+# 823 / 18.363^(1/3) = 312 eV. Annotating 823 eV on a reduced-mass run overstates the target
+# by 2.6x -- which is how the hybrid's 423 eV was read as "0.5x of expectation" when it is
+# 1.36x. See scripts/xcode_compare.py and RESULTS.md 2026-08-18.
+TSS_REDUCED = 823.0 / 18.363 ** (1.0 / 3.0)      # 312 eV
+
 def series(run_dir):
     cfg = lpconfig.load(run_dir)
     sc = lpconfig.derive(cfg)
@@ -112,8 +120,8 @@ def main() -> int:
         ax = axes[1, c]
         ax.plot(a["z"], a["Te"], color=lpp.C_TARGET, lw=1.7)
         ax.plot(b["z"], b["Te"], color=lpp.C_AMBIENT, lw=1.5, ls="--")
-        ax.axhline(823.0, color=lpp.C_LASER, ls="-.", lw=1.1)
-        ax.text(0.01, 823.0, " T$_{e,SS}$ = 823 eV", transform=ax.get_yaxis_transform(),
+        ax.axhline(TSS_REDUCED, color=lpp.C_LASER, ls="-.", lw=1.1)
+        ax.text(0.01, TSS_REDUCED, f" T$_{{e,SS}}$ = {TSS_REDUCED:.0f} eV (reduced $m_i$)", transform=ax.get_yaxis_transform(),
                 va="bottom", fontsize=7, color=lpp.C_LASER)
         if c == 0:
             ax.set_ylabel("T$_e$  [eV]   (the value K was evaluated at)")
