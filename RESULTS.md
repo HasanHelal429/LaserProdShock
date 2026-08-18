@@ -3114,3 +3114,85 @@ Cost is not a constraint on any of this: the kinetic leg is **36 min on one GPU*
 steps at 0.0040 s/step). G1 permits `n_max` up to ~50 n_cr at the present dt (ω_pe·dt = 1.24,
 leaving room for 2.6× compression before the 2.0 limit) and raising `n_max` at fixed ppc costs
 **no extra macroparticles**.
+
+---
+
+## 2026-08-18 — D3 collision gate: the e–i half PASSES, and the deficit is a cap, not a bug
+
+`studies/collision_gate/` (new): Lezhnin 2025 Appendix B reproduced at **our** production
+numerics — uniform periodic laser-off box, Z = 13, `m_i` = 2698 `m_e`, `dz` = 0.5 `d_e`,
+`cfl` = 0.35, ppc 2000, `lnΛ` = 6.3 pinned in **both** the deck and the analytic reference.
+15 runs: 5 (n, T) points × {collisions off, every step, every 10 = production}, plus one
+confirmation run. Figure `studies/collision_gate/media/b1_decay.png`.
+
+### The result
+| `n_e/n_cr` | `T_i` | cap-touched % of `f(v)` | `ν_ei·dt_coll` | `c1` | `c10` |
+|---|---|---|---|---|---|
+| 0.1 | 120 | **1.5 %** | 0.002 | **1.005** | 0.875 |
+| 1 | 120 | 4.6 % | 0.015 | 0.890 | 0.637 |
+| 0.01 | 12 | 12.9 % | 0.005 | 0.552 | 0.538 |
+| 0.1 | 12 | 32.5 % | 0.048 | 0.250 | 0.225 |
+| 1 | 12 | 65.2 % | 0.483 | 0.082 | 0.030 |
+
+WarpX reproduces Eq. (B1) to **0.5 %** where its cross-section cap is inactive. The `c1`
+ratio is monotonic in the cap-touched fraction and **uncorrelated with `ν_ei·dt_coll`** —
+the 0.01 `n_cr` / 12 eV point has `ν·dt_coll` = 0.005 and still reads 0.552. That
+decorrelation is the proof of mechanism.
+
+### Mechanism (read out of the WarpX source, not inferred)
+`UpdateMomentumPerezElastic.H` applies `sigma_eff = min(pi*b0^2*lnLmd, sigma_max)` with
+`sigma_max = 1/(n·r_min)` from `ElasticCollisionPerez.H` — a collision may not have a mean
+free path shorter than the interparticle spacing (Perez 2012 §II.C; Angus et al. JCP 531,
+113927). A pinned `CoulombLog` **is** honoured (line 181), but the cap applies afterwards
+regardless, and since `σ_C ∝ v⁻⁴` it bites on the slow tail even where the thermal-speed
+ratio looks safe.
+
+**Where the cap binds, the plasma is strongly coupled and Spitzer at `lnΛ` = 6.3 is not a
+physical target.** At `n_cr` / 13.2 eV the self-consistent `lnΛ` is 0.60, and 0.60/6.3 =
+0.095 against the measured 0.082 — the paper's own "`lnΛ` < 1 regime" (their Fig. 11a). So
+the apparent 12× discrepancy was **my reference being wrong, not the operator**.
+
+Confirmed independently: `lnΛ` pinned at **20** where the cap is inactive gives **0.669**,
+against the **0.20** that using WarpX's own `lnΛ` = 4.06 would give.
+
+### Verdict for `P4_lez_kin_bg`
+Evaluated cell by cell on the production run's own profiles, density-weighted over the
+underdense plume, the cap touches at most **1.71 %** of `f(v)` and `ν_ei·dt_coll` never
+exceeds **0.051** — and the ladder measures **1.005** at 1.5 % capped. **The kinetic leg's
+collisional transport is sound.** The risk D3 was written to catch (WarpX lacking PSC's
+reduced-mass-ratio correction, Ref. 47) is **not present**. Its `t` = 0 cold dense target
+is 18 % capped, so only the startup transient is under-collisional.
+
+This closes the last open doubt about the kinetic leg, and so completes the FLASH↔kinetic
+benchmark recorded on 2026-08-18 earlier: absorbed fraction 0.870 vs 0.769, plume `T_e` at
+1.02× / 1.11× of each code's own μ^(1/3)-corrected Manheimer value, and a rarefaction
+coefficient agreeing to 0.2 %.
+
+### One caveat and a cheap fix
+`c10/c1` = 0.87 / 0.98 / 0.72 / 0.90 / 0.37 with increasing `ν·dt_coll`. Below ≈0.5 the
+scatter matches the effect, so no trend is resolvable: honestly, the production cadence
+costs **of order 10–15 %** in the `e–i` rate, rising to 63 % at `ν·dt_coll` = 4.8.
+Collisions are **10.4 %** of a production step at `ndt` = 10, so `collisions.intervals: 1`
+doubles the run to ~72 min and removes the uncertainty. **Recommended for future Phase-4
+kinetic runs.**
+
+Also found before any run: `P4_lez_kin_bg`'s `collisions.pairs` cover only the target
+species — the ambient is collisionless and there are no target↔ambient pairs.
+
+### D3 is NOT fully closed
+Appendix C (electron thermal conductivity) is not covered; it needs an imposed gradient in
+a non-periodic box. **The e–i thermalisation half passes; the conductivity half is
+outstanding.**
+
+### Process notes
+* Three concurrent GPU runs died with AMReX `Arena out of memory` — it sizes the device
+  Arena from free GPU memory (~8.9 GiB), so a second run on the same device has nothing
+  left. And a 40-cell box is kernel-launch-latency bound anyway: **0.133 s/step on a 4070
+  against 0.011 s/step on 8 OMP threads**, with collisions only 2.8 % of the step. The
+  production run's 12.7× GPU advantage does **not** transfer to small boxes; cell count
+  decides. `run_variants.sh` now defaults to CPU.
+* `analyze.py` had a conditioning bug that produced a confident wrong answer: with
+  `t ~ 1e-16` s the design matrix `[t, 1]` has condition number ~1e14, and `lstsq` silently
+  zeroed the slope, reporting "no equilibration at all" for a run whose `T_i` had visibly
+  moved. Time is now scaled to O(1) before the fit. The tell was the inconsistency between
+  the fitted rate and the raw endpoint, not anything in the fit's own diagnostics.

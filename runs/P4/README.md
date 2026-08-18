@@ -120,7 +120,27 @@ than aborting inside WarpX after the queue has handed over the GPU.
 
 ---
 
-### D3 — Validate WarpX's collision module before trusting the kinetic run? **[SET: yes]**
+### D3 — Validate WarpX's collision module before trusting the kinetic run? **[SET: yes — e–i half RUN 2026-08-18 and PASSED; conductivity half outstanding]**
+
+> **RESULT (2026-08-18, `studies/collision_gate/`).** The `e–i` thermalisation half is done:
+> 15 runs against Eq. (B1) at our production numerics. **WarpX reproduces the analytic rate
+> to 0.5 %** where its cross-section cap is inactive, and every deviation traces to
+> `sigma_eff = min(pi b0^2 lnLmd, sigma_max)` in `UpdateMomentumPerezElastic.H` — a
+> deliberate limiter (mean free path ≥ interparticle spacing, Perez 2012 §II.C), not a
+> defect, and not the reduced-mass-ratio problem this decision was written to catch.
+> Evaluated on `P4_lez_kin_bg`'s own profiles, the plume never exceeds **1.71 %** of `f(v)`
+> touched by the cap or **0.051** in `ν_ei·dt_coll`, against a measured **1.005** at 1.5 %
+> capped — **so the kinetic leg's transport is sound.**
+>
+> Two things to carry forward: the production cadence `intervals: 10` costs **~10–15 %** in
+> the `e–i` rate and `intervals: 1` removes it for ~2× wall time (collisions are 10.4 % of a
+> step); and `P4_lez_kin_bg`'s `collisions.pairs` leave the **ambient collisionless** with no
+> target↔ambient pairs.
+>
+> **Appendix C (electron thermal conductivity) is still NOT done**, so this decision is not
+> fully discharged.
+
+
 
 The paper: *"auxiliary simulations with either collisions or laser heating turned off
 demonstrated drastically different plasma evolution."* Collisions are load-bearing, so

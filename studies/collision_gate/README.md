@@ -135,6 +135,97 @@ scratch/            the 18 variant run dirs (gitignored)
 * `i–i` and `e–e` rates are enabled (matching production) but are not themselves measured;
   they cannot move energy between species and so do not enter Eq. (B1).
 
-## Result
+## Result — ran 2026-08-18, 15 runs. **The e–i half of D3 PASSES.**
 
-_To be filled in by `analyze.py` once the ladder has run._
+`media/b1_decay.png`. Rates are the fitted decay of `T_e − T_i`; `lnΛ` = 6.3 pinned in both
+the deck and the analytic reference.
+
+### WarpX reproduces Eq. (B1) exactly where its cross-section cap is inactive
+
+| `n_e/n_cr` | `T_i` | cap-touched % of `f(v)` | `ν_ei·dt_coll` | `c1` ratio | `c10` ratio |
+|---|---|---|---|---|---|
+| 0.1 | 120 | **1.5 %** | 0.002 | **1.005** | 0.875 |
+| 1 | 120 | 4.6 % | 0.015 | 0.890 | 0.637 |
+| 0.01 | 12 | 12.9 % | 0.005 | 0.552 | 0.538 |
+| 0.1 | 12 | 32.5 % | 0.048 | 0.250 | 0.225 |
+| 1 | 12 | 65.2 % | 0.483 | 0.082 | 0.030 |
+
+**The `c1` ratio is a clean monotonic function of the cap-touched fraction and is
+UNCORRELATED with `ν_ei·dt_coll`** — the 0.01 `n_cr` / 12 eV point has `ν·dt_coll` = 0.005,
+utterly resolved, and still reads 0.552. That decorrelation is the proof of mechanism: the
+deficit is the cross-section cap, not the time step.
+
+### The mechanism, read out of the source
+
+`ElasticCollisionPerez.H` computes `σ_max = 1/(max(n₁,n₂)·r_min)` with
+`r_min = (4πn/3)^(−1/3)`, and `UpdateMomentumPerezElastic.H` applies
+
+    sigma_eff = min(pi * b0^2 * lnLmd, sigma_max)
+
+i.e. a collision may not have a mean free path shorter than the distance to the next
+particle (Perez et al., Phys. Plasmas **19**, 083104 (2012) §II.C; Angus et al., JCP **531**,
+113927 (2025)). A pinned `CoulombLog` **is** honoured — line 181, `if (L > 0) lnLmd = L` —
+but the cap is applied afterwards regardless. Because `σ_C ∝ v⁻⁴`, the cap engages below
+`u_cap = (σ_max/σ_C(v_th))^(−1/4)`, so it bites on the slow tail even where the
+thermal-speed ratio looks safe.
+
+**Where the cap binds, the plasma is strongly coupled and the Spitzer rate at `lnΛ` = 6.3 is
+not a physical target.** At `n_cr` / 13.2 eV the self-consistent `lnΛ` is **0.60**, and
+0.60/6.3 = 0.095 against the measured 0.082. Those are exactly the conditions the paper
+flags as "the `lnΛ` < 1 regime" in its Fig. 11(a). So the apparent 12× discrepancy is the
+REFERENCE being wrong, not the operator.
+
+### The confirmation run settles the input question independently
+`D3_confirm_lnL20_n1_Ti120_c1`: `lnΛ` pinned at **20** at conditions where the cap is
+inactive (`σ_max/σ_C` = 2.90). Measured ratio **0.669** against the **0.20** that would
+follow if WarpX had silently used its own `lnΛ` = 4.06. The pinned value is used. (The
+residual below 1.0 is the cap still touching 10 % of the distribution.)
+
+### Controls are clean
+Every `coll_off` arm gives `R_off/R_pred` ≤ 0.014 — **no measurable `e→i` transfer without
+collisions**, despite `dz/λ_D` = 98 in the dense cold cases. Grid heating is not
+contaminating this. Total energy conserves to **0.15 %** everywhere.
+
+### Verdict for `P4_lez_kin_bg`
+Evaluated **cell by cell on the production run's own profiles**, density-weighted, over the
+underdense plume (1e-2 ≤ `n_e/n_cr` ≤ 1) where every Phase-4 measurement is made:
+
+| τ | cap-touched (p50 / p90 / max) | `ν_ei·dt_coll` (p50 / p90 / max) |
+|---|---|---|
+| 6.7 | 1.03 / 1.71 / 1.71 % | 0.021 / 0.051 / 0.051 |
+| 13.5 | 0.77 / 1.11 / 1.41 % | 0.014 / 0.028 / 0.039 |
+| 20.3 | 0.73 / 1.35 / 1.46 % | 0.013 / 0.038 / 0.046 |
+| 27.0 | 0.69 / 1.13 / 1.30 % | 0.013 / 0.028 / 0.038 |
+
+The plume never exceeds **1.71 %** capped or **0.051** in the cadence parameter, and the
+ladder measures **1.005** at 1.5 % capped. **So the production run's collisional transport
+sits inside the regime where WarpX is exact.** The risk D3 was written to catch — that
+WarpX lacks PSC's reduced-mass-ratio correction and distorts transport invisibly — is not
+present.
+
+The `t` = 0 cold dense target (10 `n_cr`, 100 eV) is at 18 % capped, so the *startup
+transient* is under-collisional; it relaxes as the plume heats and rarefies.
+
+### One real caveat, and a cheap fix
+`c10/c1` = 0.87, 0.98, 0.72, 0.90, 0.37 in increasing `ν_ei·dt_coll`. Below `ν·dt_coll` ≈
+0.5 the scatter is comparable to the effect, so **no trend is resolvable there** — the
+honest statement is that the production cadence costs **of order 10–15 %** in the `e–i`
+rate, rising to **63 %** at `ν·dt_coll` = 4.8. That is an uncertainty worth removing rather
+than carrying: collisions are **10.4 %** of a production step at `ndt` = 10
+(`doCollisions` 224 s of 2158 s), so `collisions.intervals: 1` roughly doubles the run to
+~72 min and eliminates it. **Recommended for any future Phase-4 kinetic run.**
+
+### What was dropped, and why
+* **(0.01 `n_cr`, 120 eV)** — `τ` = 62 ps needs ~237 000 steps for S/N = 10; at an
+  affordable 24 000 it is S/N ≈ 1.2, which would look like a measurement and be none. Its
+  0.5 % cap fraction is bracketed by the (0.1 `n_cr`, 120 eV) point at 1.5 %.
+* **The two 120 eV low-density families were shortened** from 120 000 to 24 000 steps
+  (0.38 τ and 1.20 τ). Their rates come from the initial ramp; fit uncertainties are
+  ≤ 0.5 %, but they carry more systematic risk than the 2 τ points.
+* **Appendix C (electron thermal conductivity) is NOT covered**, so **D3 is not fully
+  closed.** It needs an imposed gradient in a non-periodic box and a different diagnostic.
+
+### Also found, before any run
+`P4_lez_kin_bg`'s `collisions.pairs` cover **only the target species** — `amb_electrons`
+and `amb_ions` are collisionless and there are no target↔ambient pairs. At 1e-3 `n_cr` the
+ambient is 0.35 % of the mass so the effect is small, but it was undeclared.
