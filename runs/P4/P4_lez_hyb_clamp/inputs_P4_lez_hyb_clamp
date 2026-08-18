@@ -106,7 +106,7 @@ targ_ions.injection_style = "NUniformPerCell"
 targ_ions.num_particles_per_cell_each_dim = 500
 targ_ions.profile = parse_density_function
 targ_ions.density_function(x,y,z) = "(nt*((z<=zt)*(z>=zt-wt) + (z>zt)*exp(-((z-zt)/Ln)^2)))/13"
-targ_ions.density_min = 1.e-4*nt
+targ_ions.density_min = 1.e-4*nt/13
 targ_ions.momentum_distribution_type = maxwellian
 targ_ions.maxwellian_u_std_distribution_type = "constant"
 targ_ions.ux_std = sqrt((th_ti)/mass_ratio)

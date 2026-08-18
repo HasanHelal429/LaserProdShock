@@ -311,3 +311,24 @@ def test_profile_table_columns_come_from_the_header():
         os.unlink(p)
     assert t["lnLambda"] == [7.3, 7.2]
     assert t["theta_e"] == [2e-3, 2e-3]
+
+
+def test_density_min_is_scaled_with_the_ion_density_function():
+    """Both species must be culled at the same PLASMA density, not the same number density.
+
+    The ion density function is (n_e expression)/Z, so an identical `density_min` culls ions
+    a factor Z earlier in n_e than electrons and leaves an uncompensated electron shell at
+    the tenuous edge -- measured at net charge -1.000 of the local density over 18 d_e in
+    the P4_lez_kin_flashic smoke test, before the fix.
+    """
+    import re
+    from laserprod import config as lpconfig, deck as lpdeck
+
+    cfg = lpconfig.load("runs/P4/P4_lez_kin_flashic")
+    Z = int(cfg["reference"]["charge_state"])
+    assert Z != 1, "this test is only meaningful for a multiply-charged ion"
+    txt = lpdeck.render(cfg)
+    got = dict(re.findall(r"^(\w+)\.density_min\s*=\s*(.+)$", txt, re.M))
+    assert "targ_electrons" in got and "targ_ions" in got
+    assert got["targ_electrons"].strip() == "1.e-4*nt"
+    assert got["targ_ions"].strip() == f"1.e-4*nt/{Z}", got["targ_ions"]

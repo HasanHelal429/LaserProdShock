@@ -144,17 +144,49 @@ def _density_exprs(cfg: dict) -> tuple[str, str | None]:
     zf = _face_expr(cfg)
     hi = str(cfg["laser"].get("inject_side", "lo")) == "hi"
     Ln = float(tgt.get("scale_length_de", 0.0))
+    # EXPONENTIAL corona, optionally with its own amplitude and offset.
+    #
+    # The default is Gaussian, which is what every run before 2026-08-18 used. It is the
+    # WRONG functional form for an ablation corona and cannot be made right by tuning:
+    # fitted to the FLASH 0.1 ns snapshot over 1e-3..1 n_cr, an exponential has rms(ln n)
+    # 0.107 against the Gaussian's 0.361, and -- worse -- a Gaussian's local scale length
+    # L^2/(2z) varies through the corona, so matching L_n at n = 0.1 n_cr forces the
+    # critical surface to z = 24-42 d_e where FLASH puts it at 2.3. You get the scale
+    # length or the critical-surface position, never both. `corona_profile: exponential`
+    # has a single scale and fixes both at once.
+    #
+    # `corona_density_over_ncr` + `corona_offset_de` decouple the corona from the flat top,
+    # which a real ablation profile requires: FLASH's front drops 795 -> 1 n_cr in ~3 d_e
+    # (one FLASH cell, unresolved) and only THEN turns into the long exponential corona.
+    # Tying the corona's amplitude to the slab density, as the Gaussian form does, forces
+    # the corona to start at n_max and pushes the critical surface far out -- which is
+    # exactly the 4.06 d_i0 vs FLASH's 0.23 d_i0 error in P4_lez_kin.
+    expo = str(tgt.get("corona_profile", "gaussian")) == "exponential"
+    ncor = tgt.get("corona_density_over_ncr")
+    zoff = float(tgt.get("corona_offset_de", 0.0))
+    amp = "ncor" if ncor is not None else "nt"
+
+    def _cor(sign):
+        """corona term for z on the laser side of the face; `sign` orients the decay."""
+        if not expo:
+            return f" + (z{'>' if sign > 0 else '<'}{zf})*exp(-((z-{zf})/Ln)^2)"
+        arg = f"({sign}*(z-{zf})-zcor)/Ln"
+        return f" + (z{'>' if sign > 0 else '<'}{zf})*exp(-({arg}))"
 
     if hi:   # laser from +z travelling -z: slab is [face - wt, face], corona at z > face
         slab = f"(z<={zf})*(z>={zf}-wt)"
-        corona = f" + (z>{zf})*exp(-((z-{zf})/Ln)^2)" if Ln > 0 else ""
+        corona = _cor(+1) if Ln > 0 else ""
         outside = f"((z>{zf})+(z<{zf}-wt))"
     else:    # laser from -z travelling +z: slab is [face, face + wt], corona at z < face
         slab = f"(z>={zf})*(z<={zf}+wt)"
-        corona = f" + (z<{zf})*exp(-((z-{zf})/Ln)^2)" if Ln > 0 else ""
+        corona = _cor(-1) if Ln > 0 else ""
         outside = f"((z<{zf})+(z>{zf}+wt))"
 
-    t_expr = f"nt*({slab}{corona})"
+    if expo and ncor is not None:
+        # amplitude of the corona is INDEPENDENT of the slab: nt*slab + ncor*corona
+        t_expr = f"nt*({slab}){corona.replace(' + ', ' + ' + amp + '*', 1)}"
+    else:
+        t_expr = f"nt*({slab}{corona})"
     if str(tgt.get("shape", "planar")) == "finite_width":
         t_expr = f"({t_expr})*(abs(x)<=0.5*targw)"
     a_expr = f"namb*{outside}" if not is_vacuum(cfg) else None
@@ -272,6 +304,20 @@ def render(cfg: dict) -> str:
     a(f"my_constants.wt     = {_num(tgt['thickness_de'])}*de")
     if float(tgt.get("scale_length_de", 0.0)) > 0:
         a(f"my_constants.Ln     = {_num(tgt['scale_length_de'])}*de")
+    if tgt.get("corona_density_over_ncr") is not None:
+        a(f"my_constants.ncor   = {_num(tgt['corona_density_over_ncr'])}*ncr"
+          f"      # corona amplitude, independent of the slab")
+    if float(tgt.get("corona_offset_de", 0.0)) != 0.0:
+        a(f"my_constants.zcor   = {_num(tgt['corona_offset_de'])}*de"
+          f"      # where the corona reaches ncor")
+    if tgt.get("theta_e_solid") is not None:
+        a(f"my_constants.th_ts  = {_num(tgt['theta_e_solid'])}"
+          f"        # SOLID electrons: {float(tgt['theta_e_solid'])*units.ME_C2_EV:.4g} eV")
+        a(f"my_constants.th_tis = {_num(tgt.get('theta_i_solid', tgt['theta_e_solid']))}")
+    if tgt.get("drift_uz_de") is not None:
+        d0, d1 = (float(q) for q in tgt["drift_uz_de"])
+        a(f"my_constants.uza    = {_num(d0)}          # corona drift u_z = uza + uzb*z/de")
+        a(f"my_constants.uzb    = {_num(d1)}")
     if str(tgt.get("shape", "planar")) == "finite_width":
         a(f"my_constants.targw  = {_num(tgt['width_de'])}*de")
     if str(tgt.get("shape", "planar")) == "curved":
@@ -481,6 +527,8 @@ def render(cfg: dict) -> str:
     # --- species ---------------------------------------------------------
     a(f"particles.species_names = {' '.join(species)}")
     a("")
+    tgt_blk = cfg["plasma"]["target"]
+    inject_hi_side = str(cfg["laser"].get("inject_side", "lo")) == "hi"
     for name, spec in species.items():
         kind, role = spec["kind"], spec["role"]
         dens = t_expr if role == "target" else a_expr
@@ -507,9 +555,23 @@ def render(cfg: dict) -> str:
         ion_dens = dens if int(spec.get("charge_state", 1)) == 1 else \
             f"({dens})/{int(spec.get('charge_state', 1))}"
         a(f'{name}.density_function(x,y,z) = "{dens if kind == "electron" else ion_dens}"')
-        a(f"{name}.density_min = 1.e-4*{floor}")
+        # density_min culls macroparticles below a floor. It must be scaled by the SAME
+        # factor as the species' density function, or the two species are culled at
+        # different PLASMA densities and the tenuous edge of every profile is left with
+        # electrons and no ions.
+        #
+        # Measured on the P4_lez_kin_flashic smoke test before this fix: electrons survived
+        # out to n_e = 4e-3 n_cr and ions only to n_e = 5.2e-2 n_cr, leaving an 18 d_e
+        # shell at the plume tip with net charge -1.000 of the local density -- a fully
+        # uncompensated electron layer that launches a sheath field the moment the run
+        # starts. In aggregate it is only 7.5e-5 of the total charge, which is why it never
+        # showed up in an energy budget; locally it is 100 %. This affected every Z != 1
+        # run this project has produced (the gap is exactly a factor Z wide).
+        Zc = int(spec.get("charge_state", 1))
+        fmin = f"1.e-4*{floor}" if kind == "electron" or Zc == 1 else \
+            f"1.e-4*{floor}/{Zc}"
+        a(f"{name}.density_min = {fmin}")
         a(f"{name}.momentum_distribution_type = maxwellian")
-        a(f'{name}.maxwellian_u_std_distribution_type = "constant"')
         # WarpX's u_std is the spread in u = gamma v/c, so for a species of mass m it is
         # sqrt(kT/(m c^2)). Our theta is normalised on the ELECTRON mass -- theta = kT/(m_e
         # c^2) -- so an ION needs sqrt(theta * m_e/m_i) = sqrt(theta/mass_ratio). Emitting
@@ -520,8 +582,48 @@ def render(cfg: dict) -> str:
         # 2698 here), and it is what made the Phase-4 ions look numerically heated.
         u_std = f"sqrt({theta})" if kind == "electron" else \
             f"sqrt(({theta})/mass_ratio)"
-        for comp in ("ux_std", "uy_std", "uz_std"):
-            a(f"{name}.{comp} = {u_std}")
+
+        # --- position-dependent temperature -------------------------------------
+        # A real ablation snapshot is NOT isothermal across the target: FLASH's 0.1 ns
+        # state has a 378 eV isothermal corona sitting on a 0.14 eV cold solid, a factor
+        # 2700. Emitting one temperature for both (as every run before 2026-08-18 did)
+        # either starts the reservoir far too hot -- so it expands on its own before the
+        # laser does anything -- or starts the corona far too cold, which raises inverse
+        # bremsstrahlung by T^(-3/2) and changes the absorption regime, not just its
+        # amount. WarpX takes `maxwellian_u_std_distribution_type = parser`.
+        solid = tgt_blk.get("theta_e_solid") is not None if role == "target" else False
+        if solid:
+            th_c = "th_t" if kind == "electron" else "th_ti"
+            th_s = "th_ts" if kind == "electron" else "th_tis"
+            gate = f"(z>{_face_expr(cfg)})" if inject_hi_side else f"(z<{_face_expr(cfg)})"
+            mix = f"({th_s}+({th_c}-{th_s})*{gate})"
+            u_std = f"sqrt({mix})" if kind == "electron" else \
+                f"sqrt(({mix})/mass_ratio)"
+            a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
+            for comp in ("ux_std", "uy_std", "uz_std"):
+                a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
+        else:
+            a(f'{name}.maxwellian_u_std_distribution_type = "constant"')
+            for comp in ("ux_std", "uy_std", "uz_std"):
+                a(f"{name}.{comp} = {u_std}")
+
+        # --- corona drift ---------------------------------------------------------
+        # The handoff state is a RAREFACTION already in motion: FLASH's 0.1 ns corona
+        # carries v/C_S0 = 0.55 + 0.056 z/d_e, reaching 4-5 C_S0 at its tip. Starting the
+        # same profile AT REST is not a small error -- the plume has to re-establish the
+        # flow before it can expand, which is visible as the front-position ratio running
+        # 1.69 at tau = 6.7 and only settling to 1.11 by tau = 27. Applied to BOTH species:
+        # this is a fluid velocity, not a beam.
+        if role == "target" and tgt_blk.get("drift_uz_de") is not None:
+            zf_ = _face_expr(cfg)
+            if inject_hi_side:
+                ramp = f"(uza+uzb*(z-{zf_})/de)*(z>{zf_})"
+            else:
+                ramp = f"-(uza+uzb*({zf_}-z)/de)*(z<{zf_})"
+            a(f'{name}.maxwellian_u_mean_distribution_type = "parser"')
+            a(f'{name}.ux_mean_function(x,y,z) = "0"')
+            a(f'{name}.uy_mean_function(x,y,z) = "0"')
+            a(f'{name}.uz_mean_function(x,y,z) = "{ramp}"')
         a("")
 
     # --- the laser -------------------------------------------------------
