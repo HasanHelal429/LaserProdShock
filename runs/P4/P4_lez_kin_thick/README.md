@@ -137,7 +137,28 @@ Both GPUs are free, so the pair can run concurrently in ~2.8 h wall rather than 
 | G7 `dz` | 0.5 `d_e`, unchanged from the parent | INFO |
 
 ## Result
-_Pending._
+**Predictions 1 and 2 FALSIFIED; prediction 3 passes.** Full entry: RESULTS.md 2026-08-19
+(thick). 2h51m, `reached max_step`, `--verify` OK.
+
+- **`τ_relax` rose rather than fell**: 44.3 → **249 ± 123** (`Te_at_cr`), 108 ± 7 (band).
+  Predicted ~17.
+- **Converged `T_e` rose rather than fell**: 1.22 → **2.52 ×** its own `T_e,SS`
+  (`T_∞` = 787 ± 231 eV). Still rising at τ 100–180 at 6.8 σ / 30 σ.
+- **Prediction 3 passes with room to spare**: only 418 of 2003 `n_cr·d_e` consumed in 180 τ,
+  reservoir **79 % intact**, and the target *compresses* to **15.04 `n_cr`** before relaxing.
+- **Not a boundary artifact**: deposition stays pinned at the critical surface
+  (`n_e` = 0.42–0.68 `n_cr` at the median), only 0.02 % of `P_abs` beyond 3800 `d_e`.
+- **Mechanism**: the ablation rate FELL — 2.22 `n_cr·d_e`/τ against `ic6_long`'s 3.00–3.25,
+  decelerating 2.93 → 1.82. More mass bought a denser, harder-to-ablate target, not more
+  ablation. Less mass flux → less enthalpy carried away → `T_e` overshoots.
+- **Implicates electron thermal conduction at the reduced mass ratio** (4.285× slower on the
+  ion clock) — the paper's Appendix C, which D3 never covered. Not a laser-operator problem.
+- G3 **PASSES decisively**: control electrons cool by 1.6995e5 J against +1.7387e7 J driven,
+  ratio −0.0098. G6 closure **0.9305** at 0.36 % weight loss.
+- At τ = 27 `f_abs` = **0.872 vs FLASH's 0.870** — the absorption physics is right.
 
 ## Retracted
-Nothing yet.
+The falsification clause as written ("if `T_e` still converges to ~2× **with `τ_relax`
+reduced**") does not strictly apply, because `τ_relax` was not reduced — it grew. The
+conclusion is nonetheless stronger than that clause anticipated: a real reservoir moves the
+leg *away* from FLASH, so the disagreement is not target design.

@@ -4538,3 +4538,89 @@ the same aligned time, giving three simultaneous panels.
 
 This reframes the deposition discrepancy as a **consequence of the density profile**, i.e. of
 where the critical surface sits, rather than an independent problem with the laser operator.
+
+---
+
+## 2026-08-19 (thick) — **the reservoir made it WORSE**: prediction falsified, and the cause is a suppressed ablation rate
+
+`runs/P4/P4_lez_kin_thick` (2h51m) and `P4_lez_kin_thick_off` (2h19m) complete, both
+`reached max_step`, `--verify` OK on both, no `.old.` plotfiles. Cost estimate before launch
+was 2.0–2.8 h; measured 2h51m, at the top of the range.
+
+### The pre-registered predictions
+
+| # | prediction | outcome |
+|---|---|---|
+| 3 | `n_peak` stays above 1 `n_cr` | **PASS**, emphatically — see below |
+| 1 | `τ_relax` falls from 44.3 toward ~17 | **FALSIFIED** — it *rose* to 108–249 |
+| 2 | converged `T_e` falls toward 1.0 × `T_e,SS` | **FALSIFIED** — it *rose* to 2.52 × |
+
+| | `τ_relax` | `T_∞` | /own `T_e,SS` |
+|---|---|---|---|
+| FLASH | 3.99 | 631.5 eV | 0.767 |
+| `ic6_long` (45 `d_e`, no reservoir) | 44.33 | 381.5 eV | 1.223 |
+| **`thick` (200 `d_e` reservoir)** | **249 ± 123** (`Te_at_cr`), 108 ± 7 (band) | **787 ± 231 eV** | **2.52** |
+
+`T_e` is still rising at τ 100–180 at 6.8 σ (`Te_at_cr`) and 30 σ (band mean). **Giving the
+target a real mass reservoir did not help the leg converge — it made it hotter and slower.**
+
+### It is not a boundary artifact
+
+The obvious suspect is the drive becoming a boundary quantity, and it is excluded. The
+deposition median stays pinned at the critical surface for the whole run (`n_e` = 0.42–0.68
+`n_cr` at the median, moving 4.3 → 279 `d_e`), and only **0.02 %** of `P_abs` lands beyond
+3800 `d_e` of the 4000 `d_e` face. The domain sizing did its job. (`ζ_front` reads NaN after
+τ ≈ 135 only because edge `n_e` rises through the band floor, making the band-based
+diagnostic undefined — a diagnostic artifact, not a physics one.)
+
+### The mechanism: the ablation rate FELL, and the target COMPRESSED
+
+Measured from the field dumps (`dz` = 0.5 `d_e`, the reliable resolution — the 400-bin
+particle diagnostic smears a thin dense target and under-reports its peak):
+
+| | ablation rate of the above-critical reservoir |
+|---|---|
+| `ic6_long` (45 `d_e`) | 3.00–3.25 `n_cr·d_e` per τ |
+| **`thick` (200 `d_e`)** | **2.22 average, decelerating 2.93 (τ 20–90) → 1.82 (τ 90–180)** |
+
+And the target **compresses under the ablation pressure**: peak `n_e` goes 10.0 → **15.04**
+`n_cr` at τ 108 before relaxing to 9.35. Only 418 of 2003 `n_cr·d_e` are consumed in 180 τ,
+so the reservoir is **79 % intact** — prediction 3 passes with room to spare.
+
+**That is the explanation.** More mass did not buy more ablation; it bought a *denser,
+harder-to-ablate* target. The ablation rate is set by how fast heat reaches the ablation
+front, so compressing the target lengthens and steepens the conduction path, the mass flux
+falls, less enthalpy is carried away, and the absorbed power goes into heating the corona
+that is already there. `T_e` overshoots Manheimer and keeps climbing.
+
+### What this implicates
+
+**Electron thermal conduction under the reduced mass ratio.** On the ion clock, electron
+transport is √(μ_real/μ_sim) = **4.285×** slower at μ = 2698 than at real mass — so a
+conduction-limited ablation rate is suppressed by that factor, exactly the direction needed.
+This is the paper's **Appendix C** (conductivity), which the D3 collision gate explicitly
+never covered (RESULTS 2026-08-18). It is now the leading candidate for the whole Phase-4
+temperature discrepancy, and it is *not* a laser-operator problem.
+
+### Gates
+
+- **G3 PASSES decisively.** Control electrons **cool** by 1.6995e5 J against the driven run's
+  gain of +1.7387e7 J: ratio **−0.0098**. No grid heating, at 1.667× the steps and 1.68× the
+  cells of `ic6`, which is what the control was run to bound.
+- **G6 closure 0.9305** (against `ic6_long`'s 0.876), with **0.36 %** weight loss (0.89 %) —
+  quoted together as the gate requires. The bigger box retains more, which is *why* the
+  closure improved.
+- Ion energy share settles at **0.37** of the total from τ ≈ 50 and stays flat.
+
+### One thing that did improve, and it matters
+
+At τ = 27, the thick leg's absorbed fraction is **0.872 against FLASH's 0.870** — essentially
+exact, where `ic6` managed 0.478. Its plume `T_e` is then **0.822 ×** what its own absorbed
+flux supports, i.e. the leg is *under-converged at τ 27* rather than mis-driven. So the
+absorption physics is right; the transport is what is not.
+
+### Media
+`media/P4/P4_lez_kin_thick/{movie_fields,movie_phase}.mp4`; `media/xcode/{profiles,profiles_reduced,history}.png`
+regenerated with the thick leg. `paper_fig3` is NOT generated for this run: its 8.99 τ dump
+spacing is too coarse for the paper's 0–19 τ window (two of the four times snap to one dump).
+`P4_lez_kin_ic6` remains the paper-comparison leg.
