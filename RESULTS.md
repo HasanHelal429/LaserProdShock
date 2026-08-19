@@ -4015,3 +4015,50 @@ the 20 %-complete rung — one dump wearing three labels, because `xcode_compare
 returns the nearest entry unconditionally. A coverage guard now drops a requested τ rather
 than relabelling a dump. It is the same trap `talk_xcode.py` already carries `TAU_TOL` for,
 and it produced numbers that looked entirely plausible.
+
+---
+
+## 2026-08-18 (last, addendum) — **the comparison was misaligned in time by 2.696 τ**, and correcting it makes agreement worse
+
+`scripts/xcode_compare.py` gains `--tau-offset`, defaulting to **2.696 (aligned)**.
+
+### The error
+Every Phase-4 WarpX leg's `t` = 0 **is FLASH's `t` = 0.1 ns**, i.e. FLASH's τ = 2.696 — the
+fitted ICs by construction, and the analytic one because its scale length was *derived* as
+`C_S t` at 0.1 ns (`P4_lez_kin`'s config: *"0.1 ns = 2.69 ion response times, so
+`C_S t` = 2.69 `d_i0` = 27 `d_e`"*). `xcode_compare.py` nevertheless sampled both codes at
+**equal τ**, so it compared states **2.7 τ apart — 10 % of the run** — and gave the WarpX
+legs 1.1 ns of elapsed process against FLASH's 1.0.
+
+`talk_xcode.py` has carried a `--tau-offset` flag for this since it was written, defaulting
+to 0 *"to keep the convention the RESULTS.md numbers were measured on"*. The main comparison
+script had no such flag, so the misalignment was never applied there and never visible.
+
+### Correcting it moves the WarpX legs AWAY from FLASH
+τ is now FLASH's clock; a leg is sampled at τ − 2.696.
+
+| at FLASH τ = 27 | unaligned | **aligned** | FLASH |
+|---|---|---|---|
+| `ζ_front`, 6 decades | 68.66 (0.73×) | **60.22 (0.64×)** | 94.57 |
+| `L_n`, 6 decades | 14.47 (0.68×) | **12.78 (0.60×)** | 21.42 |
+| `ζ_front`, hybrid | 92.37 (0.98×) | **81.95 (0.87×)** | 94.57 |
+| `L_n`, hybrid | 17.76 (0.83×) | **15.29 (0.71×)** | 21.42 |
+
+The direction is right and unflattering: the unaligned comparison was giving every WarpX leg
+an extra 2.7 τ of expansion, and the hybrid's much-quoted **0.98× plume front is 0.87× once
+the handoff is aligned**.
+
+### Scope of the correction
+**Every plume-front, `L_n` and profile number in this file recorded before today was
+measured unaligned**, including the "FLASH↔kinetic benchmark passes" entry and the
+hybrid's front/velocity agreement. Those are not retracted — the runs and the measurements
+stand — but they are systematically 2.7 τ generous, and any of them re-quoted should be
+re-measured with the default. `--tau-offset 0` reproduces the old convention exactly.
+
+Not affected: absorbed fractions (integrated over the whole run), `T_e` against each leg's
+own Manheimer value (a plateau, so 2.7 τ moves it little — 361.6 → 350.8 eV), and every
+Fig.-2 initial-condition number (τ = 0 on both clocks by construction).
+
+### Figures
+`media/xcode/` rebuilt with three curves — FLASH, `kinetic, 6 decades` (`L_ppc500`) and
+`hybrid` — on the aligned clock. The dropped legs stay one `--leg` away.

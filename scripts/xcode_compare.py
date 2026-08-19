@@ -366,10 +366,20 @@ PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b", "#1f6f8b")  # WarpX legs,
 # whose initial condition was FITTED to FLASH rather than assumed, and the comparison is
 # unreadable without both it and the analytic-IC leg side by side: the two bracket FLASH
 # from opposite directions (front 2.03x vs 0.50x), which is the whole result.
-LEGS_DEFAULT = (("kinetic, analytic IC", "runs/P4/P4_lez_kin_bg"),
-                ("kinetic, FLASH IC", "runs/P4/P4_lez_kin_flashic"),
-                ("kinetic, FLASH IC, mi=100", "runs/P4/P4_lez_kin_flashic_ct"),
-                ("kinetic, mi=100, PINNED", "runs/P4/P4_lez_kin_flashic_res"),
+# UPDATED 2026-08-18 (evening). The headline pair is now the SAME DECK at four and six
+# decades of resolved density (`density_min_frac` 1e-4 vs 1e-6), because that one parameter
+# — and not the closure, the reservoir or the ppc — is what moved the T_e shape from
+# RISE = 1.504 to 1.133 against FLASH's 1.148.
+#
+# The two m_i = 100 legs (`flashic_ct`, `flashic_res`) are DELIBERATELY OUT: changing the
+# mass ratio rescaled their temperatures and drift but not their corona geometry, which was
+# derived assuming d_i0 = 10 d_e, so in normalised units their corona is 5.19x too extended
+# and they are not FLASH matches at all. They remain valid against EACH OTHER (the reservoir
+# A/B) and are still selectable with --leg.
+# Three curves only. Five made the panel unreadable, and the legs that were dropped are
+# each still one `--leg` away: `P4_lez_kin` (the same deck at four decades, the density-floor
+# A/B), `P4_lez_kin_bg` (analytic IC + 1e-3 background) and `P4_lez_kin_flashic`.
+LEGS_DEFAULT = (("kinetic, 6 decades", "studies/ppc_ladder/scratch/L_ppc500"),
                 ("hybrid", "runs/P4/P4_lez_hyb_bg3"))
 
 
@@ -430,7 +440,18 @@ def leg_state(leg, tau):
     return dict(zeta=s["zeta"], ne=s["ne"], Te=Te, v=s.get("v"), tau=s["tau"])
 
 
-def collect(legs):
+# The WarpX legs' clocks do NOT start where FLASH's does. Every Phase-4 initial condition
+# stands for FLASH's t = 0.1 ns state -- the fitted ones by construction, and the analytic
+# one because its scale length was DERIVED as C_S t at 0.1 ns ("2.69 ion response times, so
+# C_S t = 2.69 d_i0 = 27 d_e", P4_lez_kin's config). 0.1 ns is tau = 2.696, so a WarpX leg
+# at its own tau = 27 is FLASH's tau = 29.7, and comparing at equal tau compares states
+# 2.7 apart -- 10 % of the run.
+#
+# TAU is FLASH's clock here. A leg is sampled at tau - TAU_HANDOFF.
+TAU_HANDOFF = 2.696
+
+
+def collect(legs, offset=TAU_HANDOFF):
     F = flash_series(FLASH_DIR, "lez1d")
     data = {}
     for tau in TAUS:
@@ -438,7 +459,7 @@ def collect(legs):
         row = {"FLASH": dict(zeta=f["zeta"], ne=f["ne"], Te=f["Te"], v=f["v"],
                              tau=f["tau"])}
         for leg in legs:
-            st = leg_state(leg, tau)
+            st = leg_state(leg, max(tau - offset, 0.0))
             if st is not None:
                 row[leg["label"]] = st
         data[tau] = row
@@ -579,6 +600,8 @@ def history(legs, out):
             st = leg_state(leg, s["tau"])
             rows.append(dict(tau=s["tau"],
                              **scalars(st["zeta"], st["ne"], st["Te"], st["v"])))
+        for r in rows:
+            r["tau"] = r["tau"] + TAU_HANDOFF     # onto FLASH's clock
         ser[leg["label"]] = rows
 
     keys = [("Te_mean_plume", r"$T_e$ in the plume [eV] (density-weighted)"),
@@ -614,10 +637,15 @@ def history(legs, out):
                    fontsize=7, color=leg["colour"])
     ax[0].set_ylim(0, 1000)
     ax[0].legend(loc="lower right", fontsize=8)
+    # Say what the legs ACTUALLY are, rather than a hardcoded sentence that goes stale the
+    # moment the default leg set changes -- as it did when the m_i = 100 legs were dropped.
+    uniq = sorted({q["sc"]["mass_ratio"] for q in legs})
+    mtxt = (f"all at $m_i/m_e$ = {uniq[0]:.0f}" if len(uniq) == 1 else
+            "and they do NOT share an ion mass: "
+            + ", ".join(f"{m:.0f}" for m in uniq) + " $m_e$")
     fig.suptitle("The four quantities that survive the mass rescaling. FLASH has real "
                  "$m_i$; each WarpX leg is plotted against its OWN $d_{i0}$, "
-                 "$d_{i0}/C_{S0}$ and $T_{e,SS}(\\mu)$ -- and they do NOT share an ion "
-                 "mass (2698 $m_e$, except $m_i$=100 which is 27x lighter again).",
+                 f"$d_{{i0}}/C_{{S0}}$ and $T_{{e,SS}}(\\mu)$ -- {mtxt}.",
                  fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(out, dpi=135)
@@ -632,6 +660,12 @@ def main():
                          "from the run's own config. Default: "
                          + "; ".join(f"{a}={b}" for a, b in LEGS_DEFAULT))
     ap.add_argument("--outdir", default="media/xcode")
+    ap.add_argument("--tau-offset", dest="tau_offset", type=float, default=TAU_HANDOFF,
+                    help="shift the WarpX legs by this much in tau before comparing. Every "
+                         "Phase-4 IC stands for FLASH's t = 0.1 ns = tau 2.696, so the "
+                         "default ALIGNS the handoff. Pass 0 to reproduce the unaligned "
+                         "convention every RESULTS.md number before 2026-08-18 was "
+                         "measured on.")
     a = ap.parse_args()
 
     spec = [tuple(q.split("=", 1)) for q in a.leg] if a.leg else list(LEGS_DEFAULT)
@@ -658,7 +692,9 @@ def main():
           f"(in its own, 18.36x longer, time base)")
 
     os.makedirs(a.outdir, exist_ok=True)
-    data, _ = collect(legs)
+    print(f"\n  tau offset {a.tau_offset:.3f} -- WarpX legs sampled at "
+          f"(FLASH tau - {a.tau_offset:.3f}); 0 would compare states 2.7 apart")
+    data, _ = collect(legs, offset=a.tau_offset)
     table(data, legs)
     figure(data, legs, os.path.join(a.outdir, "profiles.png"))
     figure_reduced(data, legs, os.path.join(a.outdir, "profiles_reduced.png"))
@@ -746,13 +782,18 @@ def figure_reduced(data, legs, out):
     ax[1, 0].text(0.03, 1.0, " each leg's own Manheimer value",
                   transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
                   color="0.25")
-    ss_txt = ", ".join(f"$m_i/m_e$={q['sc']['mass_ratio']:.0f}$\\to${q['sc']['tss']:.0f} eV"
-                       for q in legs)
-    fig.suptitle("SIMILARITY-REDUCED. Each leg against its OWN $T_{e,SS}(\\mu)$ and its own "
-                 "measured sound speed -- $T_{e,SS}\\propto\\mu^{1/3}$, so a lighter leg is "
-                 "EXPECTED cooler and that is the unit map, not disagreement. The legs do "
-                 "NOT share an ion mass: FLASH$\\to$823 eV, " + ss_txt +
-                 ". What remains here is real.", fontsize=9.0, y=0.995)
+    # Dedupe: when every WarpX leg shares an ion mass -- which is again the case now that
+    # the m_i = 100 legs are out of the default set -- listing it once per leg overflows
+    # the title with five copies of the same string.
+    uniq = sorted({(q["sc"]["mass_ratio"], round(q["sc"]["tss"], 1)) for q in legs})
+    ss_txt = ", ".join(f"$m_i/m_e$={m:.0f}$\\to${t:.0f} eV" for m, t in uniq)
+    # Two short lines, not one long one: the single-line version ran off BOTH edges of a
+    # 5-panel figure and lost its first and last words.
+    fig.suptitle("SIMILARITY-REDUCED -- each leg against its OWN $T_{e,SS}(\\mu)$ and its "
+                 "own measured sound speed.\n"
+                 f"$T_{{e,SS}}\\propto\\mu^{{1/3}}$, so a lighter leg is EXPECTED cooler: "
+                 f"FLASH$\\to$823 eV, {ss_txt}.  What remains here is real disagreement.",
+                 fontsize=9.5, y=0.998)
     fig.tight_layout(rect=(0, 0, 1, 0.972))
     fig.savefig(out, dpi=135)
     print(f"  figure: {out}")
