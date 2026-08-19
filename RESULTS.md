@@ -4495,7 +4495,7 @@ Output: `media/P4/P4_lez_kin_ic6/paper_fig3.png` (similarity units) and `paper_f
 - **(a)** near-corona densities agree; the WarpX plume falls off faster at every time.
 - **(c)** WarpX's `T_i` runs hotter than FLASH's, increasingly so late and far out.
 - **(d)** `v_z` agrees at 0.2 ns and WarpX is progressively slower after.
-- **(e)** deposition peaks at the same place with a similar shape; WarpX's is spikier.
+- **(e)** on a LOG axis (`--depo-scale`, default) the two profiles track each other closely from the near-critical peak at ζ ≈ 1–3 out to ζ ≈ 10–15, then WarpX falls off **faster** than FLASH — the same steeper plume that panel (a) shows, and consistent with the earlier finding that the kinetic absorption is too concentrated. On a linear axis this panel is all spike and no comparison.
 
 ### Also
 Added `Ti` to `xcode_compare.warpx_particles` (additive; 391 tests pass, `talk_xcode` still

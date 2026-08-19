@@ -123,6 +123,14 @@ def main():
                     help="max |dtau| between a requested time and an available WarpX "
                          "deposition dump before panel (e) omits it (default 3)")
     ap.add_argument("--no-depo", action="store_true", help="drop panel (e)")
+    ap.add_argument("--depo-scale", choices=("log", "linear"), default="log",
+                    help="y scale for panel (e) (default log). The deposition profile spans "
+                         "several decades and is dominated by a narrow near-critical spike, "
+                         "so a linear axis shows the spike and hides the comparison "
+                         "everywhere else.")
+    ap.add_argument("--depo-lim", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                    help="y limits for panel (e). Default on a log axis: 5 decades below "
+                         "the largest value drawn.")
     ap.add_argument("--nfloor", type=float, default=1e-3, metavar="N_CR",
                     help="mask T_e, T_i and v where n_e/n_cr is below this (default 1e-3). "
                          "Two independent reasons: FLASH's delivered T_i carries a known "
@@ -205,12 +213,16 @@ def main():
                                       lo, hi)
                     if y is not None:
                         axj.plot(f["zeta"], y, "-", color=col, lw=1.6)
+                        seen.setdefault("depo", []).extend(
+                            y[np.isfinite(y) & (y > 0)].tolist())
                 if D:
                     k = int(np.argmin([abs(d["tau"] - tau_w) for d in D]))
                     if abs(D[k]["tau"] - tau_w) <= a.depo_tol:
                         y = unit_integral(D[k]["zeta"], D[k]["P"], lo, hi)
                         if y is not None:
                             axj.plot(D[k]["zeta"], y, "--", color=col, lw=1.5)
+                            seen.setdefault("depo", []).extend(
+                                y[np.isfinite(y) & (y > 0)].tolist())
                             depo_drawn += 1
                 continue
             fy = mask_low(f.get(key), f.get("ne"), a.nfloor)
@@ -267,6 +279,19 @@ def main():
         if key == "v":
             ax[j].axhline(0.0, color="#8a8a8a", ls=":", lw=1.0)
 
+    if not a.no_depo:
+        je = [j for j, (k, _l, _g) in enumerate(panels) if k == "depo"]
+        if je:
+            axe = ax[je[0]]
+            if a.depo_lim:
+                if a.depo_scale == "log":
+                    axe.set_yscale("log")
+                axe.set_ylim(*a.depo_lim)
+            elif a.depo_scale == "log" and seen.get("depo"):
+                v = np.array(seen["depo"])
+                top = np.percentile(v, 99.9) * 3.0
+                axe.set_yscale("log")
+                axe.set_ylim(top * 1e-5, top)
     if not a.no_depo and not depo_drawn:
         ax[-1].text(0.5, 0.62, "no WarpX deposition dump within "
                     f"{a.depo_tol:g} tau of these times\n"
