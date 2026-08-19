@@ -3879,3 +3879,73 @@ thickness and chamber gas but misses on ppc (200×), resolution (2.5×), box len
 and the `hi` boundary. **Before any more physics is inferred from the `T_e` shape, a ppc
 ladder is required** — it is the one departure large enough to manufacture the disputed
 feature on its own.
+
+---
+
+## 2026-08-18 (final, truly last) — RETRACTION of "ppc is 200× too low", and the ppc ladder finally runs
+
+`studies/ppc_ladder/` (new), `numerics.density_min_frac` plumbed,
+`tests/test_density_min_frac.py`. 354 tests pass.
+
+### RETRACTION: the ppc comparison in the previous entry is wrong
+That entry called `N_ppc` = 500 vs the paper's 100 000 a "factor 200" and made it the
+leading suspect for the `T_e` tail. **That is only true at `n_cr`.** The paper loads
+*"10^5 **equally weighted** particles per cell per species at critical density"* — uniform
+weight, so its particle count scales with the local density:
+
+| `n/n_cr` | 10 | 1 | 0.1 | 1e-2 | **1e-3** | 1e-4 | 1e-5 |
+|---|---|---|---|---|---|---|---|
+| PSC ppc | 1e6 | 1e5 | 1e4 | 1e3 | **100** | 10 | 1 |
+| ours (fixed 500) | 500 | 500 | 500 | 500 | **500** | 500 | 500 |
+
+**PSC has more particles than us only above ~5e-3 `n_cr`. Below that we have more — and
+that is exactly where the disputed hot tail lives.** So the correct loading scheme
+*weakens* the "the tail is ppc noise" hypothesis rather than strengthening it. Where PSC is
+genuinely better is the target and near-critical region (2000× at 10 `n_cr`), i.e. where the
+laser deposits — which bears on absorption and the ablation front, not the plume tail.
+
+Matching their ppc number is also not possible: uniform weight at `N_ppc(n_cr)` = 1e5 needs
+**3.4e8 macroparticles per species** (~70 GB) for this target.
+
+### The departures were already known and deliberate — I should have read the config first
+`P4_lez_kin`'s `config.yaml` already documents nearly every item in the previous entry's
+table, and **records the measurement that settles two of them**:
+
+> *"The paper's 1000 `d_e` box does NOT hold this run: MEASURED 2026-08-13, the front
+> reaches 949.8 of 950 `d_e` at 24.6 ps — 45 % through — and is pinned there for the
+> remaining 30 ps … after, `T_e` climbs to 2.9× SS because the confined plasma cannot
+> expand."*
+
+So the 2500 `d_e` box and the **open** `hi` boundary are *deliberate, measured* departures,
+not oversights: the paper's box confines our plume and drives `T_e` to 2.9× its steady
+state. My "the boundary should be reflecting" item is answered — it was tried. The ppc note
+in the same file already says *"the paper's ppc is quoted AT `n_cr` with equal weights, so
+its ppc scales with density; ours does not … compare resolved dynamic range, not the
+number"* — the exact point of this retraction, recorded weeks ago and not read.
+
+**What survives from the previous entry:** the resolution (2 vs 5 cells per `d_e`), the
+resolved dynamic range, and the absent e–i/i–i relative-rate correction.
+
+### What is actually comparable: resolved dynamic range, and it is now a config primary
+The floor is set by `density_min`, **not** by ppc, and it was hardcoded at `1e-4·n_t` — four
+decades against the paper's six (10 `n_cr` down to the 1e-5 `n_cr` at which one uniformly
+weighted macroparticle per cell remains). `numerics.density_min_frac` now exposes it, and
+every ladder rung sets 1e-6 to span the same six decades.
+
+### The ladder (decision D6, declared in `P4_lez_kin` and never run)
+`studies/ppc_ladder/`: `P4_lez_kin` unchanged except ppc ∈ {500, 2000, 10000} and
+`density_min_frac` = 1e-6. **The question is narrow and falsifiable: does the outward `T_e`
+rise weaken with more particles?** If it does, it was sampling noise. If it survives 20×,
+it is kinetic transport and D2b / D3-Appendix-C are the follow-ups. Rungs 500 and 2000 are
+running (19 min and 53 min); 10000 follows on the first free card.
+
+### Two process notes, both caught by the harness rather than by me
+* **A formatting change is a deck change.** Plumbing `density_min_frac` made the default
+  render as `0.0001*nt` where it had always been `1.e-4*nt` — the same number, and **36
+  tests failed**, because they compare rendered decks against committed ones. Numerically
+  identical is not good enough when `--verify` diffs text. Fixed with a `_pow10` formatter
+  that reproduces the historical literal; the default is byte-identical again.
+* **The Arena collision, exactly as recorded, because I launched two rungs on one card.**
+  The second aborted at init. Now that `numerics.arena_init_size_mb` exists the generator
+  sets 4096 MiB on every rung, so rungs can share a device instead of the first one taking
+  3/4 of it.

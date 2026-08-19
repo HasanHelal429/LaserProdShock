@@ -36,6 +36,18 @@ _FUNCS = {"sqrt": math.sqrt, "abs": abs, "exp": math.exp, "log": math.log,
           "sin": math.sin, "cos": math.cos, "tan": math.tan, "pow": pow}
 
 
+def _pow10(x: float) -> str:
+    """`1.e-4` / `2.5e-6` -- the mantissa-dot-exponent form the decks use for small floats."""
+    import math
+    if x <= 0:
+        return repr(x)
+    e = int(math.floor(math.log10(x)))
+    m = x / 10.0 ** e
+    if abs(m - round(m)) < 1e-12:
+        return f"{int(round(m))}.e{e}"
+    return f"{m:g}e{e}"
+
+
 def _num(x: float) -> str:
     """Format a number the WarpX way: integer-valued floats get a trailing dot,
     scientific notation drops the redundant ``+`` (``1e+18`` -> ``1e18``)."""
@@ -625,9 +637,24 @@ def render(cfg: dict) -> str:
         # starts. In aggregate it is only 7.5e-5 of the total charge, which is why it never
         # showed up in an energy budget; locally it is 100 %. This affected every Z != 1
         # run this project has produced (the gap is exactly a factor Z wide).
+        #
+        # THE FRACTION IS THE RESOLVED DYNAMIC RANGE, and it is the meaningful match to
+        # PSC's loading. The paper loads EQUALLY WEIGHTED particles at 1e5 per cell AT
+        # n_cr, so its particle count scales with density and its floor is the density at
+        # which one macroparticle per cell remains: 1e-5 n_cr, i.e. SIX decades below its
+        # 10 n_cr target. Our fixed-ppc loading gives uniform statistics at every density
+        # instead -- better than PSC's below ~5e-3 n_cr, far worse above it -- so the ppc
+        # NUMBERS are not comparable and the dynamic RANGE is what should be matched.
+        # The 1e-4 default gives only four decades.
+        dmf = float((cfg.get("numerics") or {}).get("density_min_frac", 1.0e-4))
+        # Render as `1.e-4`, the literal this line has always emitted. `%g` would give
+        # `0.0001`, which is the same number and a different deck -- and 36 tests compare
+        # rendered text against committed decks, so a formatting change reads as every
+        # Phase-4 deck having been altered.
+        dmf_s = _pow10(dmf)
         Zc = int(spec.get("charge_state", 1))
-        fmin = f"1.e-4*{floor}" if kind == "electron" or Zc == 1 else \
-            f"1.e-4*{floor}/{Zc}"
+        fmin = f"{dmf_s}*{floor}" if kind == "electron" or Zc == 1 else \
+            f"{dmf_s}*{floor}/{Zc}"
         a(f"{name}.density_min = {fmin}")
         a(f"{name}.momentum_distribution_type = maxwellian")
         # WarpX's u_std is the spread in u = gamma v/c, so for a species of mass m it is
