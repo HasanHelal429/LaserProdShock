@@ -360,7 +360,7 @@ TAUS = (2.7, 6.7, 13.5, 20.3, 27.0)
 
 # Kept as a three-key dict, and kept exactly, because scripts/talk_xcode.py reads it.
 COLS = {"FLASH": "#1f4e9c", "kinetic": "#c1441a", "hybrid": "#2a8a5f"}
-PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b")     # WarpX legs, in order
+PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b", "#1f6f8b")  # WarpX legs, in order
 
 # The default set of WarpX legs. `P4_lez_kin_flashic` is here because it is the only leg
 # whose initial condition was FITTED to FLASH rather than assumed, and the comparison is
@@ -369,6 +369,7 @@ PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b")     # WarpX legs, in orde
 LEGS_DEFAULT = (("kinetic, analytic IC", "runs/P4/P4_lez_kin_bg"),
                 ("kinetic, FLASH IC", "runs/P4/P4_lez_kin_flashic"),
                 ("kinetic, FLASH IC, mi=100", "runs/P4/P4_lez_kin_flashic_ct"),
+                ("kinetic, mi=100, PINNED", "runs/P4/P4_lez_kin_flashic_res"),
                 ("hybrid", "runs/P4/P4_lez_hyb_bg3"))
 
 
