@@ -3949,3 +3949,69 @@ running (19 min and 53 min); 10000 follows on the first free card.
   The second aborted at init. Now that `numerics.arena_init_size_mb` exists the generator
   sets 4096 MiB on every rung, so rungs can share a device instead of the first one taking
   3/4 of it.
+
+---
+
+## 2026-08-18 (last, ppc ladder rung 1) — **the `T_e` outward rise was the DENSITY FLOOR, not ppc and not kinetics**
+
+`studies/ppc_ladder/analyze.py` (new). `L_ppc500` complete (552 960 steps, **20 min**, no
+NaN); `L_ppc2000` at 20 %, `L_ppc10000` launched (ETA ~4 h).
+
+### The metric
+`RISE` = density-weighted `<T_e>` over the outer half of the underdense band ÷ the inner
+half, split by position. FLASH's isothermal plateau gives ~1; a hot tail gives > 1; if the
+tail is sampling noise it falls toward 1 as ppc rises.
+
+### Result — and it is not the ppc axis that moves it
+
+| leg | τ = 6.7 | 13.5 | 20.3 | **27.0** | `<T_e>` at 27 | vs own SS |
+|---|---|---|---|---|---|---|
+| **FLASH** | 1.023 | 1.077 | 1.125 | **1.148** | 839.0 eV | **1.02** |
+| `P4_lez_kin` — **4 decades**, 500 ppc | 1.042 | 1.242 | 1.305 | **1.504** | 473.2 eV | **1.52** |
+| `L_ppc500` — **6 decades**, 500 ppc | 0.945 | 1.015 | 1.144 | **1.133** | 361.6 eV | **1.16** |
+| `L_ppc2000` — 6 decades, 2000 ppc | 0.944 | — | — | — | — | — |
+
+**Widening the resolved dynamic range from four decades to six — `density_min_frac`
+1e-4 → 1e-6, the ONLY difference between the first two rows, verified by config diff —
+takes the outward rise from 1.504 to 1.133, against FLASH's own 1.148.** The shape
+discrepancy that has been the last open item all day essentially closes on that one change.
+
+It moves the magnitude too: plume `<T_e>` against each leg's own Manheimer value goes
+**1.52× → 1.16×**, where FLASH sits at 1.02×.
+
+**And ppc is not the lever.** At τ = 6.7 the 500 and 2000 rungs give `RISE` = 0.945 and
+0.944 — quadrupling the particle count moves it by 0.1 %. That is exactly what the
+retraction earlier today predicted: our fixed-ppc loading already gives us *more* particles
+than PSC has below 5e-3 `n_cr`, so ppc was never the binding constraint in the plume. The
+binding constraint was that **we were culling the plume at 1e-3 `n_cr` where the paper
+resolves to 1e-5**, and the cells nearest that cull were the ones reporting a hot tail.
+
+### Why this was invisible for so long
+`density_min` was **hardcoded** at `1e-4·n_t` in `deck.py` — it was not a config primary, so
+it never appeared in a run's parameter table, never varied in a sweep, and could not be seen
+in a config diff between legs. Every Phase-4 leg carried the same four decades and therefore
+the same artifact, which made it look like a property of WarpX rather than of our deck.
+
+### Status of the three candidate causes
+1. ~~Finite reservoir~~ — eliminated by the injector run.
+2. ~~Unrelaxed initial condition~~ — `flashic`'s trough, real but not the shape driver.
+3. **No electron heat conduction** — **demoted.** Most of what was attributed to a missing
+   `∇·q_e` was a density floor. Whether a residual 1.133 vs 1.148 needs any closure argument
+   at all is now the question, and it is a much smaller one.
+
+### Not yet closed
+* `L_ppc2000` and `L_ppc10000` must reach τ = 27 before "ppc does not matter" is more than a
+  τ = 6.7 statement.
+* `<T_e>` = 362 eV is still 1.16× its own steady state against FLASH's 1.02×, and `f_abs`
+  has not been re-measured on the six-decade decks.
+* The lower floor loads more tenuous plasma, so the density-weighted mean is taken over a
+  different population; part of the 473 → 362 eV move is that reweighting rather than a
+  physical cooling. The `RISE` ratio is constructed to be insensitive to it, but the
+  absolute `<T_e>` comparison is not.
+
+### Process note
+`analyze.py`'s first version reported **identical numbers at τ = 13.5, 20.3 and 27.0** for
+the 20 %-complete rung — one dump wearing three labels, because `xcode_compare.pick()`
+returns the nearest entry unconditionally. A coverage guard now drops a requested τ rather
+than relabelling a dump. It is the same trap `talk_xcode.py` already carries `TAU_TOL` for,
+and it produced numbers that looked entirely plausible.
