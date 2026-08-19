@@ -1,16 +1,14 @@
 meta:
-  run_id: P4_lez_kin_ic6
+  run_id: P4_lez_kin_ic6_off
   phase: 4
-  deck: inputs_P4_lez_kin_ic6
-  description: The six-decade deck WITH THE FLASH-FITTED INITIAL CONDITION. L_ppc500
-    established that widening the resolved density range from four decades to six takes the
-    T_e outward rise from 1.504 to 1.133 against FLASH's 1.148 -- but it inherited
-    P4_lez_kin's ANALYTIC GAUSSIAN corona, which is the IC that FAILS the paper's own Fig.-2
-    acceptance test (peak laser deposition at zeta 4.13 against FLASH's 0.27). This run
-    carries the exponential corona fitted to the FLASH 0.1 ns snapshot, which PASSES that
-    test at zeta 0.28, on the paper-faithful target (10 n_cr, 4.5 d_i0) rather than
-    P4_lez_kin_flashic's reservoir-motivated 40 n_cr and 20 d_i0 -- the reservoir having
-    been falsified on 2026-08-18.
+  deck: inputs_P4_lez_kin_ic6_off
+  description: G3 laser-off CONTROL for P4_lez_kin_ic6. Identical in every respect except
+    that the laser never fires. It exists because that run ends with T_e STILL CLIMBING
+    (129.8 -> 271.2 eV, no plateau) while f_abs sits at 0.992 -- the one combination in
+    which a spurious numerical heat source is invisible in the energy budget, since real
+    absorption and grid heating both look like energy arriving. dz/lambda_D is 253 in the
+    cold solid (though only 1.8 in the underdense plume, which is where every benchmark
+    quantity is measured). This run measures the grid-heating rate instead of assuming it.
   reference: TEST_PLAN.md 12; decision register runs/P4/README.md (D1-D8)
 
 reference:
@@ -25,7 +23,9 @@ reference:
 
 laser:
   wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
-  intensity: 1.0e17           # = 1e13 W/cm^2, the paper's value
+  intensity: 0.0              # LASER OFF -- the one and only difference from
+                              # P4_lez_kin_ic6. config.py detects a control by
+                              # intensity == 0 and the deck generator keys off it.
   direction: z
   inject_side: hi
   incidence_angle_deg: 0.0
@@ -169,11 +169,7 @@ gates:
   compression_factor: 2.0
 
 controls:
-  laser_off: P4_lez_kin_ic6_off   # ITS OWN control. This inherited `P4_lez_kin_off` from
-                              # the config chain, which is the control for a DIFFERENT deck
-                              # -- Gaussian corona, 100 eV, four decades of dynamic range.
-                              # A G3 subtraction is only meaningful against a run that
-                              # differs in the laser and nothing else.
+  physics_run: P4_lez_kin_ic6   # the run this is the G3 control FOR
 
   sibling_hybrid: P4_lez_hyb  # identical physics, different electron closure
   sibling_flash: P4_lez_flash
