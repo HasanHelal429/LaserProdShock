@@ -97,6 +97,34 @@ DI0_W = di0(100.0 * ME)
 CS0_W = cs0(MASS_RATIO_SIM * ME)
 TAU_W = DI0_W / CS0_W
 
+
+def warpx_scales(mass_ratio=MASS_RATIO_SIM):
+    """(d_i0, C_S0, tau_unit, T_e,SS, mu) for a WarpX leg of the given m_ion/m_e.
+
+    NOT a constant. `P4_lez_kin_flashic_ct` runs the ION at 100 m_e where every earlier
+    Phase-4 leg ran aluminium at 26.98 x 100 = 2698, and the two differ by 5.2x in the tau
+    unit -- so a hardcoded TAU_W labels a completed tau = 27 run as tau = 5.2 and every
+    profile is read at the wrong time.
+
+    d_i0 is the PROTON skin depth at n_cr, the paper's convention and the one every
+    recorded Phase-4 number uses -- the sim's proton being m_i/A_Al, so mass_ratio = 2698
+    gives sqrt(2698/26.98) = 10.00 d_e and reproduces the module constant DI0_W exactly.
+    Using the ION inertial length instead would give 51.94 d_e at 2698 and silently
+    restate every result in RESULTS.md by a factor 5.19. C_S0 keeps the ION mass. That
+    mixed pairing is the paper's own (TEST_PLAN 12.2) and is preserved deliberately.
+    """
+    mi = float(mass_ratio) * ME
+    d = C / np.sqrt(N_CR * QE ** 2 / (EPS0 * mi / A_AL))
+    c_s = np.sqrt(Z_AL * TE_REF * QE / mi)
+    mu = MASS_RATIO_REAL / float(mass_ratio)
+    return dict(mass_ratio=float(mass_ratio), di0=d, cs0=c_s, tau=d / c_s,
+                tss=TE_REF / mu ** (1.0 / 3.0), mu=mu)
+
+
+SC_W = dict(mass_ratio=MASS_RATIO_SIM, di0=DI0_W, cs0=CS0_W, tau=TAU_W,
+            tss=TE_REF / (MASS_RATIO_REAL / MASS_RATIO_SIM) ** (1.0 / 3.0),
+            mu=MASS_RATIO_REAL / MASS_RATIO_SIM)
+
 X_IFACE = 50.0e-4               # cm; the FLASH solid/vacuum interface (sim_targetHeight)
 
 
@@ -149,7 +177,8 @@ def flash_series(run_dir, base):
 # ---------------------------------------------------------------------------------------
 # WarpX
 # ---------------------------------------------------------------------------------------
-def warpx_fields(run_dir):
+def warpx_fields(run_dir, sc=None):
+    sc = sc or SC_W
     """n_e/n_cr (and Te when the run carries the field) at the diag_fields cadence."""
     import yt
     from laserprod import io as lpio
@@ -169,15 +198,16 @@ def warpx_fields(run_dir):
         else:
             isp = [f for f in fl if f.startswith("rho_") and "ion" in f]
             ne = sum(np.asarray(g["boxlib", f])[:, 0, 0] for f in isp) / QE
-        d = dict(t=float(ds.current_time), tau=float(ds.current_time) / TAU_W,
-                 zeta=z / DI0_W, ne=ne / N_CR)
+        d = dict(t=float(ds.current_time), tau=float(ds.current_time) / sc["tau"],
+                 zeta=z / sc["di0"], ne=ne / N_CR)
         if "Te" in fl:
             d["Te"] = np.asarray(g["boxlib", "Te"])[:, 0, 0]
         out.append(d)
     return out
 
 
-def warpx_particles(run_dir, species, nbin=400):
+def warpx_particles(run_dir, species, nbin=400, sc=None):
+    sc = sc or SC_W
     """Binned particle moments on a common zeta grid.
 
     Returns per bin: ``ne`` (electron or Z*ion number density / n_cr), ``v`` (ion
@@ -190,22 +220,22 @@ def warpx_particles(run_dir, species, nbin=400):
     """
     import yt
     from laserprod import io as lpio
-    edges = np.linspace(-50.0 * DE_CR / DI0_W, 2450.0 * DE_CR / DI0_W, nbin + 1)
+    edges = np.linspace(-50.0 * DE_CR / sc["di0"], 2450.0 * DE_CR / sc["di0"], nbin + 1)
     mid = 0.5 * (edges[1:] + edges[:-1])
-    dz = (edges[1] - edges[0]) * DI0_W          # bin width in metres
+    dz = (edges[1] - edges[0]) * sc["di0"]      # bin width in metres
     out = []
     for p in lpio.plotfiles(run_dir, "diag1"):
         ds = yt.load(p)
         ad = ds.all_data()
         have = {f[0] for f in ds.field_list}
-        acc = dict(t=float(ds.current_time), tau=float(ds.current_time) / TAU_W, zeta=mid)
+        acc = dict(t=float(ds.current_time), tau=float(ds.current_time) / sc["tau"], zeta=mid)
         for kind, names in species.items():
             Zs, Ws, U = [], [], []
             for s in names:
                 if s not in have:
                     continue
                 try:
-                    Zs.append(np.asarray(ad[(s, "particle_position_x")]) / DI0_W)
+                    Zs.append(np.asarray(ad[(s, "particle_position_x")]) / sc["di0"])
                     Ws.append(np.asarray(ad[(s, "particle_weight")]))
                     U.append(np.stack([np.asarray(ad[(s, f"particle_momentum_{c}")])
                                        for c in "xyz"], axis=1))
@@ -218,7 +248,7 @@ def warpx_particles(run_dir, species, nbin=400):
             ok = sw > 0
             dens = sw / dz / N_CR               # 1D: weight is a per-area count
             if kind == "ion":
-                m = MASS_RATIO_SIM * ME
+                m = sc["mass_ratio"] * ME
                 # NB: in 1D WarpX the geometry axis is z. yt exposes the single spatial
                 # coordinate as particle_position_x, but the momentum keeps its three
                 # PHYSICAL components, so the longitudinal one is momentum_z, not _x.
@@ -227,7 +257,7 @@ def warpx_particles(run_dir, species, nbin=400):
                 un = u / (m * C)
                 vz = un[:, 2] / np.sqrt(1.0 + (un * un).sum(axis=1)) * C
                 sv, _ = np.histogram(z, bins=edges, weights=w * vz)
-                acc["v"] = np.where(ok, sv / np.where(ok, sw, 1), np.nan) / CS0_W
+                acc["v"] = np.where(ok, sv / np.where(ok, sw, 1), np.nan) / sc["cs0"]
                 acc["ni"] = dens
                 acc.setdefault("ne", dens * Z_AL)        # quasineutral fallback
             else:
@@ -377,10 +407,13 @@ def load_leg(label, path, colour):
     from laserprod import config as lpconfig
     cfg = lpconfig.load(path)
     hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
-    return dict(label=label, path=path, colour=colour, hybrid=hybrid,
+    # The ion mass is a per-run primary, not a project constant: flashic_ct runs it at
+    # 100 m_e where the others run 2698, which is 5.2x in the tau unit.
+    sc = warpx_scales(float(cfg["reference"]["mass_ratio"]))
+    return dict(label=label, path=path, colour=colour, hybrid=hybrid, sc=sc,
                 rid=lpconfig.run_id(cfg),
-                S=warpx_particles(path, SP_HYB if hybrid else SP_KIN),
-                F=warpx_fields(path) if hybrid else None)
+                S=warpx_particles(path, SP_HYB if hybrid else SP_KIN, sc=sc),
+                F=warpx_fields(path, sc=sc) if hybrid else None)
 
 
 def leg_state(leg, tau):
@@ -444,12 +477,13 @@ def table(data, legs):
     print(f"    real m_i  T_e,SS = {TE_REF:.0f} eV      "
           f"reduced m_i T_e,SS = {TSS_REDUCED:.1f} eV")
     print("  and against what its OWN absorbed fraction supports, T_e ~ I_abs^(2/3):")
+    ss_of = {q["label"]: q["sc"]["tss"] for q in legs}
     fabs = {"FLASH": 0.870}
     for leg in legs:
         q = absorbed(leg["path"])
         fabs[leg["label"]] = q["f_mean"] if q else np.nan
     for n in names:
-        ref = TE_REF if n == "FLASH" else TSS_REDUCED
+        ref = TE_REF if n == "FLASH" else ss_of.get(n, TSS_REDUCED)
         T = sc[n].get(27.0, {}).get("Te_mean_plume", np.nan)
         supported = ref * (fabs[n] / 0.870) ** (2.0 / 3.0)
         print(f"    {n:22s} f_abs {fabs[n]:5.3f}  T_e {T:7.1f} eV  "
@@ -647,7 +681,8 @@ def figure_reduced(data, legs, out):
     for j, leg in enumerate(legs):
         colour[leg["label"]] = leg["colour"]
         style[leg["label"]] = (("--", "-.", ":")[j % 3], 1.5)
-    ref_ss = {n: (TE_REF if n == "FLASH" else TSS_REDUCED) for n in names}
+    ss_of = {q["label"]: q["sc"]["tss"] for q in legs}
+    ref_ss = {n: (TE_REF if n == "FLASH" else ss_of.get(n, TSS_REDUCED)) for n in names}
 
     n = len(TAUS)
     fig, ax = plt.subplots(3, n, figsize=(3.5 * n, 9.6), sharex=True)

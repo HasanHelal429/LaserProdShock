@@ -3422,3 +3422,110 @@ than the structural limit the D1 entry recorded. **The 2026-08-18 retraction of 
 lines, but never to the figure's axes or to `TEST_PLAN.md`'s acceptance criteria** — so
 the project has been reading its own benchmark against a reference it had already
 retired. When a retraction lands, grep for every place the retracted number is used.
+
+---
+
+## 2026-08-18 (final, later) — `P4_lez_kin_flashic_ct`: the corona correction works on temperature and scale length, only partly on absorption — and the ion mass ratio changed with it
+
+**Environment.** `build_cuda1d/bin/warpx.1d` (binary dated 2026-08-13 12:21, unchanged
+since the parent ran, so provenance is identical), one RTX 4070 (**GPU 1**), `--gpu 1 -L`,
+149 184 steps in **15 min** at 0.0061 s/step. `--verify` OK. 328 tests pass.
+
+### What was run, and the honest caveat about it
+`runs/P4/P4_lez_kin_flashic_ct` tests the previous entry's claim that
+`P4_lez_kin_flashic`'s `f_abs` = 0.358 was a **mixed-unit initial condition** — corona
+temperature imported from FLASH in absolute eV while every other IC element was
+transferred in similarity units.
+
+**It is not a single-variable test, and must not be quoted as one.** Two things changed:
+
+| | parent | this run |
+|---|---|---|
+| corona `T_e` / `T_i` | 378.3 / 115.6 eV (absolute, from FLASH) | **47.81 / 14.61 eV** (µ-consistent) |
+| `mass_ratio` (m_Al/mₑ) | 2698 | **100** |
+
+The mass ratio changed on the user's instruction. The paper (§II.B) says *"we use a mass
+ratio of `m_p/m_e` = 100"* — the **proton**, which for aluminium gives 26.98 × 100 = 2698,
+and that is what every earlier Phase-4 leg ran. But the paper reaches its reduction with a
+**reduced speed of light** (`m_e c²` = 60 keV against 511), which WarpX cannot follow with
+real `c` and real `mₑ`. Running the ion itself at 100 mₑ is this project's choice. µ vs
+real aluminium is therefore **495.4**, and this leg's own `T_e,SS` is **104 eV**.
+
+### Result at τ = 27, the like-for-like window against FLASH
+
+| | parent (2698, hot corona) | **this run (100, µ-consistent)** | FLASH |
+|---|---|---|---|
+| `f_abs` (time-integrated to τ = 27) | 0.358 | **0.551** | 0.870 |
+| plume `T_e` | 168.1 eV | **≈123 eV** | 839.0 eV |
+| `T_e` / **own** `T_e,SS` | **0.539** | **1.18** | 1.019 |
+| `L_n` | 8.77 (0.41× FLASH) | **≈24 (1.13× FLASH)** | 21.4 |
+| `ζ_front` | 46.8 (0.50×) | **47 (0.50×)** | 94.6 |
+| peak `n_e` | 37.8, falling from 40 | **46.3, RISING from 40** | 4141 |
+
+**The prediction is partly confirmed and the falsification criterion is not met.** The
+README predicted `f_abs` → 0.7–0.8 and `T_e`/own-SS → ≈1, and said the claim would be
+falsified by `f_abs` staying near 0.36. It did not stay: it moved to 0.551.
+
+- **`T_e` self-consistency is fixed.** 0.539 → **1.18** of its own Manheimer value. This
+  was the parent's most conspicuous defect — the only Phase-4 leg not sitting near 1.0 —
+  and it is gone.
+- **The density scale length is fixed.** 0.41× → **1.13×** of FLASH. The parent's corona
+  was right in *shape* but wrong in *temperature*, and `L_n` is what that costs.
+- **The target now compresses rather than ablates away**: peak `n_e` rises 40 → 46.3,
+  where the parent fell 40 → 37.8 and `P4_lez_kin` collapsed 10 → 1.74. That is the
+  qualitative behaviour FLASH shows (its overdense column *grows*).
+- **Absorption is only 63 % recovered.** 0.551 against FLASH's 0.870, where 0.7–0.8 was
+  predicted. `T_e,SS ∝ I_abs^(2/3)` puts the absorption-supported temperature at 76 eV
+  against the measured ≈123, so this leg now sits **1.6× above what its own absorbed flux
+  supports** — the opposite sign of the parent's problem, and unexplained.
+- **The plume front is unchanged at 0.50× FLASH.** Neither correction touched it.
+
+### A late-time feature worth recording
+Because of the `max_step` error below, the run continued to τ = 140. Over that extension
+`f_abs` **recovers**: 0.350 at τ = 27 → **0.781** at τ = 140, while peak `n_e` stays near
+45–50 and `T_e` climbs to 182 eV (1.76× own SS). So the absorption deficit at τ = 27 is a
+*transient*, not a floor. Nothing in Phase 4 has looked at this window before.
+
+### MY ERROR: `max_step` was set by mixing the two `d_i0` conventions
+I sized the run for τ = 27 using the **ion** inertial length for WarpX (10 `d_e` at
+`m_i` = 100) while the FLASH τ it was matched to uses the **proton** one. Under the
+consistent proton convention (`d_i0` = `d_e`√(m_i/A_Al·mₑ) = 1.925 `d_e`) the τ unit is
+0.0751 ps, so 10.53 ps is **τ = 140**, not 27, and τ = 27 falls at step 28 695. This is
+exactly the trap `TEST_PLAN.md` §12.2 documents, committed by the person who had just
+finished writing about it. The run is not wasted — τ = 27 is inside it and is what the
+table above reports — but a run sized this way at 2698 would have cost 5.2× more wall
+clock than intended rather than 5.2× less.
+
+### Tooling
+* **`xcode_compare.warpx_scales(mass_ratio)`** — `d_i0`, `C_S0`, τ and `T_e,SS` are no
+  longer module constants. `load_leg` reads `reference.mass_ratio` from each run's own
+  config, so a leg at `m_i` = 100 is normalised on its own scales; previously the
+  hardcoded `TAU_W` labelled this completed τ = 140 run as τ = 5.2. Regression: at 2698 it
+  reproduces the old `DI0_W`/`TAU_W` to 3e-5 (the config rounds 26.9815 × 100 to 2698).
+  **`d_i0` is the PROTON skin depth**, the paper's convention and the one every recorded
+  number uses — defining it from the ion instead would restate all of RESULTS.md by 5.19×.
+* **`deck.py` gains `numerics.arena_init_size_mb`.** AMReX pre-allocates **3/4 of the
+  card's TOTAL memory** in one `cudaMalloc` — 8904 MiB of an RTX 4070's 11873 — **not 3/4
+  of free memory** as the earlier entry today recorded. So on a shared GPU it aborts at
+  init whenever another user holds enough of the card, regardless of how small the run is.
+  It killed the first launch (8509 MiB free, 8904 requested) while another user held
+  3.2 GB. This deck's real footprint is a few hundred MB; capped at 2 GiB.
+* **`config.py`'s geometry diagram hardcoded "Gaussian"** for the coronal ramp, so it has
+  mislabelled every exponential-corona run since `corona_profile` was added — including the
+  parent's README, whose deck is exponential. It now reads `corona_profile`.
+
+### Not done, deliberately
+The **G3 laser-off control was not run** (user's decision). The asymmetry that makes this
+defensible: grid heating warms the corona and `κ_ib ∝ T^(−3/2)`, so it can only push
+`f_abs` **down** — a high `f_abs` is self-validating, and only a low one is ambiguous.
+`f_abs` = 0.551 is mid-range, so **the control is still the right next step if the 63 %
+recovery is to be quoted**, and `dz/λ_D` = **327** here against the parent's 116 makes
+that more pressing, not less. Partly offset by 5.2× fewer steps at τ = 27.
+
+### Open
+1. Why does this leg sit **1.6× above** its own absorbed-flux expectation?
+2. Is the **0.50× plume front** a real deficit or another normalisation artifact? It is
+   the one quantity untouched by two successive IC corrections.
+3. **The comparison figures have not been rebuilt** with this leg — the other three legs
+   are at `m_i` = 2698 and this one is at 100, so `TEST_PLAN.md` §12.6 acceptance across
+   all four is not meaningful until it is decided whether the older legs are re-run at 100.
