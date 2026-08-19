@@ -4220,3 +4220,53 @@ different shapes and skipping it moves `ζ`(50 %)/`ζ`(90 %) rather than merely 
 The compact-deposition finding and the non-convergence are the same story told twice, so the
 extended `ic6` run tests both at once: if the plume eventually expands, the deposition region
 should broaden toward FLASH's and `f_abs` should fall off 0.99.
+
+---
+
+## 2026-08-19 — **G3 PASSES decisively: there is no grid heating.** `ic6`'s rising `T_e` is real absorption
+
+`runs/P4/P4_lez_kin_ic6_off` complete — 552 960 steps, **17 min**, no NaN, `--verify` OK.
+Deck differs from the physics run in **exactly one line** (`laser_deposition.intensity`),
+verified by diff.
+
+### The subtraction
+Electron kinetic energy from the `EP` reduced diagnostic, over the whole run:
+
+| | start | end | **gain** |
+|---|---|---|---|
+| driven (`ic6`) | 5.0771e5 J | 1.8424e6 J | **+1.3347e6 J** |
+| **control (laser off)** | 5.0771e5 J | 3.2835e5 J | **−1.7936e5 J** |
+
+**The control's electrons COOL by 35 %.** Grid heating does not merely fail to dominate —
+it is **absent**: the laser-off run has no net numerical heat source at all, and the laser
+has to work against a real cooling term rather than being flattered by a spurious one.
+
+The energy that leaves the electrons goes where it should: ions **gain 1.9436e5 J** against
+the electrons' 1.7936e5 J loss, so the transfer closes to **8 %** with no creation. That is
+the ambipolar rarefaction doing exactly what it should in a laser-off expansion.
+
+### What this settles
+1. **`ic6`'s still-climbing `T_e` (129.8 → 271.2 eV) is laser absorption, not numerics.**
+   The non-convergence recorded yesterday is physical: the run has not yet reached
+   quasi-steady ablation, and the right response is to run it longer.
+2. **Implicit PIC is not needed.** `theta_implicit_em` buys grid-heating immunity at ~1.9×
+   per step; there is no grid heating here to be immune to.
+3. **`dz/λ_D` = 253 in the cold solid is confirmed harmless for this measurement** — which
+   is what the plume value of **1.8** predicted. The badly-resolved region is a mass
+   reservoir, not the region any benchmark quantity is measured in. The 15-day resolved-λ_D
+   run would have bought nothing.
+4. The earlier decision to defer this control was, in the event, correct — but it is now
+   **measured rather than argued**, and the argument that justified deferring it (grid
+   heating suppresses absorption, so a high `f_abs` is self-validating) had genuinely
+   stopped applying once `f_abs` reached 0.992 with `T_e` still rising.
+
+### Also fixed
+`ic6` had inherited `controls.laser_off: P4_lez_kin_off` down the config chain — the control
+for a *different* deck (Gaussian corona, 100 eV, four decades). A G3 subtraction is only
+meaningful against a run differing in the laser alone, so it now names its own control.
+
+### Consequence
+The extended `ic6` run is the clear next step and needs no numerical caveat: run it until
+`T_e` plateaus, then read `f_abs`, `ζ_front` and `L_n` off a converged state instead of a
+transient. The deposition finding (absorption 2.45× too concentrated) is unaffected either
+way — it is measured at times FLASH covers.

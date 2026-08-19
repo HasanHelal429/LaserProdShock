@@ -2,3 +2,14 @@
 # logging_started 2026-08-18T23:42:35  total_steps=552960  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
 2026-08-18T23:43:05 | 13122/552960 ( 2.4%) | 0h00m | 0.0023 s/step(wall) | 0.0022 s/step(warpx) | ETA ~0h20m | x1.03 | load 0.5 | laser OFF (I0 = 0)
+2026-08-18T23:45:05 | 59870/552960 (10.8%) | 0h02m | 0.0026 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h21m | x1.03 | load 1.0 | laser OFF (I0 = 0)
+2026-08-18T23:47:06 | 115351/552960 (20.9%) | 0h04m | 0.0022 s/step(wall) | 0.0023 s/step(warpx) | ETA ~0h15m | x0.93 | load 1.0 | laser OFF (I0 = 0)
+2026-08-18T23:49:06 | 177664/552960 (32.1%) | 0h06m | 0.0019 s/step(wall) | 0.0022 s/step(warpx) | ETA ~0h12m | x0.88 | load 1.4 | laser OFF (I0 = 0)
+2026-08-18T23:50:37 | 227679/552960 (41.2%) | 0h08m | 0.0018 s/step(wall) | 0.0021 s/step(warpx) | ETA ~0h09m | x0.86 | load 1.2 | laser OFF (I0 = 0)
+2026-08-18T23:52:07 | 279197/552960 (50.5%) | 0h09m | 0.0018 s/step(wall) | 0.0020 s/step(warpx) | ETA ~0h08m | x0.86 | load 1.1 | laser OFF (I0 = 0)
+2026-08-18T23:53:38 | 332657/552960 (60.2%) | 0h11m | 0.0017 s/step(wall) | 0.0020 s/step(warpx) | ETA ~0h06m | x0.86 | load 1.0 | laser OFF (I0 = 0)
+2026-08-18T23:55:09 | 387627/552960 (70.1%) | 0h12m | 0.0017 s/step(wall) | 0.0019 s/step(warpx) | ETA ~0h04m | x0.85 | load 1.0 | laser OFF (I0 = 0)
+2026-08-18T23:56:40 | 444523/552960 (80.4%) | 0h14m | 0.0016 s/step(wall) | 0.0019 s/step(warpx) | ETA ~0h02m | x0.85 | load 1.1 | laser OFF (I0 = 0)
+2026-08-18T23:58:11 | 503290/552960 (91.0%) | 0h15m | 0.0016 s/step(wall) | 0.0019 s/step(warpx) | ETA ~0h01m | x0.84 | load 1.0 | laser OFF (I0 = 0)
+2026-08-18T23:59:43 | 552960/552960 (100.0%) | 0h17m | 0.0018 s/step(wall) | 0.0018 s/step(warpx) | ETA ~0h00m | x1.01 | load 0.9 | laser OFF (I0 = 0)
+DONE 2026-08-18T23:59:43 | 552960/552960 (100.0%) | total wall 0h17m | mean 0.0019 s/step(wall) | reached max_step
