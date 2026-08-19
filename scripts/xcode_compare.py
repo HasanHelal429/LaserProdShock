@@ -170,7 +170,7 @@ def flash_series(run_dir, base):
                         ne=ne / N_CR,
                         Te=v["tele"] / KELV, Ti=v["tion"] / KELV,
                         v=v["velx"] * 1e-2 / CS0_F,
-                        depo=v["depo"]))
+                        depo=v["depo"], dens=v["dens"]))
     return out
 
 

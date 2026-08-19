@@ -4166,3 +4166,57 @@ remaining metrics look short:
 hours. Until it does, `f_abs`, `ζ_front` and `L_n` are being read off a transient and none of
 them is a fair test. The shape result stands regardless, because `RISE` is a ratio within a
 single profile rather than a comparison of two clocks.
+
+---
+
+## 2026-08-18 (final, deposition) — **why the kinetic plume is slower: the absorption is 2.4× too concentrated**
+
+`scripts/deposition_compare.py` (new), `media/P4/P4_lez_kin_ic6/deposition_compare.png`.
+`flash_series` now also returns `dens`.
+
+### The measurement
+ζ by which 50 % and 90 % of the absorbed power has been deposited, counting inward from the
+laser side. Clocks aligned (a WarpX leg's `t` = 0 is FLASH's τ = 2.696):
+
+| FLASH τ | kinetic τ | `ζ`(50 %) FLASH | kinetic | `ζ`(90 %) FLASH | kinetic |
+|---|---|---|---|---|---|
+| **2.7** | 0.0 | **0.38** | **0.43** | **1.02** | **0.93** |
+| 9.4 | 6.7 | 2.42 | 1.43 | 7.11 | 4.08 |
+| 16.2 | 13.5 | 5.71 | 1.93 | 15.72 | 7.18 |
+| **22.9** | 20.2 | **9.26** | **3.78** | **25.41** | **11.83** |
+
+**At the handoff the two deposition profiles are the same** — 0.38 vs 0.43 and 1.02 vs 0.93,
+which is Fig. 2 passing, now confirmed on the volumetric profile rather than only at its
+peak. **They then diverge monotonically.** By τ = 22.9 FLASH is laying 90 % of its power
+down over 25.4 `d_i0` while the kinetic does it over 11.8 — and the half-power depth is
+**2.45× shallower** (3.78 against 9.26).
+
+### The mechanism, and it is not under-absorption
+`f_abs` at the end of the kinetic run is **0.992** against FLASH's 0.870 — the kinetic leg
+absorbs *more* of the beam, not less. It simply puts that energy into a much thinner layer
+just outside the critical surface, where FLASH spreads it through an extended corona.
+
+That is the answer to "why is the kinetic slower": **the same joules heat a smaller mass of
+expandable plasma.** The ablative mass flux is set by the temperature reached in plasma that
+can actually fly away, and a compact deposition layer heats a compact plume, which keeps the
+absorption compact — a feedback FLASH escapes and the kinetic leg does not, within 27 τ.
+
+It also explains the non-convergence recorded in the previous entry: the run is still
+absorbing at essentially 100 % at `t_end`, so it is nowhere near the quasi-steady ablation
+FLASH has settled into.
+
+### Caveat on FLASH's absolute units, recorded rather than papered over
+`depo` does not close the energy budget in either obvious interpretation: `∫depo dz` is
+9.2e-10 of the absorbed intensity and `∫depo·dens·0.1 dz` is 1.2e-13, and the residual is
+~1e13 ≈ 1/dt. So `depo` is almost certainly specific energy **per timestep** [erg/g] rather
+than a rate. That factor is one number per dump and cancels in both panels here — the
+profile is peak-normalised and the depth panel is a cumulative *fraction* — but **the
+density weighting does NOT cancel and is applied**, since `depo` and `depo·dens` have
+different shapes and skipping it moves `ζ`(50 %)/`ζ`(90 %) rather than merely rescaling them
+(uncorrected, the FLASH depths read 0.59/1.78 → 17.87/46.94 instead of 0.38/1.02 → 9.26/25.41).
+**Absolute W/m³ for FLASH is not established by this script and must not be read off it.**
+
+### Next
+The compact-deposition finding and the non-convergence are the same story told twice, so the
+extended `ic6` run tests both at once: if the plume eventually expands, the deposition region
+should broaden toward FLASH's and `f_abs` should fall off 0.99.
