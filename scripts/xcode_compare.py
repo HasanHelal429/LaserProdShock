@@ -327,7 +327,18 @@ SP_KIN = {"electron": ["targ_electrons", "amb_electrons"],
           "ion": ["targ_ions", "amb_ions"]}
 SP_HYB = {"ion": ["targ_ions", "amb_ions"]}
 TAUS = (2.7, 6.7, 13.5, 20.3, 27.0)
+
+# Kept as a three-key dict, and kept exactly, because scripts/talk_xcode.py reads it.
 COLS = {"FLASH": "#1f4e9c", "kinetic": "#c1441a", "hybrid": "#2a8a5f"}
+PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b")     # WarpX legs, in order
+
+# The default set of WarpX legs. `P4_lez_kin_flashic` is here because it is the only leg
+# whose initial condition was FITTED to FLASH rather than assumed, and the comparison is
+# unreadable without both it and the analytic-IC leg side by side: the two bracket FLASH
+# from opposite directions (front 2.03x vs 0.50x), which is the whole result.
+LEGS_DEFAULT = (("kinetic, analytic IC", "runs/P4/P4_lez_kin_bg"),
+                ("kinetic, FLASH IC", "runs/P4/P4_lez_kin_flashic"),
+                ("hybrid", "runs/P4/P4_lez_hyb_bg3"))
 
 
 def absorbed(run_dir, i0=1.0e17):
@@ -337,7 +348,10 @@ def absorbed(run_dir, i0=1.0e17):
     the one that sets the energy budget; f_abs(end) shows whether coupling is still live.
     """
     t, P, E = [], [], []
-    for ln in open(os.path.join(run_dir, "run.log"), errors="ignore"):
+    path = os.path.join(run_dir, "run.log")
+    if not os.path.exists(path):
+        return None
+    for ln in open(path, errors="ignore"):
         if not ln.startswith("LASERDEP step"):
             continue
         f = ln.split()
@@ -352,45 +366,194 @@ def absorbed(run_dir, i0=1.0e17):
                 f_end=P[-1] / i0, f_0=P[0] / i0)
 
 
-def history(kin, hyb, out):
-    """Time histories of the four scalars that survive the rescaling."""
+def load_leg(label, path, colour):
+    """One WarpX leg, with its species map and T_e source chosen from its own config.
+
+    A hybrid run has no electron macroparticles at all, so its T_e is the `Te` FIELD and its
+    species map has only ions; a kinetic run's T_e is a particle moment. Deciding that from
+    the config rather than from a flag passed by the caller is what lets the leg list be
+    arbitrary -- and stops a hybrid leg being silently read as if it had electrons.
+    """
+    from laserprod import config as lpconfig
+    cfg = lpconfig.load(path)
+    hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
+    return dict(label=label, path=path, colour=colour, hybrid=hybrid,
+                rid=lpconfig.run_id(cfg),
+                S=warpx_particles(path, SP_HYB if hybrid else SP_KIN),
+                F=warpx_fields(path) if hybrid else None)
+
+
+def leg_state(leg, tau):
+    """(zeta, ne, Te, v) for one leg at the nearest tau, with the hybrid T_e interpolated."""
+    s = pick(leg["S"], tau)
+    if s is None:
+        return None
+    Te = s.get("Te")
+    if leg["hybrid"]:
+        hf = pick(leg["F"], tau, "Te")
+        Te = np.interp(s["zeta"], hf["zeta"], hf["Te"]) if hf else None
+    return dict(zeta=s["zeta"], ne=s["ne"], Te=Te, v=s.get("v"), tau=s["tau"])
+
+
+def collect(legs):
+    F = flash_series(FLASH_DIR, "lez1d")
+    data = {}
+    for tau in TAUS:
+        f = pick(F, tau)
+        row = {"FLASH": dict(zeta=f["zeta"], ne=f["ne"], Te=f["Te"], v=f["v"],
+                             tau=f["tau"])}
+        for leg in legs:
+            st = leg_state(leg, tau)
+            if st is not None:
+                row[leg["label"]] = st
+        data[tau] = row
+    return data, F
+
+
+def table(data, legs):
+    keys = ["ne_peak", "zeta_cr", "zeta_front", "Te_mean_plume", "Te_max_plume",
+            "v_at_0p1", "v_band_max", "L_n"]
+    names = ["FLASH"] + [q["label"] for q in legs]
+    sc = {n: {} for n in names}
+    for tau in TAUS:
+        for n in names:
+            d = data[tau].get(n)
+            if d is None:
+                continue
+            sc[n][tau] = scalars(d["zeta"], d["ne"], d["Te"], d["v"])
+    for n in names:
+        print("\n" + "=" * 116)
+        print(f"{n}   (band {BAND[0]:g} <= n_e/n_cr <= {BAND[1]:g};  "
+              f"density-weighted where a mean is taken)")
+        print(f"{'tau':>6} " + " ".join(f"{k:>14}" for k in keys))
+        for tau in TAUS:
+            if tau not in sc[n]:
+                continue
+            print(f"{tau:6.1f} " + " ".join(f"{sc[n][tau].get(k, np.nan):14.3f}"
+                                           for k in keys))
+    print("\n" + "=" * 116)
+    print("FINAL STATE (tau = 27), each WarpX leg as a ratio to FLASH")
+    for k in keys:
+        f = sc["FLASH"][27.0].get(k, np.nan)
+        line = f"  {k:16s} FLASH {f:10.3f}"
+        for n in names[1:]:
+            v = sc[n].get(27.0, {}).get(k, np.nan)
+            line += f" | {n} {v:9.3f} ({v/f:5.2f}x)" if f else f" | {n} {v:9.3f}"
+        print(line)
+    print(f"\n  T_e (plume, density-weighted) against EACH LEG'S OWN Manheimer value")
+    print(f"    real m_i  T_e,SS = {TE_REF:.0f} eV      "
+          f"reduced m_i T_e,SS = {TSS_REDUCED:.1f} eV")
+    print("  and against what its OWN absorbed fraction supports, T_e ~ I_abs^(2/3):")
+    fabs = {"FLASH": 0.870}
+    for leg in legs:
+        q = absorbed(leg["path"])
+        fabs[leg["label"]] = q["f_mean"] if q else np.nan
+    for n in names:
+        ref = TE_REF if n == "FLASH" else TSS_REDUCED
+        T = sc[n].get(27.0, {}).get("Te_mean_plume", np.nan)
+        supported = ref * (fabs[n] / 0.870) ** (2.0 / 3.0)
+        print(f"    {n:22s} f_abs {fabs[n]:5.3f}  T_e {T:7.1f} eV  "
+              f"/ own SS {ref:6.1f} = {T/ref:5.3f}  "
+              f"/ absorption-supported {supported:6.1f} = {T/supported:5.3f}")
+    return sc
+
+
+def figure(data, legs, out):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    names = ["FLASH"] + [q["label"] for q in legs]
+    colour = {"FLASH": COLS["FLASH"]}
+    style = {"FLASH": ("-", 2.0)}
+    for j, leg in enumerate(legs):
+        colour[leg["label"]] = leg["colour"]
+        style[leg["label"]] = (("--", "-.", ":")[j % 3], 1.5)
+
+    n = len(TAUS)
+    fig, ax = plt.subplots(3, n, figsize=(3.5 * n, 9.6), sharex=True)
+    for c, tau in enumerate(TAUS):
+        for name in names:
+            d = data[tau].get(name)
+            if d is None:
+                continue
+            ls, lw = style[name]
+            ax[0, c].semilogy(d["zeta"], np.maximum(d["ne"], 1e-9), color=colour[name],
+                              lw=lw, ls=ls, label=name)
+            inb = np.isfinite(d["ne"]) & (d["ne"] >= BAND[0]) & (d["ne"] <= BAND[1])
+            for r, y in ((1, d["Te"]), (2, d["v"])):
+                if y is None:
+                    continue
+                ax[r, c].plot(d["zeta"], np.where(inb, y, np.nan), color=colour[name],
+                              lw=lw, ls=ls)
+                ax[r, c].plot(d["zeta"], np.where(inb, np.nan, y), color=colour[name],
+                              lw=lw * 0.7, ls=ls, alpha=0.20)
+        ax[0, c].axhline(1.0, color="0.4", ls=":", lw=0.9)
+        ax[0, c].set_ylim(1e-4, 5e3)
+        ax[0, c].set_title(rf"$\tau$ = {tau:.1f}", loc="left", fontsize=9.5,
+                           fontweight="bold")
+        ax[1, c].axhline(TE_REF, color="0.35", ls=":", lw=1.0)
+        ax[1, c].axhline(TSS_REDUCED, color="0.35", ls="--", lw=1.0)
+        ax[1, c].set_ylim(0, 1100)
+        ax[2, c].set_ylim(-0.5, 6.0)
+        ax[2, c].axhline(0.0, color="0.7", lw=0.7)
+        ax[2, c].set_xlabel(r"$\zeta = z/d_{i0}$")
+        for r in range(3):
+            ax[r, c].set_xlim(-8, 110)
+            ax[r, c].grid(alpha=0.15)
+            if c:
+                ax[r, c].tick_params(labelleft=False)
+    ax[0, 0].set_ylabel(r"$n_e/n_{cr}$")
+    ax[1, 0].set_ylabel(r"$T_e$  [eV]")
+    ax[2, 0].set_ylabel(r"$v_z/C_{S0}$")
+    ax[0, 0].legend(loc="lower left", fontsize=8, framealpha=0.9)
+    ax[1, 0].text(0.03, TE_REF, f" {TE_REF:.0f} eV real $m_i$",
+                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
+                  color="0.25")
+    ax[1, 0].text(0.03, TSS_REDUCED, f" {TSS_REDUCED:.0f} eV reduced $m_i$",
+                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
+                  color="0.25")
+    fig.suptitle("FLASH (real $m_i$) vs the WarpX legs (reduced $m_i$), on the normalised "
+                 "axes. $T_e$ and $v$ are solid inside the comparison band and faded "
+                 "outside. Overdense interiors are NOT comparable ($n_{max}$ 795 $n_{cr}$ "
+                 "vs 40 / 10) -- decision D5.", fontsize=9.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.972))
+    fig.savefig(out, dpi=135)
+    print(f"\n  figure: {out}")
+
+
+def history(legs, out):
+    """Time histories of the four quantities that survive the mass rescaling."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     F = flash_series(FLASH_DIR, "lez1d")
-    K = warpx_particles(kin, SP_KIN)
-    H = warpx_particles(hyb, SP_HYB)
-    Hf = warpx_fields(hyb)
-    ser = {}
-    for name, S in (("FLASH", F), ("kinetic", K), ("hybrid", H)):
+    ser = {"FLASH": [dict(tau=s["tau"],
+                          **scalars(s["zeta"], s["ne"], s["Te"], s["v"]))
+                     for s in F if s["tau"] > 0]}
+    for leg in legs:
         rows = []
-        for s in S:
+        for s in leg["S"]:
             if s["tau"] <= 0:
                 continue
-            if name == "hybrid":
-                hf = pick(Hf, s["tau"], "Te")
-                Te = np.interp(s["zeta"], hf["zeta"], hf["Te"]) if hf else None
-            else:
-                Te = s.get("Te")
-            sc = scalars(s["zeta"], s["ne"], Te, s.get("v"))
-            sc["tau"] = s["tau"]
-            rows.append(sc)
-        ser[name] = rows
+            st = leg_state(leg, s["tau"])
+            rows.append(dict(tau=s["tau"],
+                             **scalars(st["zeta"], st["ne"], st["Te"], st["v"])))
+        ser[leg["label"]] = rows
 
-    keys = [("Te_mean_plume", r"$T_e$ in the plume  [eV]  (density-weighted)", None),
-            ("zeta_front", r"plume front  $\zeta(n_e = 10^{-2} n_{cr})$", None),
-            ("v_at_0p1", r"$v_z/C_{S0}$  at  $n_e = 0.1\,n_{cr}$", None),
-            ("L_n", r"density scale length  $L_n/d_{i0}$", None)]
+    keys = [("Te_mean_plume", r"$T_e$ in the plume [eV] (density-weighted)"),
+            ("zeta_front", r"plume front  $\zeta(n_e = 10^{-2} n_{cr})$"),
+            ("v_at_0p1", r"$v_z/C_{S0}$ at $n_e = 0.1\,n_{cr}$"),
+            ("L_n", r"density scale length $L_n/d_{i0}$")]
     fig, ax = plt.subplots(1, 4, figsize=(17.5, 4.1))
-    for j, (k, lab, _) in enumerate(keys):
-        for name, col in COLS.items():
-            r = ser[name]
-            x = [q["tau"] for q in r]
-            y = [q.get(k, np.nan) for q in r]
-            ls = "-" if name == "FLASH" else ("--" if name == "kinetic" else "-.")
-            ax[j].plot(x, y, color=col, lw=1.9 if name == "FLASH" else 1.5, ls=ls,
-                       label=name)
+    for j, (k, lab) in enumerate(keys):
+        for name, rows in ser.items():
+            col = COLS["FLASH"] if name == "FLASH" else \
+                next(q["colour"] for q in legs if q["label"] == name)
+            ls = "-" if name == "FLASH" else "--"
+            ax[j].plot([q["tau"] for q in rows], [q.get(k, np.nan) for q in rows],
+                       color=col, lw=1.9 if name == "FLASH" else 1.5, ls=ls, label=name)
         ax[j].set_xlabel(r"$\tau = t/(d_{i0}/C_{S0})$")
         ax[j].set_title(lab, fontsize=9.5)
         ax[j].grid(alpha=0.15)
@@ -400,149 +563,53 @@ def history(kin, hyb, out):
     ax[0].set_ylim(0, 1000)
     ax[0].text(0.5, TE_REF + 12, f"Manheimer, real $m_i$ ({TE_REF:.0f} eV)", fontsize=7,
                color="0.25")
-    ax[0].text(0.5, TSS_REDUCED + 12,
-               f"Manheimer, REDUCED $m_i$ ({TSS_REDUCED:.0f} eV)", fontsize=7,
-               color="0.25")
-    ax[0].legend(loc="lower right", fontsize=8.5)
+    ax[0].text(0.5, TSS_REDUCED + 12, f"Manheimer, REDUCED $m_i$ ({TSS_REDUCED:.0f} eV)",
+               fontsize=7, color="0.25")
+    ax[0].legend(loc="lower right", fontsize=8)
     fig.suptitle("The four quantities that survive the mass rescaling. FLASH has real "
-                 "$m_i$; both WarpX legs are 18.36x lighter, so each is plotted against "
-                 "its OWN $d_{i0}$ and $d_{i0}/C_{S0}$.", fontsize=10)
+                 "$m_i$; the WarpX legs are 18.36x lighter, so each is plotted against its "
+                 "OWN $d_{i0}$ and $d_{i0}/C_{S0}$.", fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(out, dpi=135)
     print(f"  figure: {out}")
 
 
-def collect(kin="runs/P4/P4_lez_kin_bg", hyb="runs/P4/P4_lez_hyb_bg3"):
-    F = flash_series(FLASH_DIR, "lez1d")
-    K = warpx_particles(kin, SP_KIN)
-    H = warpx_particles(hyb, SP_HYB)
-    Hf = warpx_fields(hyb)
-    out = {}
-    for tau in TAUS:
-        f, k, h = pick(F, tau), pick(K, tau), pick(H, tau)
-        hf = pick(Hf, tau, "Te")
-        Th = np.interp(h["zeta"], hf["zeta"], hf["Te"]) if hf else None
-        out[tau] = dict(
-            FLASH=dict(zeta=f["zeta"], ne=f["ne"], Te=f["Te"], v=f["v"], tau=f["tau"]),
-            kinetic=dict(zeta=k["zeta"], ne=k["ne"], Te=k.get("Te"), v=k.get("v"),
-                         tau=k["tau"]),
-            hybrid=dict(zeta=h["zeta"], ne=h["ne"], Te=Th, v=h.get("v"), tau=h["tau"]))
-    return out, F, K, H, Hf
-
-
-def table(data):
-    keys = ["ne_peak", "zeta_cr", "zeta_front", "Te_mean_plume", "Te_max_plume",
-            "v_at_0p1", "v_band_max", "L_n"]
-    sc = {c: {} for c in COLS}
-    for tau in TAUS:
-        for c in COLS:
-            d = data[tau][c]
-            sc[c][tau] = scalars(d["zeta"], d["ne"], d["Te"], d["v"])
-    for c in COLS:
-        print("\n" + "=" * 112)
-        print(f"{c}   (band {BAND[0]:g} <= n_e/n_cr <= {BAND[1]:g};  "
-              f"density-weighted where a mean is taken)")
-        print(f"{'tau':>6} " + " ".join(f"{k:>14}" for k in keys))
-        for tau in TAUS:
-            print(f"{tau:6.1f} " + " ".join(f"{sc[c][tau].get(k, np.nan):14.3f}"
-                                           for k in keys))
-    print("\n" + "=" * 112)
-    print("FINAL STATE (tau = 27), WarpX legs as a ratio to FLASH")
-    for k in keys:
-        f = sc["FLASH"][27.0][k]
-        line = f"  {k:16s} FLASH {f:10.3f}"
-        for c in ("kinetic", "hybrid"):
-            v = sc[c][27.0][k]
-            line += f" | {c} {v:9.3f} ({v/f:5.2f}x)" if f else f" | {c} {v:9.3f}"
-        print(line)
-    print(f"\n  T_e (plume, density-weighted) against EACH CODE'S OWN Manheimer value")
-    print(f"    real m_i  T_e,SS = {TE_REF:.0f} eV      "
-          f"reduced m_i T_e,SS = {TSS_REDUCED:.1f} eV")
-    for c, ref in (("FLASH", TE_REF), ("kinetic", TSS_REDUCED), ("hybrid", TSS_REDUCED)):
-        print(f"    {c:9s} {sc[c][27.0]['Te_mean_plume']:7.1f} eV / {ref:6.1f} eV "
-              f"= {sc[c][27.0]['Te_mean_plume']/ref:.3f}")
-    return sc
-
-
-def figure(data, out):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    n = len(TAUS)
-    fig, ax = plt.subplots(3, n, figsize=(3.5 * n, 9.6), sharex=True)
-    for c, tau in enumerate(TAUS):
-        for name, col in COLS.items():
-            d = data[tau][name]
-            ls = "-" if name == "FLASH" else ("--" if name == "kinetic" else "-.")
-            lw = 2.0 if name == "FLASH" else 1.6
-            ax[0, c].semilogy(d["zeta"], np.maximum(d["ne"], 1e-9), color=col, lw=lw,
-                              ls=ls, label=name)
-            if d["Te"] is not None:
-                ax[1, c].plot(d["zeta"], d["Te"], color=col, lw=lw, ls=ls)
-            if d["v"] is not None:
-                ax[2, c].plot(d["zeta"], d["v"], color=col, lw=lw, ls=ls)
-        ax[0, c].axhline(1.0, color="0.4", ls=":", lw=0.9)
-        ax[0, c].set_ylim(1e-4, 5e3)
-        ax[0, c].set_title(rf"$\tau$ = {tau:.1f}   ($t/(d_{{i0}}/C_{{S0}})$)",
-                           loc="left", fontsize=9.5, fontweight="bold")
-        ax[1, c].axhline(TE_REF, color="0.35", ls=":", lw=1.0)
-        ax[1, c].axhline(TSS_REDUCED, color="0.35", ls="--", lw=1.0)
-        ax[1, c].set_ylim(0, 1100)
-        ax[2, c].set_ylim(-0.5, 6.0)
-        ax[2, c].axhline(0.0, color="0.7", lw=0.7)
-        ax[2, c].set_xlabel(r"$\zeta = z/d_{i0}$   (each code's own $d_{i0}$)")
-        for r in range(3):
-            ax[r, c].set_xlim(-6, 110)
-            ax[r, c].grid(alpha=0.15)
-            if c:
-                ax[r, c].tick_params(labelleft=False)
-    ax[0, 0].set_ylabel(r"$n_e/n_{cr}$")
-    ax[1, 0].set_ylabel(r"$T_e$  [eV]")
-    ax[2, 0].set_ylabel(r"$v_z/C_{S0}$")
-    ax[0, 0].legend(loc="lower left", fontsize=8.5, framealpha=0.9)
-    ax[1, 0].text(0.03, TE_REF, f" {TE_REF:.0f} eV: Manheimer, real $m_i$",
-                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
-                  color="0.25")
-    ax[1, 0].text(0.03, TSS_REDUCED, f" {TSS_REDUCED:.0f} eV: same, REDUCED $m_i$",
-                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
-                  color="0.25")
-    fig.suptitle("FLASH (real $m_i$) vs kinetic and hybrid WarpX (reduced $m_i$), on the "
-                 "normalised axes.  Overdense interiors are NOT comparable: "
-                 "$n_{max}$ = 795 $n_{cr}$ in FLASH, 10 in WarpX (D5).",
-                 fontsize=10, y=0.995)
-    fig.tight_layout(rect=(0, 0, 1, 0.975))
-    fig.savefig(out, dpi=135)
-    print(f"\n  figure: {out}")
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--kinetic", default="runs/P4/P4_lez_kin_bg")
-    ap.add_argument("--hybrid", default="runs/P4/P4_lez_hyb_bg3")
+    ap.add_argument("--leg", action="append", metavar="LABEL=PATH",
+                    help="a WarpX leg to include; repeatable. Kinetic or hybrid is decided "
+                         "from the run's own config. Default: "
+                         + "; ".join(f"{a}={b}" for a, b in LEGS_DEFAULT))
     ap.add_argument("--outdir", default="media/xcode")
     a = ap.parse_args()
+
+    spec = [tuple(q.split("=", 1)) for q in a.leg] if a.leg else list(LEGS_DEFAULT)
+    legs = [load_leg(lab, path, PALETTE[i % len(PALETTE)])
+            for i, (lab, path) in enumerate(spec)]
+
     banner()
     print(f"\nManheimer steady state  T_e,SS = 5.94 mu^(1/3) Z^(-1/3) lambda^(4/3) I^(2/3)")
     print(f"  real aluminium          : {TE_REF:.0f} eV")
     print(f"  at the REDUCED ion mass : {TSS_REDUCED:.1f} eV   "
           f"(mu is down {RESCALE:.2f}x, and T_e,SS ~ mu^(1/3))")
     print("  ^ this is the reference the WarpX legs must be judged against, NOT 823 eV.")
+    print("\nLEGS")
+    for leg in legs:
+        q = absorbed(leg["path"])
+        print(f"  {leg['label']:22s} {leg['path']:34s} "
+              f"{'hybrid' if leg['hybrid'] else 'kinetic':8s} "
+              + (f"<f_abs> {q['f_mean']:.3f}  E_abs {q['E_abs']:.4e} J/m2"
+                 if q else "(no run.log)"))
+    print(f"  {'FLASH (rad off)':22s} {FLASH_DIR.split('/')[-1]:34s} "
+          f"{'radhydro':8s} <f_abs> 0.870  E_abs 8.2740e+07 J/m2 "
+          f"(in its own, 18.36x longer, time base)")
+
     os.makedirs(a.outdir, exist_ok=True)
-    print("\nABSORBED LASER ENERGY -- quote this beside every temperature")
-    print(f"  {'leg':22s} {'E_abs[J/m2]':>13} {'<f_abs>':>9} {'f_abs(0)':>9} {'f_abs(end)':>11}")
-    for lab, rd in (("kinetic", a.kinetic), ("hybrid", a.hybrid)):
-        q = absorbed(rd)
-        if q:
-            print(f"  {lab+' '+os.path.basename(rd):22s} {q['E_abs']:13.4e} "
-                  f"{q['f_mean']:9.3f} {q['f_0']:9.3f} {q['f_end']:11.3f}")
-    print(f"  {'FLASH (rad off)':22s} {8.274e7:13.4e} {0.870:9.3f} "
-          f"{'--':>9} {'--':>11}   (in its own, 18.36x longer, time base)")
-    data, *_ = collect(a.kinetic, a.hybrid)
-    table(data)
-    figure(data, os.path.join(a.outdir, "profiles.png"))
-    history(a.kinetic, a.hybrid, os.path.join(a.outdir, "history.png"))
+    data, _ = collect(legs)
+    table(data, legs)
+    figure(data, legs, os.path.join(a.outdir, "profiles.png"))
+    history(legs, os.path.join(a.outdir, "history.png"))
     return 0
 
 
