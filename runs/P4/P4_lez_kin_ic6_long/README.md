@@ -1,0 +1,80 @@
+# P4_lez_kin_ic6_long — `P4_lez_kin_ic6` run 4× longer, to τ_own 108
+
+**Phase.** 4, `TEST_PLAN.md` §12.
+
+**Question.** Does the kinetic leg reach quasi-steady ablation at all, and at what
+temperature? `P4_lez_kin_ic6` ended with `T_e` **still climbing** (129.8 → 183.8 → 224.6 →
+271.2 eV, increments 54/41/47, no sign of a plateau) and `f_abs` still at **0.992**, so
+`f_abs`, `ζ_front` and `L_n` were all being read off a transient rather than a converged
+state.
+
+**This is not more benchmark.** FLASH ends at τ = 27 (1 ns) and, on the aligned clock, the
+kinetic leg already covers FLASH's entire run by τ_own = 24.3. There is no FLASH data beyond
+that. What this tests is the WarpX leg's *own* approach to steady state.
+
+**Expected.** `T_e` plateaus and `f_abs` falls away from 0.992 as the target goes underdense.
+Three outcomes, all informative:
+1. plateau near its own `T_e,SS` = 312 eV → right physics, slower approach; the τ = 27
+   disagreement is a transient;
+2. plateau elsewhere → converges to a genuinely different state, which is real disagreement;
+3. no plateau at all → something is pumping energy in — but see below, that is now unlikely.
+
+**Falsified by.** Outcome 3, which after the G3 result would need an explanation other than
+grid heating.
+
+**Why no numerical caveat.** `P4_lez_kin_ic6_off` (2026-08-19) measured the grid-heating
+contribution and found it **negative**: the laser-off run's electrons *cool* by 35 %, and the
+energy they lose turns up in the ions (+1.944e5 J against −1.794e5 J, closing to 8 %). So the
+parent's rising `T_e` is laser absorption, and `dz/λ_D` = 253 in the cold solid is harmless
+for this measurement — as the plume value of 1.8 predicted.
+
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -50                                                  z = +2450
+
+  #  target flat top : 10 n_cr, 45 d_e thick, centred at -22.5 d_e
+  ~  coronal ramp   : exponential, L_n = 6.955 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 5000 cells, dz = 0.5 d_e, dt = 0.09885 fs, 2211840 steps = 218.6 ps
+```
+
+## Setup
+`P4_lez_kin_ic6` with `max_step` 552 960 → **2 211 840**, and the diagnostic intervals scaled
+by the same 4× so the dump *count* is unchanged (`runs/README.md`'s `_long` rule) rather than
+producing 4× the data. Deck diff against the parent is duration and diagnostic cadence and
+nothing else.
+
+**Domain risk, recorded in advance.** The domain is unchanged at −50 … 2450 `d_e`. The
+parent's plume front reached 510 `d_e` — **21 %** — and its growth was *decelerating*
+(increments in ζ per 5.4 τ: 12.6, 11.2, 10.9, 7.4, 5.4). Extrapolating that, 4× duration
+lands near 1300 `d_e`, comfortably inside. But `T_e` is still rising, so the plume may
+*re-accelerate* as it heats, and the estimate is an extrapolation of a decelerating trend
+under a drive that has not saturated. The `hi` boundary is `open`, so an overshoot bleeds
+plume rather than reflecting it — the failure mode is a G6 energy-closure loss, not an
+instability. **Check the front against 2450 `d_e` before quoting anything from late times.**
+The domain was deliberately NOT enlarged, so the run stays comparable to its parent.
+
+## Cost
+5000 cells × 500 ppc × 2 211 840 steps. The parent was 21 min, so **~84 min** on one RTX 4070.
+
+## Gates
+| Gate | Value | Pass? |
+|---|---|---|
+| G1 `omega_pe dt` | 0.783 | PASS |
+| G2 `dz/lambda_D` solid / plume | 253 / 1.8 | INFO |
+| G3 laser-off control | **passed on the parent** — grid heating measured NEGATIVE | PASS (inherited) |
+| G4 `ray_cfl` | 0.25 | PASS |
+| G5 ppc | 500 | PASS |
+| G6 energy closure | **watch — see the domain risk** | post-run |
+
+## Result
+_Pending._
+
+## Retracted
+Nothing yet.

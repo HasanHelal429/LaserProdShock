@@ -339,14 +339,16 @@ def main():
                     help="profiles only: the times to overplot, in tau. Pass a "
                          "single 0 to choose them automatically from the range "
                          "the two codes actually share -- useful on a partial run")
-    ap.add_argument("--tau-offset", dest="tau_offset", type=float, default=0.0,
+    ap.add_argument("--tau-offset", dest="tau_offset", type=float, default=2.696,
                     help="shift the KINETIC leg by this much in tau before "
                          "comparing. A run initialised from a FLASH snapshot "
                          "starts its own clock at zero, but that state is "
                          "FLASH's t = 0.1 ns = tau 2.696 -- so comparing the "
-                         "two at equal tau compares states 2.7 apart. Default "
-                         "0 keeps the convention the RESULTS.md numbers were "
-                         "measured on; pass 2.696 to align the handoff")
+                         "two at equal tau compares states 2.7 apart. DEFAULT CHANGED "
+                         "2026-08-19 from 0 to 2.696 (aligned), to match "
+                         "xcode_compare.py -- two scripts disagreeing on the clock is a "
+                         "trap, not a convention. Pass 0 to reproduce the unaligned "
+                         "numbers every RESULTS.md entry before 2026-08-18 was measured on")
     ap.add_argument("--tol", type=float, default=TAU_TOL,
                     help="profiles only: how close a dump must be to a requested "
                          "tau, as a fraction of it. A dump further away is "
