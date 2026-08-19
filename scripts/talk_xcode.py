@@ -79,6 +79,12 @@ PANELS = {
     "front": ("zeta_front",    r"plume front  $\zeta$  [$d_{i0}$]"),
     "v":     ("v_at_0p1",      r"outflow  $v_z/C_{S0}$"),
     "Ln":    ("L_n",           r"scale length  $L_n/d_{i0}$"),
+    # SIMILARITY-REDUCED. T_e,SS ~ mu^(1/3) and the WarpX legs run 18.363x
+    # lighter, so raw eV and a shared 823 eV sound speed BOTH show a ~2.6x
+    # offset that is the unit map working (TEST_PLAN 12.2, corrected
+    # 2026-08-18). These two are the ones an acceptance claim is read on.
+    "Te_red": ("Te_red", r"$T_e\ /\ T_{e,SS}(\mathrm{own}\ \mu)$"),
+    "v_red":  ("v_red",  r"outflow  $v_z\ /\ C_S(\mathrm{own\ measured}\ T_e)$"),
 }
 
 
@@ -117,6 +123,15 @@ def series(kin, hyb, want=LEGS):
                 Te = s.get("Te")
             sc = X.scalars(s["zeta"], s["ne"], Te, s.get("v"))
             sc["tau"] = s["tau"]
+            # Reduced forms, derived here so the talk figure and the notebook
+            # figure cannot disagree about what "reduced" means.
+            ref = X.TE_REF if name == "FLASH" else X.TSS_REDUCED
+            Tp = sc.get("Te_mean_plume", np.nan)
+            sc["Te_red"] = Tp / ref if np.isfinite(Tp) else np.nan
+            vv = sc.get("v_at_0p1", np.nan)
+            sc["v_red"] = (vv / np.sqrt(Tp / X.TE_REF)
+                           if np.isfinite(vv) and np.isfinite(Tp) and Tp > 0
+                           else np.nan)
             rows.append(sc)
         out[name] = rows
     return out
@@ -478,6 +493,12 @@ def main():
             ax[j].axhline(X.TE_REF, color="0.45", ls=":", lw=1.2)
             ax[j].axhline(X.TSS_REDUCED, color="0.45", ls="--", lw=1.2)
             ax[j].set_ylim(0, 1000)
+        if k == "Te_red":
+            # One line now, because each leg carries its own reference.
+            ax[j].axhline(1.0, color="0.45", ls="--", lw=1.2)
+            ax[j].set_ylim(0, 2.0)
+            ax[j].text(0.4, 1.0, " each leg's own Manheimer value", va="bottom",
+                       fontsize=9, color="0.35")
 
     ax[0].legend(frameon=False, loc="upper left")
     fig.tight_layout()
