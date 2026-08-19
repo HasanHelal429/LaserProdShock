@@ -203,7 +203,26 @@ def _pick_near(series, tau, tol, key=None):
     return (hit, d) if d <= tol * max(tau, 1.0) else (None, d)
 
 
-def profiles(flash, kin, taus, ax, ylim, xlim, tol=TAU_TOL, colours=None):
+def despike(y, n):
+    """Rolling median over n cells, or the array untouched when n < 3.
+
+    Not cosmetic smoothing: this run loads an exponential ramp at fixed ppc, so
+    macroparticle weights span seven decades (CLAUDE.md), and one heavy
+    macroparticle landing in a tenuous cell spikes that single bin by an order
+    of magnitude. A median rejects an isolated cell and leaves a profile that
+    is resolved over several cells alone -- which a mean would not. Report the
+    window whenever the figure is shown.
+    """
+    if n is None or n < 3:
+        return y
+    n = int(n) | 1                                   # odd, so the window centres
+    pad = n // 2
+    padded = np.pad(np.asarray(y, float), pad, mode="edge")
+    return np.median(np.lib.stride_tricks.sliding_window_view(padded, n), axis=-1)
+
+
+def profiles(flash, kin, taus, ax, ylim, xlim, tol=TAU_TOL, colours=None,
+             smooth=0):
     """n_e(zeta) at several times, one colour per time, two codes per colour.
 
     Draws whatever is available and reports what is not, rather than failing or
@@ -233,7 +252,8 @@ def profiles(flash, kin, taus, ax, ylim, xlim, tol=TAU_TOL, colours=None):
                   + (f" (nearest is {dk:+.1f} away)" if dk is not None
                      else " (no kinetic data at all)"))
         else:
-            ax.semilogy(k["zeta"], k["ne"], color=col, lw=1.8, ls="--")
+            ax.semilogy(k["zeta"], despike(k["ne"], smooth), color=col,
+                        lw=1.8, ls="--")
             drawn += 1
     ax.axhline(1.0, color="0.45", ls=":", lw=1.2)
     ax.text(xlim[1], 0.86, r"$n_{cr}$", ha="right", va="top", color="0.35")
@@ -315,6 +335,11 @@ def main():
                          "species, or as Z n_i from the ions. With no ambient the "
                          "hot electron tail runs ahead of the plume, so ions is "
                          "the like-for-like comparison against a fluid code")
+    ap.add_argument("--smooth", type=int, default=0,
+                    help="profiles only: rolling-median window in CELLS applied "
+                         "to the kinetic profile. 0 or <3 leaves it raw. Use it "
+                         "to reject single-cell weight spikes; say the window "
+                         "out loud when you show the figure")
     ap.add_argument("--cmap", default=None,
                     help="profiles only: sample a matplotlib colormap for the "
                          "time colours instead of the built-in distinct set. "
@@ -401,7 +426,9 @@ def main():
         # is bound by the height and comes out half a slide wide.
         fig, ax = plt.subplots(figsize=tuple(a.figsize) if a.figsize else (9.5, 3.0))
         drawn = profiles(fl, kin, taus, ax, tuple(a.ylim), tuple(a.xlim),
-                         tol=a.tol, colours=colours)
+                         tol=a.tol, colours=colours, smooth=a.smooth)
+        if a.smooth and a.smooth >= 3:
+            print(f"  kinetic profile median-filtered over {int(a.smooth)|1} cells")
         if not drawn:
             raise SystemExit("error: nothing was drawn -- no dump in either code "
                              "landed near any requested tau. Run with --taus 0.")
