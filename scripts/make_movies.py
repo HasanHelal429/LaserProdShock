@@ -93,7 +93,7 @@ def _contiguous_front(n, z_de, floor, k=5):
     return float(z_de[ok].max()) if ok.any() else float("nan")
 
 
-def movie_fields(cfg, sc, rid, rd, fps, keep=False):
+def movie_fields(cfg, sc, rid, rd, fps, keep=False, zlim=None):
     """n_e(z) + B_y(z) lineouts, with f_abs(t) tracking underneath."""
     import matplotlib.pyplot as plt
     from plot_fields import load_series, electron_density
@@ -176,7 +176,7 @@ def movie_fields(cfg, sc, rid, rd, fps, keep=False):
             axes[k].set_ylabel("B$_y$ / B$_0$")
             k += 1
         for a in axes[:k]:
-            a.set_xlim(z_de[0], z_de[-1])
+            a.set_xlim(*(zlim if zlim else (z_de[0], z_de[-1])))
             a.axvline(x_in, color=lpp.C_LASER, lw=1.4, alpha=0.7)
             if "pec" in str(ax_bc):
                 for edge, sgn in ((z_de[0], +1), (z_de[-1], -1)):
@@ -204,7 +204,7 @@ def movie_fields(cfg, sc, rid, rd, fps, keep=False):
                       fps=fps, cleanup=not keep)
 
 
-def movie_phase(cfg, sc, rid, rd, fps, keep=False):
+def movie_phase(cfg, sc, rid, rd, fps, keep=False, zlim=None, vlim=None):
     """Ion (z, u_z) phase space, additive two-colour."""
     import matplotlib.pyplot as plt
     import yt
@@ -253,13 +253,14 @@ def movie_phase(cfg, sc, rid, rd, fps, keep=False):
                 vmax = max(vmax, float(np.percentile(np.abs(v), 99.5)))
         frames.append((float(ds.current_time), data))
 
-    z_edges = np.linspace(sc.domain_lo / sc.de_ref, sc.domain_hi / sc.de_ref, 300)
-    v_edges = np.linspace(-0.5 * vmax, 1.05 * vmax, 240)
+    z0, z1 = (zlim if zlim else (sc.domain_lo / sc.de_ref, sc.domain_hi / sc.de_ref))
+    v0, v1 = (vlim if vlim else (-0.5 * vmax, 1.05 * vmax))
+    z_edges = np.linspace(z0, z1, 300)
+    v_edges = np.linspace(v0, v1, 240)
     d = lpp.movie_dir(rid, "phase")
     bc = lpconfig.boundary_faces(cfg)[str(cfg["geometry"].get("normal_axis", "z"))]
 
-    v_hi_lim = 1.05 * vmax
-    v_lo_lim = -0.5 * vmax
+    v_hi_lim, v_lo_lim = v1, v0
     for i, (tt, data) in enumerate(frames):
         n_out = sum(int(((vv > v_hi_lim) | (vv < v_lo_lim)).sum())
                     for (_zz, vv, _ww) in data.values())
@@ -354,6 +355,15 @@ def main() -> int:
     ap.add_argument("run_dir")
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--only", choices=["fields", "phase", "map2d"], default=None)
+    ap.add_argument("--zlim", nargs=2, type=float, default=None, metavar=("ZMIN", "ZMAX"),
+                    help="z axis limits in d_e. The default spans the whole DOMAIN, which "
+                         "is right when the plume fills it and useless when it does not: "
+                         "P4_lez_kin_flashic's plume reaches 470 of 2464 d_e, so the "
+                         "default put the entire run in the left tenth of the frame.")
+    ap.add_argument("--vlim", nargs=2, type=float, default=None, metavar=("VMIN", "VMAX"),
+                    help="phase-space velocity limits in C_s(target). The default is the "
+                         "99.5th percentile of |v|, which a small fast tail can stretch "
+                         "far beyond the bulk.")
     ap.add_argument("--keep-frames", action="store_true",
                     help="keep the per-frame PNGs after encoding (for debugging a bad "
                          "movie); by default they are deleted, since they are a build "
@@ -382,9 +392,9 @@ def main() -> int:
     # crashed in the tracking panel and stranded 81 PNGs. Sweep on the way out as well.
     try:
         if "fields" in want:
-            movie_fields(cfg, sc, rid, rd, args.fps, keep)
+            movie_fields(cfg, sc, rid, rd, args.fps, keep, args.zlim)
         if "phase" in want:
-            movie_phase(cfg, sc, rid, rd, args.fps, keep)
+            movie_phase(cfg, sc, rid, rd, args.fps, keep, args.zlim, args.vlim)
         if "map2d" in want and sc.dims == 2:
             movie_map2d(cfg, sc, rid, rd, args.fps, keep)
     except BaseException:
