@@ -84,7 +84,45 @@ the injected population is cold (`u_std` = `sqrt(th_ts)`, the solid temperature)
 than silently heating the reservoir.
 
 ## Result
-_Pending._
+
+**The hypothesis is FALSIFIED, on the criterion stated above.** 14 min on one RTX 4070,
+149 184 steps, no NaN, `--verify` OK, all 11 `target_injector` keys present in
+`warpx_used_inputs`.
+
+**The injector demonstrably worked**, so this is a real null result and not an insensitive
+test:
+
+| | `_ct` (foil) | **`_res` (pinned)** |
+|---|---|---|
+| total electron weight, end/start | **1.000** | **1.146** (+29 310 macroparticles) |
+| weight inside the pinned box at end | 6.12e23 | **8.10e23 (+32 %)** |
+
+And yet, at τ = 27, against FLASH:
+
+| | `_ct` | **`_res`** | FLASH |
+|---|---|---|---|
+| plume front `ζ` | 43.7 | **43.7 — unchanged** | 94.6 |
+| `n_e/n_cr` at ζ = 70 | 0.0 | **4.7e-8** | 3.3e-2 |
+| `L_n` | 23.3 | **17.9 (moved AWAY)** | 21.4 |
+| plume `T_e` | 124.2 eV | 130.1 eV | 839.0 eV |
+| `f_abs` | 0.603 | 0.637 | 0.870 |
+| profile-shape raw slope std | 1.050 | **0.933** | 0.330 |
+
+**Feeding the target does not lengthen the plume.** The added mass stays in the slab —
+peak `n_e` goes 46.3 → 47.0, i.e. it was *already compressing* rather than running out.
+The cliff is still a cliff. The shape improves by 11 % against a gap of 3.2×.
+
+In hindsight the null was predictable from one number this run supplies: `_ct`'s total
+weight ratio is **exactly 1.000** — over the entire run **no weight ever left the domain**.
+The "5–15 % consumed" figure describes material moving from slab to plume, not mass being
+lost, so there was never a global deficit for a reservoir to fill. There *was* a local one
+inside the box (hence the +32 %), and filling it changed nothing downstream.
+
+**Decision D5 is therefore not the cause of the profile-shape discrepancy**, which is worth
+knowing: it was the leading suspect and it is now eliminated at a cost of 14 GPU-minutes.
 
 ## Retracted
-Nothing yet.
+
+Nothing from this run. But the reasoning that motivated it — "FLASH ablates 0.275 % of its
+reservoir and we lose 5–15 %, so the reservoir is the difference" — is **not** supported:
+the mass budget differs as stated, and it does not drive the profile shape.

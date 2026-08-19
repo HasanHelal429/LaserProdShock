@@ -3628,3 +3628,78 @@ Three distinct causes are now separated, and only one of them is the closure:
 3. **No electron conduction** — the residual 18–50 % of shape variance, plus the far-field
    `T_e` maximum in `kin_bg`. This is D2b/D3-Appendix-C and is the one that needs the
    `conducting` closure or a heat-flux measurement.
+
+---
+
+## 2026-08-18 (final, last) — The semi-infinite reservoir is NOT the cause: `TargetInjector` plumbed, run, and the hypothesis falsified
+
+`runs/P4/P4_lez_kin_flashic_res` (new, 149 184 steps, **14 min** on one RTX 4070, no NaN,
+`--verify` OK). `src/laserprod/{deck,config}.py` gain an `injector:` block;
+`tests/test_injector_schema.py` (10 checks). 345 tests pass.
+
+### The tooling gap, closed
+WarpX's `TargetInjector` — a density-relaxation injector ported from PSC's `InjectFoil` —
+was **already compiled into `build_cuda1d`** but **not expressible in `config.yaml`**, so
+the reservoir test could not be run without hand-editing a deck. `make_inputs.py` now emits
+`target_injector.*`, and `config.validate` refuses, at config time rather than after the
+queue hands over the GPU: unknown species names, a box outside the domain, an inverted box,
+non-positive `tau`/`ppc`, and **pinning above the target's own density** — the operator
+replenishes a *deficit*, so a higher value is a particle **source** and breaks G6 rather
+than crashing.
+
+Two details that would have failed silently:
+* injected ions carry **`u_std = sqrt(th_tis/mass_ratio)`** like every other ion block.
+  Omitting the division injects ions hot by √2698 = **52×** and heats the reservoir the
+  injector exists to hold cold.
+* injected particles carry the **SOLID** temperatures (`th_ts`), not the corona's — they
+  stand for undisturbed material behind the ablation front.
+
+### The run: a genuine single-variable test
+The deck differs from `P4_lez_kin_flashic_ct` **in the injector block and nothing else**
+(verified by diff) — which the parent, changing two things at once, was not. The box pins
+the **rear half** of the slab (−200 → −100 `d_e`) at its own 40 `n_cr`, stopping 100 `d_e`
+short of the laser-facing face so the ablation front stays free.
+
+### FALSIFIED — and the injector demonstrably worked, so it is a real null
+
+| | `_ct` (foil) | `_res` (pinned) |
+|---|---|---|
+| total electron weight end/start | 1.000 | **1.146** (+29 310 macroparticles) |
+| weight inside the pinned box | 6.12e23 | **8.10e23 (+32 %)** |
+| plume front `ζ` at τ = 27 | 43.7 | **43.7 (unchanged)** — FLASH 94.6 |
+| `n_e/n_cr` at ζ = 70 | 0.0 | 4.7e-8 — FLASH **3.3e-2** |
+| `L_n` | 23.3 | **17.9**, i.e. AWAY from FLASH's 21.4 |
+| plume `T_e` | 124.2 eV | 130.1 eV |
+| `f_abs` | 0.603 | 0.637 |
+| shape raw slope std | 1.050 | **0.933** — FLASH **0.330** |
+
+**Feeding the target does not lengthen the plume.** The added mass stays in the slab (peak
+`n_e` 46.3 → 47.0 — it was already *compressing*, not running out). The plateau-and-cliff
+survives intact. The profile shape improves **11 %** against a **3.2×** gap.
+
+### The number that made the null predictable, and was there all along
+`_ct`'s total electron weight ratio over the whole run is **exactly 1.000** — **no weight
+ever left the domain.** The "PIC loses 5–15 % of its reservoir" figure describes material
+moving from slab to plume, *not* mass being lost, so there was never a global deficit for a
+reservoir to fill. A local deficit did exist inside the box (hence +32 %), and filling it
+changed nothing downstream. **I should have checked the weight budget before building the
+feature** — it cost ~1 h of plumbing to learn something one diagnostic would have said.
+The plumbing is not wasted (it is the tool D5 always needed), but the ordering was wrong.
+
+### Where the discrepancy now stands — one cause left standing
+Of the three separated on 2026-08-18:
+
+1. ~~**Finite reservoir**~~ — **ELIMINATED** by this run, at 14 GPU-minutes.
+2. **Unrelaxed initial condition** — still live for `flashic` (its corona as a detached
+   shell), but `flashic_ct`/`_res` show the cliff *without* a shell, so it is not the whole
+   story either.
+3. **No electron heat conduction** — **now the leading cause by elimination.** FLASH's
+   smooth exponential is a statement that its plume is isothermal, enforced by
+   flux-limited Spitzer-Härm; WarpX has no conduction operator, its `T_e` is not flat, and
+   `kin_bg`'s `T_e` *maximum* sits in the tenuous far field. `D2b` (the hybrid `conducting`
+   closure) and `D3` Appendix C (the heat-flux gate) are the two tests that address it, and
+   **neither has ever been run**.
+
+Cost note: `f_abs` is now 0.637 against FLASH's 0.870 and plume `T_e` is 1.25× its own
+Manheimer value, so this leg is over-performing its absorbed flux by a wider margin than
+before — unchanged in kind from the parent, and still unexplained.

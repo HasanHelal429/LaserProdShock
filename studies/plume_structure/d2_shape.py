@@ -36,7 +36,8 @@ import xcode_compare as X
 
 LEGS = (("kin_bg",     "runs/P4/P4_lez_kin_bg",         2698.0),
         ("flashic",    "runs/P4/P4_lez_kin_flashic",    2698.0),
-        ("flashic_ct", "runs/P4/P4_lez_kin_flashic_ct",  100.0))
+        ("flashic_ct", "runs/P4/P4_lez_kin_flashic_ct",  100.0),
+        ("flashic_res","runs/P4/P4_lez_kin_flashic_res", 100.0))
 TAUS = (6.7, 13.5, 20.3, 27.0)
 BAND = (1e-2, 1.0)          # the underdense comparison band, TEST_PLAN 12.6
 
