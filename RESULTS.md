@@ -4328,10 +4328,15 @@ reservoir), not a longer run.
 
 1. **`f_abs` rose; it did not fall.** The README expected absorption to fall away from 0.992
    as the target went underdense. Time-mean `f_abs` by window: **0.282** (τ<10) → 0.614 →
-   0.859 → 0.954 → **0.975** (τ 78–108); whole-run mean **0.823**. The *plume* becomes
-   optically thick over its 2500 `d_e` length long before the target thins — `Vskip` (the
-   fraction of the axis the ray march skips as empty) reaches **0 by τ ≈ 30** and stays
-   there. The absorber stops being the target and becomes the plume.
+   0.859 → 0.954 → **0.975** (τ 78–108); whole-run mean **0.823**. The absorbing column is
+   the **inner corona**, which lengthens as the target ablates: the deposition median moves
+   4.3 → 38.8 → 114.3 → **236.8 `d_e`** (τ 0/27/54/81), always sitting near critical
+   (`n_e` = 0.76 → 0.43 `n_cr`), and the 90 % quantile reaches only 590 `d_e`.
+   **The far plume absorbs nothing** — 0.0 % of `P_abs` lands beyond 1500 `d_e` at every
+   dump, and 84.8 % is still inside 500 `d_e` at τ 81. `Vskip` → 0 by τ ≈ 30 means only that
+   no cell is *empty*, not that the far plume is optically active. Consequence for design:
+   **box size does not set `f_abs`**, so the domain need only contain the absorbing corona
+   (plus margin), not the whole plume.
 2. **The domain risk half-materialised.** The `1e-2 n_cr` front hit the 2450 `d_e` wall at
    **τ 78.2**; the bulk `0.1 n_cr` contour only reached **1302 `d_e`**, comfortably inside,
    vindicating the README's extrapolation for the bulk but not for the tenuous precursor.
@@ -4379,3 +4384,73 @@ the same kind of sample. **Quote a time-mean over a stated window instead.**
 ### Media
 `media/P4/P4_lez_kin_ic6_long/{movie_fields,movie_phase}.mp4`, `laser_history.png`,
 `laser_profile.png`, `checks.png`, `gates.png`.
+
+---
+
+## 2026-08-19 (convergence) — **the τ = 27 FLASH agreement is a coincidence of the transient**, and the real disagreement is 1.6–2.0×
+
+Prompted by `P4_lez_kin_ic6_long`. Both codes' `T_e` histories were fitted to the same
+model, `T(τ) = T_∞ − A exp(−τ/τ_relax)`, with the same `xcode_compare` scalars, and each
+normalised by **its own** `T_e,SS` (FLASH 823 eV at real mass; WarpX 312 eV at μ = 2698 —
+the μ^(1/3) transfer).
+
+| `Te_at_cr` | `τ_relax` | at τ 27 | converged `T_∞` | /own `T_e,SS` at τ27 | /own at ∞ |
+|---|---|---|---|---|---|
+| FLASH | **3.99** | 646.1 eV | 631.5 ± 5.5 eV | 0.785 | 0.767 |
+| WarpX `ic6_long` | **44.33** | 214.3 eV | 381.5 ± 21.5 eV | 0.687 | 1.223 |
+| **WarpX/FLASH** | | | | **0.875** | **1.594** |
+
+| `Te_mean_plume` | `τ_relax` | at τ 27 | converged `T_∞` | /own at τ27 | /own at ∞ |
+|---|---|---|---|---|---|
+| FLASH | **5.54** | 839.0 eV | 817.5 ± 6.2 eV | 1.019 | 0.993 |
+| WarpX `ic6_long` | **60.22** | 272.8 eV | 620.0 ± 11.5 eV | 0.874 | 1.988 |
+| **WarpX/FLASH** | | | | **0.858** | **2.001** |
+
+### The finding
+
+**At τ = 27 the two codes agree to 12–14 % in similarity units — inside the paper's 20 %
+tolerance — and that agreement is worthless as validation.** FLASH is **99.9 %** converged at
+τ 27; WarpX is **36–46 %**. WarpX is crossing FLASH's converged value *on its way up*. Run
+either code a little longer and the agreement evaporates: extrapolated to convergence the
+same comparison reads **1.59×** and **2.00×**.
+
+This inverts the natural reading of the extended run. The slow WarpX approach does **not**
+excuse the τ = 27 disagreement — at τ = 27 there barely *is* one. What the extended run
+reveals is a disagreement that the τ = 27 snapshot **hid**.
+
+### Why WarpX relaxes 11× slower, and what that is worth
+
+Observed ratio of `τ_relax` (`Te_at_cr`): **44.33/3.99 = 11.1**. Two contributions:
+
+1. **The reduced mass ratio, a factor 4.285.** `v_th,e`/`C_S` = √(μ/Z), so on the ion clock
+   τ = `d_i0`/`C_S0` electron transport is √(49542/2698) = **4.285×** slower at μ = 2698 than
+   at real mass. A conduction-limited relaxation is stretched by exactly that.
+   **This predicts FLASH's `τ_relax` = 44.3/4.285 = 10.3, and FLASH measures 3.99** — so the
+   mass ratio is real but accounts for only part of it. Prediction not confirmed; recorded as
+   made.
+2. **The missing mass reservoir, the residual factor 2.6.** FLASH ablates a thin front off a
+   deep solid — its `n_peak` *rises* 795 → **4141 `n_cr`** over the run. `ic6_long` had no
+   reservoir at all: `n_peak` fell 10 → 1.14 and the whole slab decompressed. Decision D5
+   already held that the overdense interiors are different objects; this shows the difference
+   **sets the relaxation time**, not merely the profile.
+
+### The consequence, and the caveat that matters most
+
+**`ic6_long`'s fitted `T_∞` is probably not an ablation steady state at all.** It is the
+asymptote of a decompressing slab, fitted over a run in which the target was being consumed
+throughout. Quoting "WarpX converges to 2× its own Manheimer steady state" as a physics
+result would be over-reading it — Manheimer describes steady ablation, which this run never
+performed.
+
+That is what `P4_lez_kin_thick` (set up 2026-08-19, 200 `d_e`, ~2.5 h) is for, and it now
+carries a **falsifiable pre-registered prediction**: with a real reservoir, `τ_relax` should
+fall from 44.3 toward **3.99 × 4.285 ≈ 17**, and the converged `T_e` should come **down**
+toward 1.0 × its own `T_e,SS`. **If it does not — if WarpX still converges to ~2× with a deep
+reservoir intact — the disagreement is real physics rather than target design**, and the
+prime suspect becomes collisions under a reduced mass ratio (TEST_PLAN 12.8 risk 1).
+
+### Method note
+FLASH's `Te_at_cr` (631.5 eV) and its band mean (817.5 eV) differ by 1.29×, and only the band
+mean is close to its Manheimer 823. So **the choice of comparator changes the answer** and
+must be stated: the tables above compare each statistic to itself across codes, which is the
+only defensible form.
