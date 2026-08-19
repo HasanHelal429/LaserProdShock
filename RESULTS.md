@@ -4454,3 +4454,51 @@ FLASH's `Te_at_cr` (631.5 eV) and its band mean (817.5 eV) differ by 1.29×, and
 mean is close to its Manheimer 823. So **the choice of comparator changes the answer** and
 must be stated: the tables above compare each statistic to itself across codes, which is the
 only defensible form.
+
+---
+
+## 2026-08-19 (Fig. 3) — the paper's Fig. 3 recreated with a WarpX leg, and it agrees far better than raw eV suggested
+
+`scripts/paper_fig3.py` (new) recreates Lezhnin et al. 2025 Fig. 3 — the five-panel
+FLASH-vs-PIC profile comparison, (a) `n_e`, (b) `T_e`, (c) `T_i`, (d) `v_z`, (e) laser
+deposition — with **`P4_lez_kin_ic6`** standing in for the paper's PSC run, at the paper's own
+times **0.2/0.4/0.6/0.8 ns** in red/blue/green/magenta, FLASH solid and WarpX dashed.
+Output: `media/P4/P4_lez_kin_ic6/paper_fig3.png` (similarity units) and `paper_fig3_eV.png`
+(the paper's absolute axis).
+
+### Three things the figure required getting right
+
+1. **Use `ic6`, not `ic6_long`.** `ic6` dumps particles every **1.348 τ**, and the paper's
+   four times land on that grid to **0.002 τ**. `ic6_long` dumps every 5.391 τ, and the 2.696
+   clock offset is almost exactly *half* of that — so the paper's grid lands mid-interval and
+   `pick` takes the earlier dump every time, biasing **every** WarpX curve **2.695 τ early**.
+   The script now anchors on the WarpX dump and pulls FLASH to the same aligned time
+   (`--snap`, default on), so a colour pair is genuinely simultaneous.
+2. **`T` must be normalised by each code's OWN `T_e,SS`.** Every other axis already is
+   (`ζ`/`d_i0`, `v`/`C_S0`, `n_e`/`n_cr`). In raw eV, FLASH's 800 eV against WarpX's 300 eV
+   reads as catastrophic disagreement; against 823 and 312 eV respectively it is **0.97 vs
+   0.96**. `--tnorm tss` is the default for exactly this reason; `--tnorm none` reproduces the
+   paper's absolute axis.
+3. **Mask the moments where there is no plasma.** FLASH's delivered `T_i` carries a known
+   vacuum artifact reaching **~1.4e5 eV** (`P4_lez_flash/DELIVERY.md`), which autoscaled panel
+   (c) into uselessness; a WarpX per-bin moment in the far wing is a handful of
+   macroparticles. `--nfloor` (default 1e-3 `n_cr`) blanks both.
+
+### What it shows
+
+- **(b) `T_e` agrees well in the inner plume** — both codes sit at 0.85–1.0 `T_e,SS` out to
+  ζ ≈ 15. Beyond that WarpX **rises above 1** while FLASH stays isothermal. That is the
+  paper's own reported PSC-vs-FLASH distinction ("the PSC electron temperature profile is
+  doubly peaked… one peak near the critical surface and another at the edge of the expanding
+  plasma… this contrasts with the isothermal plasma expansion observed in FLASH"), and the
+  WarpX leg **reproduces PSC's behaviour, not FLASH's**.
+- **(a)** near-corona densities agree; the WarpX plume falls off faster at every time.
+- **(c)** WarpX's `T_i` runs hotter than FLASH's, increasingly so late and far out.
+- **(d)** `v_z` agrees at 0.2 ns and WarpX is progressively slower after.
+- **(e)** deposition peaks at the same place with a similar shape; WarpX's is spikier.
+
+### Also
+Added `Ti` to `xcode_compare.warpx_particles` (additive; 391 tests pass, `talk_xcode` still
+imports). Panel (e) is only populated because `ic6`'s deposition dumps happen to fall at
+τ_own 0/6.7/13.5/20.2 — that cadence is the `profile_intervals`-not-a-multiple-of-
+`laser.intervals` bug, which asked for 20 dumps and wrote 4. Fixed in `P4_lez_kin_thick`.

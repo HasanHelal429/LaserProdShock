@@ -260,6 +260,18 @@ def warpx_particles(run_dir, species, nbin=400, sc=None):
                 acc["v"] = np.where(ok, sv / np.where(ok, sw, 1), np.nan) / sc["cs0"]
                 acc["ni"] = dens
                 acc.setdefault("ne", dens * Z_AL)        # quasineutral fallback
+                # Ion temperature, same second-moment-minus-drift form as the electrons.
+                # m_i c^2 in eV is mass_ratio * 511 keV. Needed by paper_fig3.py panel (c);
+                # additive, so existing callers are unaffected.
+                u2i = (un * un).sum(axis=1)
+                s2i, _ = np.histogram(z, bins=edges, weights=w * u2i)
+                mu2i = np.where(ok, s2i / np.where(ok, sw, 1), np.nan)
+                dri = np.zeros_like(mu2i)
+                for k in range(3):
+                    ski, _ = np.histogram(z, bins=edges, weights=w * un[:, k])
+                    mki = np.where(ok, ski / np.where(ok, sw, 1), 0.0)
+                    dri += mki * mki
+                acc["Ti"] = (mu2i - dri) / 3.0 * (sc["mass_ratio"] * 511e3)
             else:
                 un = u / (ME * C)
                 u2 = (un * un).sum(axis=1)
