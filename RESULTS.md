@@ -4062,3 +4062,46 @@ Fig.-2 initial-condition number (τ = 0 on both clocks by construction).
 ### Figures
 `media/xcode/` rebuilt with three curves — FLASH, `kinetic, 6 decades` (`L_ppc500`) and
 `hybrid` — on the aligned clock. The dropped legs stay one `--leg` away.
+
+---
+
+## 2026-08-18 (last, correction) — the six-decade result was measured on the WRONG corona; `P4_lez_kin_ic6` fixes it
+
+`L_ppc2000` (40 %) and `L_ppc10000` (0.2 %) **killed**. Two reasons, both sound: ppc is not
+the lever (500 vs 2000 gave `RISE` 0.945 vs 0.944 at τ = 6.7, a 0.1 % move), and **every
+ladder rung inherited `P4_lez_kin`'s analytic Gaussian corona** — the initial condition that
+*fails* the paper's own Fig.-2 acceptance test.
+
+### The mistake
+`L_ppc500` produced the largest single step toward FLASH all campaign — `T_e` rise
+1.504 → 1.133 against FLASH's 1.148, from widening the resolved density range alone. But it
+was generated from `P4_lez_kin`, whose corona is the analytic Gaussian: **peak laser
+deposition at ζ = 4.13 against FLASH's 0.27, critical surface 4.08 against 0.27**. The
+density-floor A/B remains valid (both sides carried the same corona) but the leg is not a
+FLASH match, and it should not have gone into the comparison figure as one.
+
+### `P4_lez_kin_ic6` — six decades AND the FLASH-fitted corona
+`L_ppc500`'s geometry and dynamic range, with `P4_lez_kin_flashic`'s exponential corona,
+temperatures and initial drift, on the **paper-faithful target** (10 `n_cr`, 4.5 `d_i0`)
+rather than `flashic`'s reservoir-motivated 40 and 20 — the reservoir having been falsified
+earlier today, and the paper's own `n_max` scan finding `T_e` matches for `n_max` ≳ 5 `n_cr`.
+
+**It passes the Fig.-2 acceptance test, measured from its step-0 deposition dump:**
+
+| leg | ζ(critical surface) | max `T_e` | **peak `P_abs` at ζ** |
+|---|---|---|---|
+| **FLASH** | 0.27 | 379.4 eV | **0.27** |
+| **`P4_lez_kin_ic6`** | **0.23** | 408.2 eV | **0.28** ✓ |
+| `P4_lez_kin_flashic` | 0.23 | 419.5 eV | 0.28 ✓ |
+| `L_ppc500` (Gaussian) | 4.08 | 108.3 eV | **4.13** ✗ |
+
+**And all four pre-run gates pass for the first time in this phase** (`ω_pe·dt` = 0.783,
+`dz/λ_D` = **58.1** against 116 on the 100 eV corona — the hotter FLASH corona doubles the
+Debye resolution). Every earlier Phase-4 deck carried two warnings.
+
+### What is still true from the ladder
+* **The density floor is the dominant lever on the `T_e` shape** — `P4_lez_kin` vs
+  `L_ppc500`, single-variable, 1.504 → 1.133. That A/B is clean.
+* **ppc is not** — 0.1 % across 4×, at τ = 6.7.
+* Both were measured on the Gaussian corona, so whether the floor result *transfers* to the
+  correct IC is exactly what `P4_lez_kin_ic6` now tests.
