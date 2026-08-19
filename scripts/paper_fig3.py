@@ -64,7 +64,9 @@ def warpx_depo(run_dir, sc):
         d = np.loadtxt(p)
         z = d[:, 0] / sc["di0"]
         P = np.maximum(np.nan_to_num(d[:, 3]), 0.0)
-        out.append(dict(step=step, zeta=z, P=P))
+        # column 1 is n_e in m^-3 (the file's own header) -- kept so the critical surface
+        # can be marked on the SAME grid the deposition was written on.
+        out.append(dict(step=step, zeta=z, P=P, ne=np.nan_to_num(d[:, 1]) / xc.N_CR))
     return out
 
 

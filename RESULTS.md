@@ -4502,3 +4502,39 @@ Added `Ti` to `xcode_compare.warpx_particles` (additive; 391 tests pass, `talk_x
 imports). Panel (e) is only populated because `ic6`'s deposition dumps happen to fall at
 τ_own 0/6.7/13.5/20.2 — that cadence is the `profile_intervals`-not-a-multiple-of-
 `laser.intervals` bug, which asked for 20 dumps and wrote 4. Fixed in `P4_lez_kin_thick`.
+
+---
+
+## 2026-08-19 (deposition) — deposition split by time: **WarpX's critical surface sits at half FLASH's ζ**, and that is why its absorption is concentrated
+
+`scripts/paper_fig3e.py` (new) plots Fig. 3(e) alone, one stacked panel per time, shared log
+axis. Output `media/P4/P4_lez_kin_ic6/paper_fig3e_bytime.png`.
+
+**Times anchor on the WarpX deposition dumps**, not the paper's grid — the deposition profile
+is written on `profile_intervals`, which is far coarser than the plotfile cadence, so
+anchoring on 0.2/0.4/0.6/0.8 ns leaves panels with no WarpX curve at all. FLASH is pulled to
+the same aligned time, giving three simultaneous panels.
+
+| `t_FLASH` | `τ_F`/`τ_W` | `ζ_cr` FLASH | `ζ_cr` WarpX | median `ζ` FLASH | median `ζ` WarpX | ratio | 90 % `ζ` F/W |
+|---|---|---|---|---|---|---|---|
+| 0.35 ns | 9.4 / 6.7 | 1.33 | **0.78** | 1.89 | 1.40 | 1.35 | 4.87 / 4.05 |
+| 0.60 ns | 16.2 / 13.5 | 2.61 | **1.27** | 3.47 | 1.90 | 1.82 | 10.24 / 7.14 |
+| 0.85 ns | 22.9 / 20.2 | 3.56 | **1.71** | 5.94 | 3.73 | 1.59 | 17.81 / 11.80 |
+
+### What the split panels show that the combined one could not
+
+1. **Both codes put the deposition peak just outside their own critical surface** — the
+   operator is doing the right thing; the peak is not misplaced relative to the physics.
+2. **WarpX's critical surface is at roughly HALF FLASH's `ζ` at every time** (0.78/1.33,
+   1.27/2.61, 1.71/3.56 — a ratio of 0.59, 0.49, 0.48). The WarpX critical surface simply has
+   not moved out as far.
+3. **That, and not a defect in the deposition kernel, is what "the absorption is too
+   concentrated" means.** The median deposition `ζ` differs by only 1.35–1.82×, and the 90 %
+   width by 1.2–1.5× — much less than the concentration ratio quoted earlier from a different
+   measure. The deposition column is anchored on the critical surface, so a critical surface
+   at half the distance drags the whole profile inward with it.
+4. Beyond ζ ≈ 10 FLASH's profile decays much more slowly, matching its shallower density
+   profile in Fig. 3(a). WarpX's far tail is macroparticle noise, not structure.
+
+This reframes the deposition discrepancy as a **consequence of the density profile**, i.e. of
+where the critical surface sits, rather than an independent problem with the laser operator.
