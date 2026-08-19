@@ -82,20 +82,36 @@ PANELS = {
 }
 
 
-def series(kin, hyb):
-    """The same three legs history() builds, in the same units."""
-    F = X.flash_series(X.FLASH_DIR, "lez1d")
-    K = X.warpx_particles(kin, X.SP_KIN)
-    H = X.warpx_particles(hyb, X.SP_HYB)
-    Hf = X.warpx_fields(hyb)
+LEGS = ("FLASH", "kinetic", "hybrid")
+
+
+def series(kin, hyb, want=LEGS):
+    """The same legs history() builds, in the same units.
+
+    `want` selects which to load as well as which to draw -- a leg nobody asked
+    for should not cost a pass over its plotfiles, and should not be able to
+    fail the figure by being absent.
+    """
+    raw = {}
+    if "FLASH" in want:
+        raw["FLASH"] = X.flash_series(X.FLASH_DIR, "lez1d")
+    if "kinetic" in want:
+        raw["kinetic"] = X.warpx_particles(_require_dir(kin, "kinetic run"),
+                                           X.SP_KIN)
+    Hf = None
+    if "hybrid" in want:
+        raw["hybrid"] = X.warpx_particles(_require_dir(hyb, "hybrid run"),
+                                          X.SP_HYB)
+        # The hybrid has no electron macroparticles, so its T_e is the Te FIELD.
+        Hf = X.warpx_fields(hyb)
     out = {}
-    for name, S in (("FLASH", F), ("kinetic", K), ("hybrid", H)):
+    for name, S in raw.items():
         rows = []
         for s in S:
             if s["tau"] <= 0:
                 continue
             if name == "hybrid":
-                hf = X.pick(Hf, s["tau"], "Te")
+                hf = X.pick(Hf, s["tau"], "Te") if Hf else None
                 Te = np.interp(s["zeta"], hf["zeta"], hf["Te"]) if hf else None
             else:
                 Te = s.get("Te")
@@ -272,12 +288,23 @@ def main():
     ap.add_argument("--kinetic", default="runs/P4/P4_lez_kin_bg")
     ap.add_argument("--hybrid", default="runs/P4/P4_lez_hyb_bg3")
     ap.add_argument("--figure", choices=("history", "profiles"), default="history")
+    ap.add_argument("--legs", default=",".join(LEGS),
+                    help="history only: comma list from " + ",".join(LEGS) +
+                         ". A leg left out is not loaded at all")
     ap.add_argument("--panels", default="front,v",
                     help="history only: comma list from " + ",".join(PANELS))
     ap.add_argument("--taus", type=float, nargs="+", default=(6.7, 13.5, 20.3, 27.0),
                     help="profiles only: the times to overplot, in tau. Pass a "
                          "single 0 to choose them automatically from the range "
                          "the two codes actually share -- useful on a partial run")
+    ap.add_argument("--tau-offset", dest="tau_offset", type=float, default=0.0,
+                    help="shift the KINETIC leg by this much in tau before "
+                         "comparing. A run initialised from a FLASH snapshot "
+                         "starts its own clock at zero, but that state is "
+                         "FLASH's t = 0.1 ns = tau 2.696 -- so comparing the "
+                         "two at equal tau compares states 2.7 apart. Default "
+                         "0 keeps the convention the RESULTS.md numbers were "
+                         "measured on; pass 2.696 to align the handoff")
     ap.add_argument("--tol", type=float, default=TAU_TOL,
                     help="profiles only: how close a dump must be to a requested "
                          "tau, as a fraction of it. A dump further away is "
@@ -311,6 +338,12 @@ def main():
     bad = [k for k in keys if k not in PANELS]
     if bad:
         ap.error(f"unknown panel(s) {bad}; choose from {list(PANELS)}")
+    want = [l.strip() for l in a.legs.split(",") if l.strip()]
+    bad = [l for l in want if l not in LEGS]
+    if bad:
+        ap.error(f"unknown leg(s) {bad}; choose from {list(LEGS)}")
+    if not want:
+        ap.error("--legs left nothing to draw")
 
     import matplotlib
     matplotlib.use("Agg")
@@ -333,6 +366,10 @@ def main():
             raise SystemExit(f"error: no lez1d plotfiles under {X.FLASH_DIR}")
         load = warpx_ne_from_ions if a.src == "ions" else X.warpx_fields
         kin = load(a.kinetic)
+        if a.tau_offset:
+            for q in kin:
+                q["tau"] += a.tau_offset
+            print(f"  kinetic leg shifted by tau {a.tau_offset:+.3f}")
 
         tf = coverage(fl, "FLASH")
         tk = coverage(kin, f"kinetic ({os.path.basename(a.kinetic)})")
@@ -375,14 +412,23 @@ def main():
         print(f"  figure: {out}  ({drawn} curves)")
         return 0
 
-    ser = series(a.kinetic, a.hybrid)
-    fs = tuple(a.figsize) if a.figsize else (5.2 * len(keys), 4.3)
+    ser = series(a.kinetic, a.hybrid, want)
+    if a.tau_offset and "kinetic" in ser:
+        for q in ser["kinetic"]:
+            q["tau"] += a.tau_offset
+        print(f"  kinetic leg shifted by tau {a.tau_offset:+.3f}")
+    # One panel goes on a slide the same way the profiles figure does: full text
+    # width, ~4 cm of height under the bullets. Several panels sit side by side
+    # and can afford to be squarer.
+    fs = (tuple(a.figsize) if a.figsize else
+          ((10.5, 3.0) if len(keys) == 1 else (5.2 * len(keys), 4.3)))
     fig, ax = plt.subplots(1, len(keys), figsize=fs, squeeze=False)
     ax = ax[0]
 
     for j, k in enumerate(keys):
         field, label = PANELS[k]
-        for name, col in X.COLS.items():
+        for name in want:
+            col = X.COLS[name]
             r = ser[name]
             ls = "-" if name == "FLASH" else ("--" if name == "kinetic" else "-.")
             ax[j].plot([q["tau"] for q in r], [q.get(field, np.nan) for q in r],
@@ -390,6 +436,10 @@ def main():
                        label=name)
         ax[j].set_xlabel(r"$\tau = t/(d_{i0}/C_{S0})$")
         ax[j].set_title(label)
+        # A short wide panel gets thinned to two y ticks, which reads as though
+        # the axis were unlabelled.
+        import matplotlib.ticker as mt
+        ax[j].yaxis.set_major_locator(mt.MaxNLocator(4))
         ax[j].set_xlim(0, 27.5)
         ax[j].grid(alpha=0.15)
         for side in ("top", "right"):
