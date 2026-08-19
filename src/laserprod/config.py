@@ -656,8 +656,12 @@ def _geometry_diagram_2d(cfg: dict, width: int = 58, height: int = 17) -> str:
     a(f"  #  target flat top : {tgt['density_over_ncr']:g} n_cr, "
       f"{tgt['thickness_de']:g} d_e thick, centred at {centre:+g} d_e{extra}")
     if Ln > 0:
-        a(f"  ~  coronal ramp   : Gaussian, L_n = {Ln:g} d_e on the LASER-FACING side "
-          f"(face at z = {face0:+g}), drawn out to 1e-3 n_cr")
+        # The FORM is a config primary (deck.py keys off corona_profile), and a diagram
+        # that names the wrong one is worse than no diagram: an exponential and a Gaussian
+        # of the same L_n put the critical surface in different places, which is the whole
+        # subject of decision D1.
+        a(f"  ~  coronal ramp   : {_corona_form(tgt)}, L_n = {Ln:g} d_e on the "
+          f"LASER-FACING side (face at z = {face0:+g}), drawn out to 1e-3 n_cr")
     if vac:
         a("  ' ' vacuum        : no ambient plasma")
     else:
@@ -689,6 +693,16 @@ def _geometry_diagram_2d(cfg: dict, width: int = 58, height: int = 17) -> str:
       f"{sc.max_step} steps = {sc.t_end*1e12:.4g} ps")
     a("```")
     return "\n".join(L)
+
+
+def _corona_form(tgt):
+    """The coronal ramp's functional form, as deck.py decides it.
+
+    Kept in one place so the diagram and the deck cannot disagree: deck.py reads
+    `corona_profile` with the same default.
+    """
+    return ("exponential" if str(tgt.get("corona_profile", "gaussian")) == "exponential"
+            else "Gaussian")
 
 
 def geometry_diagram(cfg: dict, width: int = 66) -> str:
@@ -773,8 +787,8 @@ def geometry_diagram(cfg: dict, width: int = 66) -> str:
     a(f"  #  target flat top : {tgt['density_over_ncr']:g} n_cr, "
       f"{tgt['thickness_de']:g} d_e thick, centred at {centre:+g} d_e")
     if Ln > 0:
-        a(f"  ~  coronal ramp   : Gaussian, L_n = {Ln:g} d_e on the LASER-FACING side "
-          f"(face at z = {face:+g})")
+        a(f"  ~  coronal ramp   : {_corona_form(tgt)}, L_n = {Ln:g} d_e on the "
+          f"LASER-FACING side (face at z = {face:+g})")
     if is_vacuum(cfg):
         a("  ' ' vacuum        : no ambient plasma")
     else:

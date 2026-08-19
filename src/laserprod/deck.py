@@ -415,6 +415,20 @@ def render(cfg: dict) -> str:
                 a(f"amr.max_grid_size_{suffix[i]} = {int(v)}{note}")
         else:
             a(f"amr.max_grid_size = {int(mgs)}")
+
+    # THE GPU ARENA IS SIZED FROM *TOTAL* DEVICE MEMORY, NOT FREE MEMORY.
+    # AMReX pre-allocates 3/4 of the card's TOTAL memory in one cudaMalloc, so on a
+    # shared box any other user's job makes that allocation fail even when the run
+    # itself needs a fraction of it: on a 11873 MiB RTX 4070 it asks for 8904 MiB
+    # regardless, and another user holding 3.2 GB leaves 8509 MiB free -> abort at
+    # init with "Arena out of memory". (RESULTS.md 2026-08-18 recorded this as
+    # sizing from FREE memory, which predicts it would shrink to fit; it does not.)
+    # An ablation deck needs a few hundred MB, so capping costs nothing and is the
+    # difference between running beside another user and not running at all.
+    arena = num.get("arena_init_size_mb")
+    if arena is not None:
+        a(f"amrex.the_arena_init_size = {int(round(float(arena) * 1024 * 1024))}"
+          f"  # {int(arena)} MiB -- see numerics.arena_init_size_mb")
     a(f"geometry.dims     = {dims}")
     a(f"geometry.prob_lo  = {' '.join(f'{n}lo' for n in ax_names)}")
     a(f"geometry.prob_hi  = {' '.join(f'{n}hi' for n in ax_names)}")

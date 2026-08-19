@@ -1,0 +1,203 @@
+meta:
+  run_id: P4_lez_kin_flashic_ct
+  phase: 4
+  deck: inputs_P4_lez_kin_flashic_ct
+  description: P4_lez_kin_flashic with the corona temperature CORRECTED to
+    similarity-consistent values. Its parent transferred lengths, densities and velocities
+    in normalised units but corona TEMPERATURE in absolute eV straight from FLASH, and
+    T_e,SS ~ mu^(1/3), so 378.3 eV is 2.638x too hot at the reduced ion mass. Since
+    kappa_ib ~ T^(-3/2) that suppressed absorption by 4.29x and is the whole of the
+    parent's f_abs = 0.358 against the analytic leg's 0.769. ONE change from the parent --
+    theta_e_init and theta_i_init. See README.md.
+  reference: TEST_PLAN.md 12 (12.2 corrected 2026-08-18); runs/P4/README.md D1 and D5;
+    RESULTS.md 2026-08-18 (final) - the entry this run tests
+
+reference:
+  length_scale: critical
+  mass_ratio: 100.0           # m_Al/m_e -- the ION mass ratio is 100, NOT the proton's.
+                              # CHANGED 2026-08-18 from 2698. The paper (Sec II.B) says
+                              # "we use a mass ratio of m_p/m_e = 100", i.e. the PROTON,
+                              # which for aluminium gives m_Al = 26.98 x 100 = 2698 m_e --
+                              # and that is what every earlier Phase-4 leg ran. But the
+                              # paper reaches its reduction with a REDUCED SPEED OF LIGHT
+                              # (m_e c^2 = 60 keV against the real 511), which WarpX cannot
+                              # follow: it has real c and real m_e. Running the ion at 100
+                              # m_e directly is this project's choice, and it makes the
+                              # DECK's d_i = d_e*sqrt(mass_ratio) = 10 d_e coincide with the
+                              # comparison's d_i0 for the first time (TEST_PLAN 12.2's "two
+                              # different d_i0" trap closes). mu vs real Al = 495.4.
+  charge_state: 13
+
+laser:
+  wavelength_um: 1.064
+  intensity: 1.0e17           # 1e13 W/cm^2, the paper's value
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 13.0
+  coulomb_log: 6.3
+  temperature_mode: local
+  intervals: 10
+  ray_cfl: 0.25
+  profile_intervals: 5328
+  beam:
+    profile: uniform
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -224               # 200 d_e of target + 24 d_e of clearance behind it.
+                              # -224..2464 is 2688 d_e = 5376 cells at dz 0.5,
+                              # and 5376 = 64 x 84: AMReX aborts outright if the
+                              # domain is not divisible by blocking_factor (8),
+                              # which the first draft's 5340 was not.
+    hi_de: 2464               # essentially unchanged from P4_lez_kin; its plume front reached
+                              # zeta = 192 (1920 d_e) by tau = 27 with NO reservoir. With
+                              # a reservoir the front should sit nearer FLASH's zeta = 95,
+                              # so this is now generous rather than marginal.
+  boundary:
+    axis:
+      lo: reflecting          # stands for the rest of a semi-infinite target. With a real
+                              # reservoir this is MORE justified than it was in P4_lez_kin:
+                              # FLASH's slab is 295 d_e thick at 795 n_cr and is barely
+                              # touched (0.275 % ablated in 27 tau), so its rear face is
+                              # genuinely a symmetry plane on this timescale.
+      hi: open                # the plume must leave
+
+plasma:
+  target:
+    # ================= THE INITIAL CONDITION, FITTED TO FLASH =================
+    # Fits to Ablation_prod_08-17 at t = 0.1 ns (tau = 2.69), expressed in WarpX units
+    # (z in WarpX d_e = FLASH zeta x 10, because WarpX's d_i0 = 10 d_e).
+    #
+    # [1] RESERVOIR. FLASH's target is 795 n_cr and 295 d_e thick; PIC cannot carry that
+    #     (omega_pe*dt = 4.93 at 795 n_cr, against the gate's 1.2). 40 n_cr x 200 d_e gives
+    #     omega_pe*dt = 0.79 at cfl 0.25 -- room for 2.3x compression before the gate --
+    #     and an areal density 11.7x that of P4_lez_kin. FLASH ablates 1.06e23 m^-2 over
+    #     27 tau, which is 7.9 % of this reservoir against ~100 % of P4_lez_kin's. That is
+    #     the difference between a target that ablates and one that disassembles: measured,
+    #     P4_lez_kin's peak fell 10 -> 1.74 n_cr and it went fully underdense. [D5]
+    density_over_ncr: 40
+    thickness_de: 200
+    center_de: -100           # slab spans -200..0; face (and the laser side) at z = 0
+    shape: planar
+
+    # [2] CORONA SHAPE. FLASH's corona below n_cr is an EXPONENTIAL of scale 6.955 d_e,
+    #     fitted over 1e-3..1 n_cr with rms(ln n) = 0.107. The Gaussian this project used
+    #     until now fits the same data at rms 0.361, and cannot be rescued by tuning: a
+    #     Gaussian's local scale length L^2/(2z) varies through the corona, so matching
+    #     L_n at n = 0.1 n_cr forces the critical surface out to 24-42 d_e. P4_lez_kin's
+    #     Gaussian (Ln = 27 d_e, n_max = 10) put n_cr at 40.6 d_e where FLASH has it at
+    #     2.3 -- a factor 18 -- so the laser began depositing far out in a tenuous corona
+    #     instead of at a compact ablation front.
+    corona_profile: exponential
+    scale_length_de: 6.955
+    corona_density_over_ncr: 1.0    # the corona is anchored at n_cr ...
+    corona_offset_de: 2.3144        # ... which sits 2.31 d_e in front of the face
+
+    # [3] TEMPERATURE. FLASH's corona is ISOTHERMAL at 378.3 eV (spread 374-379 across
+    #     four decades of density) over a cold solid. P4_lez_kin used 100 eV everywhere:
+    #     3.8x too cold in the corona, where inverse bremsstrahlung goes as T^(-3/2), and
+    #     far too hot in the solid.
+    # CORRECTED 2026-08-18. The parent set these to FLASH's ABSOLUTE eV (378.3 / 115.6),
+    # which is a mixed-unit transfer: every other element of this IC is in similarity
+    # units. T_e,SS = 5.94 mu^(1/3) Z^(-1/3) lambda^(4/3) I^(2/3) carries mu^(1/3), and mu
+    # here is 18.363x smaller than real Al, so the corresponding corona is
+    #     378.3 / 18.363^(1/3) = 143.4 eV   and   115.6 / 18.363^(1/3) = 43.8 eV.
+    # Setting it 2.638x too hot suppresses kappa_ib ~ T^(-3/2) by 2.638^1.5 = 4.29x, which
+    # is the whole of the parent's absorption deficit (f_abs 0.358 vs the analytic leg's
+    # 0.769, ratio 0.466 ~ 1/2.15, and the T ratio alone predicts 1/4.29 on kappa before
+    # the plume re-equilibrates). T_e/T_i = 3.27 is preserved -- the RATIO is dimensionless
+    # and transfers unchanged.
+    # mu = 49542/100 = 495.4, so mu^(-1/3) = 0.1264 and FLASH's corona maps to
+    #     378.3 x 0.1264 = 47.81 eV   and   115.6 x 0.1264 = 14.61 eV.
+    # T_e/T_i = 3.27 is dimensionless and is preserved exactly.
+    theta_e_init: 9.3560e-5   # 47.81 eV  (2698-leg used 2.8061e-4 = 143.4 eV)
+    theta_i_init: 2.8590e-5   # 14.61 eV  (2698-leg used 8.5747e-5 =  43.8 eV)
+    theta_e_solid: 3.914e-5   # 20 eV. NOT FLASH's 0.1377 eV: at 40 n_cr that would give
+                              # dz/lambda_D = 6100 and the solid would numerically heat
+                              # faster than the laser heats it. 20 eV gives 413, still bad
+                              # (G2 will warn) which is exactly why the laser-off control
+                              # below is mandatory. Recorded as a KNOWN departure from
+                              # FLASH, not a fit.
+    theta_i_solid: 3.914e-6   # 2 eV
+
+    # [4] VELOCITY. The handoff state is a rarefaction already in motion: FLASH's corona
+    #     carries v/C_S0 = 0.548 + 0.05598 z[d_e], reaching 4-5 C_S0 at its tip (rms
+    #     residual 0.099 C_S0). P4_lez_kin started it AT REST. Converted to u = gamma v/c
+    #     with C_S0(WarpX) = 8.3514e5 m/s, i.e. C_S0/c = 2.78574e-3.
+    # RESCALED with the ion mass: u = 0.548*(C_S0/c) + 0.05598*(C_S0/c)/(d_i0/d_e) * z[d_e].
+    # C_S0 = sqrt(Z kT_e0/m_i) at the 823 eV reference is 5.194x faster at m_i = 100 m_e
+    # (4.3379e6 m/s), and d_i0 = 10 d_e instead of 51.94.
+    drift_uz_de: [7.9294e-3, 8.1002e-5]
+
+  ambient: null               # NO background species, as the paper specifies. P4_lez_kin_bg
+                              # carried 1e-3 n_cr only so the hybrid leg could be compared
+                              # against something identical; that crutch is not wanted here,
+                              # and it is not benign -- it acted as a tamper (bg3 vs bg4
+                              # moved the plume front 1.8x).
+
+field:
+  orientation: none
+
+numerics:
+  cfl: 0.25                   # 0.35 -> 0.25 to buy headroom at 40 n_cr: omega_pe*dt = 0.79
+                              # at t = 0 and stays under the 1.2 gate to 2.3x compression.
+                              # CLAUDE.md: check omega_pe*dt at the PEAK COMPRESSED density,
+                              # not at t = 0 -- a run that started at 1.91 reached 2.43 and
+                              # every number after that was measuring the instability.
+  particle_shape: 2
+  max_grid_size: 5000
+  arena_init_size_mb: 2048    # AMReX otherwise pre-allocates 3/4 of the card's TOTAL
+                              # memory (8904 MiB of an RTX 4070's 11873) in ONE
+                              # cudaMalloc, and aborts at init if another user holds
+                              # enough of the card -- which is what killed the first
+                              # launch of this run (8509 MiB free, 8904 requested).
+                              # This deck's actual footprint is a few hundred MB:
+                              # ~1.5e6 macroparticles and 5376 cells. 2 GiB is ample
+                              # and leaves the rest of the card for whoever else is on it.
+  max_step: 149184            # = 28 x 5328. dt = 0.125 d_e/c = 0.0706 fs (unchanged --
+                              # it is set by dz/c, not by the ion), so t_end = 10.53 ps.
+                              # The tau UNIT changed with the ion: d_i0 = 10 d_e and
+                              # C_S0 = 4.3379e6 m/s give d_i0/C_S0 = 0.39037 ps against the
+                              # 2698-leg's 2.0277 ps, so 10.53 ps is tau = 26.99 -- the SAME
+                              # normalised duration as FLASH's 1 ns. 5.2x fewer steps, NOT
+                              # 27x: d_i0 shrinks along with C_S0 and the two partly cancel.
+  ppc:
+    target: 500
+    ambient: 1
+
+collisions:
+  enabled: true
+  type: coulomb
+  intervals: 1                # WAS 10. The D3 gate (studies/collision_gate/, 2026-08-18)
+                              # measured that ndt = 10 costs of order 10-15 % in the e-i
+                              # equilibration rate, and collisions are only 10.4 % of a
+                              # step, so ndt = 1 removes the uncertainty for ~2x wall time.
+  coulomb_log: 6.3
+  pairs:                      # complete: with no ambient there are only two species, so
+    - [targ_electrons, targ_electrons]   # unlike P4_lez_kin_bg this leaves nothing
+    - [targ_electrons, targ_ions]        # collisionless.
+    - [targ_ions, targ_ions]
+
+diagnostics:
+  plotfile_intervals: 5328    # scaled with max_step so the dump COUNT is unchanged (28)
+  field_intervals: 1332
+  phase_intervals: 5328
+  reduced_intervals: 200
+
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 500
+  compression_factor: 2.3
+
+controls:
+  # G3 control DELIBERATELY NOT RUN up front (decision, 2026-08-18). Grid heating
+  # warms the corona and kappa_ib ~ T^(-3/2), so it SUPPRESSES absorption: a HIGH
+  # f_abs is therefore self-validating and needs no control. Run the control only
+  # if f_abs comes back LOW, which is the one branch where grid heating and a real
+  # absorption deficit are not distinguishable.
+  laser_off: null
