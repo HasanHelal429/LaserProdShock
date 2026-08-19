@@ -3803,3 +3803,79 @@ ETA 12 h 28 m** — because every pair touching an ambient species walks all 537
 the target occupies ~1000. Cut back to the target-only 3 pairs, matching both parents, so
 the run differs from `flashic` in exactly one thing. The background is therefore
 collisionless, as in every earlier leg — deliberate, and noted rather than silent.
+
+---
+
+## 2026-08-18 (final, actually last) — Read back against the paper's own setup: **ppc is 200× too low**, and four other departures
+
+No new runs. `P4_lez_kin_bg5` was **killed at 30 %**: the paper states outright *"We do not
+introduce any chamber gas … since we are unable to fully capture the physics at such low
+densities"*, so testing a thinner background was testing the wrong axis. Superseded by the
+table below.
+
+### Every PSC parameter the paper states, against our decks
+
+| parameter | **PAPER (PSC)** | `P4_lez_kin` | `kin_bg` | `flashic` |
+|---|---|---|---|---|
+| box length | 1000 `d_e` = 100 `d_i0` | 2500 | 2500 | 2688 |
+| cells | 5000 | 5000 | 5000 | 5376 |
+| **cells per `d_e`** | **5** (`dz` = 0.2) | **2** (0.5) | 2 | 2 |
+| **`N_ppc` at `n_cr`** | **100 000** | **500** | 500 | 500 |
+| **density floor** | **1e-5 `n_cr`** | **2e-3** | 2e-3 | 2e-3 |
+| chamber gas | **NONE**, explicitly | none | **1e-3 `n_cr`** | none |
+| `n_max` | 10 `n_cr` | 10 ✓ | 10 ✓ | 40 |
+| target thickness | 4.5 `d_i0` | 4.5 ✓ | 4.5 ✓ | 20.0 |
+| boundaries | **reflecting** | refl / **open** | refl / **open** | refl / **open** |
+| e–i / i–i rate correction | **YES** (Ref. 47) | **NO** | NO | NO |
+| Coulomb log | single global | ✓ | ✓ | ✓ |
+
+### 1. `N_ppc` = 500 against the paper's 100 000 — a factor 200, and the new leading suspect
+The paper is explicit about what that number buys: *"This particle number allows us to
+resolve densities greater than 1e-5 `n_cr`."* The PIC density floor is `n_cr/N_ppc`, so
+**ours is 2e-3 `n_cr` where theirs is 1e-5** — we cannot represent the tenuous plume at all,
+and FLASH's exponential runs well below our floor.
+
+Worse, it attacks the one quantity still in dispute. **The `T_e` "hot tail rising outward"
+may substantially BE ppc noise**: a per-cell temperature at 500 ppc in a rarefied plume is a
+small-sample estimate whose upper tail is heavily biased, and this file has already been
+bitten by it twice — `CLAUDE.md` records that `T^(-3/2)` convexity biases absorption high at
+low ppc, and today's `D-2` Knudsen analysis returned `Kn` = 19 for `flashic` until the
+temperature was smoothed, which is a noise floor rather than a plasma statement. **A `T_e`
+shape argued from 500 ppc is not yet a physics result.**
+
+### 2. Resolution: 2 cells per `d_e` against the paper's 5
+Also the cheapest route to the worst gate we have: `dz/λ_D` = 116–327 would improve by 2.5×
+on the same change.
+
+### 3. The `hi` boundary is `open`; the paper uses **reflecting**
+Hot electrons leave our box and in PSC they do not. That truncates the ambipolar potential
+which drives the expansion, and the plume front running **0.71×** short is exactly the
+symptom it would produce. The paper's 100 `d_i0` box is only just longer than the plume it
+contains (~95 `d_i0` at τ = 27), so the reflecting condition is load-bearing, not incidental.
+
+### 4. Our box is 2.5× longer at the same cell count
+Which is *why* we are 2.5× coarser. Matching the paper's box would buy the resolution back
+for free.
+
+### 5. The collision-rate correction we do not have — and the paper's own warning
+*"Caution should be used when modeling collisions in PIC systems with reduced speed of light
+and mass ratio parameters, since they will modify the relative role of e–e, e–i, and i–i
+collisions **if treated uniformly**. A special approach to match e–i and i–i collisional
+rates is implemented in PSC."* WarpX treats them uniformly. `D3` measured WarpX's e–i rate
+against Spitzer and passed, but **that is not the same as having the correction** — the
+correction is about the *relative* rates, which no single-pair test can see. TEST_PLAN
+§12.8 risk 1 remains open, and `D3` Appendix C is still unrun.
+
+### What the paper's own convergence study says we do NOT need
+`n_max` was scanned over {2, 5, 10, 20} `n_cr`: *"The underdense plasma density evolves
+similarly in all cases. However, electron temperature matches only when `n_max` ≳ 5 `n_cr`."*
+So 10 is sufficient and `flashic`'s 40 buys nothing — consistent with the reservoir
+falsification earlier today, and a second independent reason to go back to the thin
+paper-faithful target.
+
+### Consequence
+The paper-faithful deck has never actually been run. `P4_lez_kin` matches it on `n_max`,
+thickness and chamber gas but misses on ppc (200×), resolution (2.5×), box length (2.5×)
+and the `hi` boundary. **Before any more physics is inferred from the `T_e` shape, a ppc
+ladder is required** — it is the one departure large enough to manufacture the disputed
+feature on its own.
