@@ -250,7 +250,11 @@ def profiles(flash, kin, taus, ax, ylim, xlim, tol=TAU_TOL, colours=None):
     # it from the saved PNG altogether. The caller reserves the strip.
     ax.figure.legend(handles=t_keys, frameon=False, ncol=len(taus),
                      loc="upper center", handlelength=1.6, columnspacing=1.8)
-    ax.legend(handles=c_keys, frameon=False, loc="lower left", handlelength=2.4)
+    # loc="best" rather than a fixed corner: which corner is empty depends
+    # entirely on the run. The analytic-IC leg left the lower left free and the
+    # FLASH-fitted one fills it, so a hard-coded corner is wrong every other
+    # time this is regenerated.
+    ax.legend(handles=c_keys, frameon=False, loc="best", handlelength=2.4)
     return drawn
 
 
@@ -358,7 +362,7 @@ def main():
         # Wide and short by default. The slide gives this figure the full text
         # width but only ~4.5 cm of height under two bullets, so a 4:3-ish panel
         # is bound by the height and comes out half a slide wide.
-        fig, ax = plt.subplots(figsize=tuple(a.figsize) if a.figsize else (8.0, 3.2))
+        fig, ax = plt.subplots(figsize=tuple(a.figsize) if a.figsize else (9.5, 3.0))
         drawn = profiles(fl, kin, taus, ax, tuple(a.ylim), tuple(a.xlim),
                          tol=a.tol, colours=colours)
         if not drawn:
