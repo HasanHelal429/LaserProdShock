@@ -3529,3 +3529,102 @@ that more pressing, not less. Partly offset by 5.2× fewer steps at τ = 27.
 3. **The comparison figures have not been rebuilt** with this leg — the other three legs
    are at `m_i` = 2698 and this one is at 100, so `TEST_PLAN.md` §12.6 acceptance across
    all four is not meaningful until it is decided whether the older legs are re-run at 100.
+
+---
+
+## 2026-08-18 (final, later still) — D-1 and D-2: the far-field shelf is NOT an ambipolar precursor, and non-isothermality explains most of the shape
+
+`studies/plume_structure/` (new): `d1_trough.py`, `d2_shape.py`. Analysis only, no runs.
+
+### D-1 — the trough/shelf is quasineutral everywhere. The precursor hypothesis is FALSIFIED
+The proposal was that the density minimum beyond the plume front, with material again
+beyond it, might be a **hot-electron-driven fast ion precursor** — real kinetic physics a
+3T fluid cannot produce, and therefore a *result* rather than a defect. The discriminator
+is not density (both stories give the same `n_e`) but **macroparticle count** and whether
+the charge separation is **coherent**. A real ambipolar front is charge-separated at its
+leading edge with one sign over many bins; noise flips sign bin to bin.
+
+At τ = 27, over ζ = 40–110, resolved bins only:
+
+| leg | macroparticles/bin at ζ = 40…100 | `n_e/(Z n_i)` | % of bins electron-rich |
+|---|---|---|---|
+| `kin_bg` | 574–1719 (**fully resolved**) | **1.006 ± 0.069** | **50 %** |
+| `flashic` | 24–152 (marginal) | **1.001 ± 0.091** | **49 %** |
+| `flashic_ct` | resolved to ζ = 50, then **exactly 0 beyond ζ = 70** | 1.037 ± 0.140 | 43 % |
+
+**Quasineutral to 0.1 %, with the sign of the departure a coin flip.** There is no coherent
+charge separation in any leg, so there is no ambipolar precursor. Two consequences:
+
+* **`kin_bg`'s shelf is its own ambient background.** It sits at 1e-3 `n_cr`, which is the
+  configured `ambient.density_over_ncr`, and it is fully resolved. Not a plume feature at
+  all — and a reminder that bg3-vs-bg4 moved the plume front 1.8×.
+* **`flashic`'s trough is a REAL, quasineutral density minimum** — marginally resolved, but
+  a genuine two-population structure rather than noise or kinetics. The likeliest reading
+  is that its fitted initial corona was launched as a **distinct shell** ahead of the
+  newly-ablated plume and never merged with it, i.e. **an unrelaxed initial condition**.
+  `flashic_ct`, whose corona expands 5.2× faster in absolute terms, has no shelf at all by
+  τ = 27 — consistent with the shell having already run off the end.
+* **`flashic_ct` has a hard cutoff, not a tail.** Zero macroparticles beyond ζ = 70 against
+  FLASH's smooth exponential still at 7.5e-3 `n_cr` at ζ = 100. That is the finite-slab
+  free-expansion signature (plateau then cliff), not the semi-infinite rarefaction.
+
+### D-2 — non-isothermality explains 50–82 % of the profile shape, for the legs where it can be measured
+The isothermal rarefaction `n = n_cr exp(−z/C_S t)` has `d ln n/dζ = −1/(τ·C_S/C_S0)`,
+**constant in z only if `T_e` is**. `R` below is the fraction of the profile-shape variance
+removed by dividing the measured slope by the prediction formed from each leg's own local
+`T_e(z)`.
+
+| leg | raw slope std | corrected | **R** |
+|---|---|---|---|
+| FLASH | 0.330 | 0.460 | **−1.15** |
+| `flashic` | 11.70 | 3.68 | **0.82** |
+| `flashic_ct` | 1.05 | 0.744 | **0.50** |
+| `kin_bg` | 0.681 | 1.321 | −2.42 (**metric invalid, see below**) |
+
+* **For the two no-background legs, knowing `T_e(z)` removes 50–82 % of the structure.**
+  So non-isothermality is most of the shape difference, as proposed — but not all of it.
+* **FLASH's `R` is negative, and that is meaningful rather than broken here**: its density
+  profile is *more* exponential than its own residual `T_e` variation would predict, which
+  is what an imposed diffusive conduction operator does — it flattens `T_e` and the
+  leftover variation is small and uncorrelated with the density slope.
+* **`kin_bg`'s `R` is not usable**, and the reason is itself the finding: its `T_e`
+  **maximum is in the tenuous far field** (the hot tail), so the "restrict to beyond the
+  `T_e` plateau onset" cut leaves only a 10-ζ window at τ = 27. A leg whose temperature
+  peaks outside its own plume has no isothermal region to fit.
+
+### MY ERROR, corrected mid-diagnostic
+The first version of `d2_shape.py` fitted the whole underdense band and reported **R < 0
+for FLASH itself** — "knowing `T_e` makes FLASH less exponential", which is a broken metric,
+not a result. Cause: the band includes the ablation front, where `T_e` ramps from ~0 over a
+few `d_i0` and `1/√T_e` diverges. The fit is now restricted to beyond the `T_e` plateau
+onset (first ζ at which `T_e` exceeds half its in-band maximum). Recorded because the
+broken version's numbers were *plausible* — every leg came out negative together, which
+reads as a physics result rather than a bug.
+
+### The reservoir: `TargetInjector` is available and is the right tool
+`warpx-cda/Source/Particles/TargetInjector/` — a density-relaxation injector ported from
+PSC's `InjectFoil`. Each application it deposits the measured density of a species group
+and, inside a user-given box, replenishes the deficit toward a target `n_t` on a relaxation
+time `τ_inj`, **co-injecting a neutralizing species in exact charge balance**. That is
+precisely the semi-infinite reservoir the comparison is missing: it pins the slab at `n_t`
+and replaces what ablates away, converting a disassembling foil into a solid.
+
+* **It is already in `build_cuda1d/bin/warpx.1d`** (substring check on `target_injector`,
+  `ppc_reference`, `neutralizing_species` — all present), so **no rebuild is needed**.
+* **It is NOT plumbed through `make_inputs.py`.** `config.yaml` cannot express it today,
+  and CLAUDE.md forbids hand-editing a deck. This is a generator gap, and closing it is the
+  prerequisite for the reservoir test.
+* Keys: `target_injector.{species, intervals, lo, hi, density, reference_density,
+  ppc_reference, tau, random_positions, neutralizing_species}` plus per-species
+  `{fraction, u_std}`.
+
+### Where this leaves the discrepancy
+Three distinct causes are now separated, and only one of them is the closure:
+
+1. **Finite reservoir** — `flashic_ct` cuts off hard where FLASH continues. Addressable
+   with `TargetInjector`, and that is the next run.
+2. **Unrelaxed initial condition** — `flashic`'s trough is its own corona as a detached
+   shell. Addressable by relaxing the IC before the laser fires, or by the injector.
+3. **No electron conduction** — the residual 18–50 % of shape variance, plus the far-field
+   `T_e` maximum in `kin_bg`. This is D2b/D3-Appendix-C and is the one that needs the
+   `conducting` closure or a heat-flux measurement.
