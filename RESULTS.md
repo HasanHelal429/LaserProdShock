@@ -4105,3 +4105,64 @@ Debye resolution). Every earlier Phase-4 deck carried two warnings.
 * **ppc is not** — 0.1 % across 4×, at τ = 6.7.
 * Both were measured on the Gaussian corona, so whether the floor result *transfers* to the
   correct IC is exactly what `P4_lez_kin_ic6` now tests.
+
+---
+
+## 2026-08-18 (final) — `P4_lez_kin_ic6`: the shape result **transfers** to the correct IC, and the run turns out not to have reached steady state
+
+`runs/P4/P4_lez_kin_ic6` complete — 552 960 steps, **21 min** on one RTX 4070, no NaN,
+`--verify` OK. Figures rebuilt on the aligned clock with this leg in place of `L_ppc500`.
+
+### It passes the acceptance test the Gaussian-corona legs failed
+From its own step-0 deposition dump: **peak `P_abs` at ζ = 0.28 against FLASH's 0.27**,
+critical surface 0.23 against 0.27, corona 408 eV against 379. `L_ppc500` sits at 4.13 and
+4.08. And **all four pre-run gates pass**, the first Phase-4 deck to do so
+(`ω_pe·dt` = 0.783, `dz/λ_D` = 58.1 against 116 — the hot FLASH corona doubles the Debye
+resolution).
+
+### The `T_e` shape result survives the corona change — this was the open question
+`RISE` (outer/inner `<T_e>` over the underdense band; FLASH's plateau ≈ 1):
+
+| leg | τ = 6.7 | 13.5 | 20.3 | **27.0** |
+|---|---|---|---|---|
+| **FLASH** | 1.023 | 1.077 | 1.125 | **1.148** |
+| `P4_lez_kin` — 4 dec, Gaussian | 1.042 | 1.242 | 1.305 | **1.504** |
+| `L_ppc500` — 6 dec, Gaussian | 0.945 | 1.015 | 1.144 | **1.133** |
+| **`P4_lez_kin_ic6` — 6 dec, FLASH IC** | 1.354 | 1.899 | 1.640 | **1.161** |
+
+**1.161 against FLASH's 1.148.** So the density-floor result was not an accident of the
+Gaussian corona: two different initial conditions, both at six decades, land within 2 % of
+FLASH's own outward rise, while the four-decade version sits 31 % above it. **The `T_e`
+shape discrepancy — the last open item of the campaign — is a resolved-dynamic-range
+artifact, not missing electron conduction.**
+
+The velocity profile is the other clear win: on the aligned clock `v_z/C_S` overlies FLASH's
+from τ = 13.5 to 27.
+
+### But the run has NOT reached steady state, and that is new
+`<T_e>` in the plume climbs **129.8 → 183.8 → 224.6 → 271.2 eV** across the four times, with
+no sign of flattening (increments 54, 41, 47), where FLASH is visibly plateauing
+(599 → 733 → 794 → 839, increments 134, 61, 45). At the end `f_abs` is still **0.992** —
+the target remains optically thick and the laser is still being fully absorbed, so energy is
+still going in.
+
+That inverts the earlier legs, whose absorption decayed as the target went underdense. With
+the compact FLASH corona and a properly resolved plume the target holds (peak `n_e` 10.18,
+essentially its initial 10) and keeps absorbing. **Comparing at τ = 27 therefore compares a
+converged FLASH against an unconverged WarpX**, which is the most likely reason the
+remaining metrics look short:
+
+| at FLASH τ = 27, aligned | `ic6` | FLASH |
+|---|---|---|
+| `f_abs` (whole-run mean) | 0.478 | 0.870 |
+| plume `<T_e>` / own SS | **0.795** (still rising) | 1.019 |
+| `ζ_front` | 47.9 (0.51×) | 94.6 |
+| `L_n` | 9.73 (0.45×) | 21.4 |
+| `ζ_cr` | 1.51 (0.36×) | 4.16 |
+| peak `n_e` | 10.18 (initial 10) | 4141 |
+
+### The obvious next run
+**Extend `ic6` until `T_e` plateaus** — it is 21 minutes, so 3–4× the duration is under two
+hours. Until it does, `f_abs`, `ζ_front` and `L_n` are being read off a transient and none of
+them is a fair test. The shape result stands regardless, because `RISE` is a ratio within a
+single profile rather than a comparison of two clocks.

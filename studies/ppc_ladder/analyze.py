@@ -23,7 +23,7 @@ so `P4_lez_kin` is included as the four-decade reference: rung 500 against it is
 dynamic range, and the rungs against each other isolate ppc.
 """
 from __future__ import annotations
-import glob, os, sys, warnings
+import argparse, glob, os, sys, warnings
 warnings.filterwarnings("ignore")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "src"))
@@ -62,10 +62,21 @@ def rise(zeta, ne, Te):
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--leg", action="append", metavar="LABEL=PATH",
+                    help="extra leg to include; repeatable")
+    ap.add_argument("--no-scratch", action="store_true",
+                    help="skip the ladder rungs under scratch/")
+    a = ap.parse_args()
     print(__doc__)
-    legs = [("P4_lez_kin (4 decades)", os.path.join(HERE, "..", "..", "runs", "P4", "P4_lez_kin"))]
-    for d in sorted(glob.glob(os.path.join(HERE, "scratch", "L_ppc*"))):
-        legs.append((os.path.basename(d) + " (6 decades)", d))
+    legs = [("P4_lez_kin (4 dec, Gauss)", os.path.join(HERE, "..", "..", "runs", "P4", "P4_lez_kin"))]
+    if not a.no_scratch:
+        for d in sorted(glob.glob(os.path.join(HERE, "scratch", "L_ppc*"))):
+            legs.append((os.path.basename(d) + " (6 dec, Gauss)", d))
+    for spec in (a.leg or []):
+        lab, path = spec.split("=", 1)
+        legs.append((lab, path))
 
     F = X.flash_series(X.FLASH_DIR, "lez1d")
     print(f"  {'leg':<28} {'tau':>6} {'RISE':>7} {'<T_e> eV':>10} {"bins out":>9}")

@@ -379,7 +379,7 @@ PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b", "#1f6f8b")  # WarpX legs,
 # Three curves only. Five made the panel unreadable, and the legs that were dropped are
 # each still one `--leg` away: `P4_lez_kin` (the same deck at four decades, the density-floor
 # A/B), `P4_lez_kin_bg` (analytic IC + 1e-3 background) and `P4_lez_kin_flashic`.
-LEGS_DEFAULT = (("kinetic, 6 decades", "studies/ppc_ladder/scratch/L_ppc500"),
+LEGS_DEFAULT = (("kinetic, 6 dec + FLASH IC", "runs/P4/P4_lez_kin_ic6"),
                 ("hybrid", "runs/P4/P4_lez_hyb_bg3"))
 
 
