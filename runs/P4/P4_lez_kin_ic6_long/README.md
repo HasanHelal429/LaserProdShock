@@ -71,10 +71,40 @@ The domain was deliberately NOT enlarged, so the run stays comparable to its par
 | G3 laser-off control | **passed on the parent** — grid heating measured NEGATIVE | PASS (inherited) |
 | G4 `ray_cfl` | 0.25 | PASS |
 | G5 ppc | 500 | PASS |
-| G6 energy closure | **watch — see the domain risk** | post-run |
+| G6 energy closure | **0.876** = (ΔKE+ΔFE)/E_abs, with 53.5 % macroparticle / **0.89 % weight** loss | LOSS, not heating |
 
 ## Result
-_Pending._
+**Outcome 3: no plateau at τ_own 108** — but not for the reason outcome 3 was written to
+catch, and both secondary expectations came out backwards. Full entry: RESULTS.md
+2026-08-19 (extended).
+
+- `T_e` still rising significantly at τ 70–108: `Te_at_cr` **+1.751 ± 0.436 eV/τ** (4.0 σ),
+  `Te_mean_plume` **+2.092 ± 0.225 eV/τ** (9.3 σ). The last four dumps *look* flat
+  (501→522→524→522 eV); the regression says they are not.
+- It **is** converging, slowly. `T(τ) = T_∞ − A e^(−τ/τ_relax)` gives `Te_at_cr` →
+  **381.5 ± 21.5 eV**, `τ_relax` = 44.3, i.e. **1.22 × its own `T_e,SS` = 312 eV**, 93.8 %
+  reached. `Te_at_cr` is the Manheimer comparator; the band mean (620 eV, 1.99 ×) is pulled
+  up by the hot tenuous far plume and is the wrong number to judge against `T_e,SS`.
+- **The asymptote is unreachable in this configuration.** `n_peak` = 18.66 exp(−τ/38.7)
+  crosses 1 `n_cr` at **τ ≈ 113**, five τ after this run ends and far short of ~3 `τ_relax`.
+  The target is consumed as fast as the temperature relaxes. Quasi-steady ablation needs a
+  **thicker/denser target**, not a longer run — this closes the "just run it longer" route.
+- **`f_abs` rose, it did not fall**: time-mean 0.282 (τ<10) → **0.975** (τ 78–108), run-mean
+  0.823. The plume goes optically thick over 2500 `d_e` (`Vskip` → 0 by τ ≈ 30) long before
+  the target thins; the absorber becomes the plume.
+- **Domain risk half-materialised.** The `1e-2 n_cr` front hit 2450 `d_e` at **τ 78.2**; the
+  bulk `0.1 n_cr` contour reached only **1302 `d_e`**, inside — the README's extrapolation
+  was right for the bulk, wrong for the tenuous precursor.
+- **Late data survive it**: outflow is **supersonic (Mach 2.3–4.8) at the wall at all
+  times**, so the boundary is causally disconnected from the ablation region. Local
+  quantities near the critical surface are sound to τ 108. Band-integrated quantities
+  (`ζ_front`, `L_n`, `Te_mean_plume`) are truncation-contaminated from **τ ≈ 102** (edge
+  `n_e` crosses the `1e-2` band floor at τ 93); `ζ_front` pins at the wall.
+- No shock: phase space is a pure self-similar rarefaction fan, no reflected population.
+
+Movies: `media/P4/P4_lez_kin_ic6_long/{movie_fields,movie_phase}.mp4`.
 
 ## Retracted
-Nothing yet.
+Nothing from this run. Noted against the *parent*: `f_abs` "still 0.992" was an
+**instantaneous** `laser_report` sample, not a time-mean — the same statistic here reads
+1.0000 instantaneously against a run-mean of 0.823. Quote a windowed mean instead.

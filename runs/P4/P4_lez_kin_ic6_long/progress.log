@@ -2,3 +2,14 @@
 # logging_started 2026-08-19T00:04:32  total_steps=2211840  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
 2026-08-19T00:05:02 | 12447/2211840 ( 0.6%) | 0h00m | 0.0024 s/step(wall) | 0.0023 s/step(warpx) | ETA ~1h28m | x1.03 | load 2.1 | laser 0.163 of peak, Eabs 2.362e+04 J
+2026-08-19T00:14:33 | 229139/2211840 (10.4%) | 0h10m | 0.0026 s/step(wall) | 0.0026 s/step(warpx) | ETA ~1h27m | x1.01 | load 1.0 | laser 0.456 of peak, Eabs 6.74e+05 J
+2026-08-19T00:22:38 | 451095/2211840 (20.4%) | 0h18m | 0.0022 s/step(wall) | 0.0024 s/step(warpx) | ETA ~1h04m | x0.91 | load 1.0 | laser 0.664 of peak, Eabs 1.958e+06 J
+2026-08-19T00:29:45 | 665827/2211840 (30.1%) | 0h25m | 0.0020 s/step(wall) | 0.0023 s/step(warpx) | ETA ~0h51m | x0.88 | load 1.0 | laser 0.825 of peak, Eabs 3.561e+06 J
+2026-08-19T00:36:23 | 892055/2211840 (40.3%) | 0h31m | 0.0018 s/step(wall) | 0.0021 s/step(warpx) | ETA ~0h38m | x0.83 | load 1.1 | laser 0.936 of peak, Eabs 5.485e+06 J
+2026-08-19T00:42:03 | 1107283/2211840 (50.1%) | 0h37m | 0.0016 s/step(wall) | 0.0020 s/step(warpx) | ETA ~0h29m | x0.78 | load 1.0 | laser 0.911 of peak, Eabs 7.452e+06 J
+2026-08-19T00:47:45 | 1342911/2211840 (60.7%) | 0h43m | 0.0015 s/step(wall) | 0.0019 s/step(warpx) | ETA ~0h20m | x0.75 | load 1.0 | laser 0.976 of peak, Eabs 9.656e+06 J
+2026-08-19T00:52:26 | 1548531/2211840 (70.0%) | 0h47m | 0.0014 s/step(wall) | 0.0018 s/step(warpx) | ETA ~0h15m | x0.74 | load 1.1 | laser 0.938 of peak, Eabs 1.162e+07 J
+2026-08-19T00:57:40 | 1792810/2211840 (81.1%) | 0h53m | 0.0013 s/step(wall) | 0.0018 s/step(warpx) | ETA ~0h08m | x0.73 | load 1.1 | laser 1.000 of peak, Eabs 1.396e+07 J
+2026-08-19T01:01:54 | 2003195/2211840 (90.6%) | 0h57m | 0.0012 s/step(wall) | 0.0017 s/step(warpx) | ETA ~0h04m | x0.70 | load 1.1 | laser 0.982 of peak, Eabs 1.599e+07 J
+2026-08-19T01:06:08 | 2211840/2211840 (100.0%) | 1h01m | 0.0012 s/step(wall) | 0.0017 s/step(warpx) | ETA ~0h00m | x0.74 | load 0.8 | laser 1.000 of peak, Eabs 1.8e+07 J
+DONE 2026-08-19T01:06:08 | 2211840/2211840 (100.0%) | total wall 1h01m | mean 0.0017 s/step(wall) | reached max_step

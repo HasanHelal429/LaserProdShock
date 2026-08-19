@@ -4270,3 +4270,112 @@ The extended `ic6` run is the clear next step and needs no numerical caveat: run
 `T_e` plateaus, then read `f_abs`, `ζ_front` and `L_n` off a converged state instead of a
 transient. The deposition finding (absorption 2.45× too concentrated) is unaffected either
 way — it is measured at times FLASH covers.
+
+---
+
+## 2026-08-19 (extended) — `P4_lez_kin_ic6_long`: **still no plateau at 4× duration**, and the target burns through before one is reachable
+
+`runs/P4/P4_lez_kin_ic6_long` complete — 2 211 840 steps, **1 h 01 m**, `reached max_step`,
+`--verify` OK, no stray `.old.` plotfiles. Deck differs from the parent in duration and
+diagnostic cadence only. τ_own 0 → **107.83** (218.64 ps).
+
+The run was launched to settle one question: does the kinetic leg reach quasi-steady
+ablation, and at what temperature? The README pre-registered three outcomes. The answer is
+**outcome 3 (no plateau)** — but not for the reason outcome 3 was written to catch, and the
+run's two secondary expectations were both **backwards**.
+
+### `T_e` is still rising at τ 108, significantly
+
+Density-weighted moments, `xcode_compare` definitions, over τ 70–108:
+
+| | slope | significance | verdict |
+|---|---|---|---|
+| `Te_at_cr` (at the critical surface) | **+1.751 ± 0.436 eV/τ** | 4.0 σ | still rising |
+| `Te_mean_plume` (band mean, 1e-2…1 `n_cr`) | **+2.092 ± 0.225 eV/τ** | 9.3 σ | still rising |
+
+Eyeballing the last four dumps suggests a plateau (501 → 522 → 524 → 522 eV); the
+regression does not. **The apparent flattening is scatter, not convergence** — recorded here
+because the eyeball read was made first and was wrong.
+
+### But it *is* converging — slowly, to a value close to Manheimer
+
+Fitting the physically right model, `T(τ) = T_∞ − A exp(−τ/τ_relax)`:
+
+| | `T_∞` | `τ_relax` | `T_∞`/`T_e,SS` (312 eV) | reached by τ 108 |
+|---|---|---|---|---|
+| `Te_at_cr` | **381.5 ± 21.5 eV** | 44.3 | **1.22** | 93.8 % |
+| `Te_mean_plume` | 620.0 ± 11.5 eV | 60.2 | 1.99 | 84.2 % |
+
+**`Te_at_cr` is the Manheimer comparator, not the band mean.** `T_e,SS` is the temperature
+of the absorption region; the band mean is pulled up by the hot, tenuous far plume
+(`Te_max_plume` exceeds 1000 eV). Read correctly, the kinetic leg extrapolates to **1.22 ×**
+its own reduced-mass steady state — the physics is right and the approach is simply slow.
+Read incorrectly it is 1.99 ×, which is how the earlier "disagreement" arose.
+
+### The configuration can never reach that asymptote
+
+Peak density decays as **`n_peak` = 18.66 exp(−τ/38.7)** over τ 35–108 (10.0 → 1.14 `n_cr`),
+crossing **1 `n_cr` at τ ≈ 113** — five τ after this run ends, and far short of the ~3 `τ_relax`
+≈ 130 needed. **The 45 `d_e` / 10 `n_cr` target is consumed on the same timescale as the
+temperature relaxes.** Once `n_peak` < 1 there is no critical surface and `Te_at_cr` ceases
+to exist as a diagnostic.
+
+This is a **design finding, not a physics failure**: quasi-steady ablation is unreachable in
+this configuration at any duration. Getting there needs a thicker or denser target (a mass
+reservoir), not a longer run.
+
+### Both secondary expectations were backwards
+
+1. **`f_abs` rose; it did not fall.** The README expected absorption to fall away from 0.992
+   as the target went underdense. Time-mean `f_abs` by window: **0.282** (τ<10) → 0.614 →
+   0.859 → 0.954 → **0.975** (τ 78–108); whole-run mean **0.823**. The *plume* becomes
+   optically thick over its 2500 `d_e` length long before the target thins — `Vskip` (the
+   fraction of the axis the ray march skips as empty) reaches **0 by τ ≈ 30** and stays
+   there. The absorber stops being the target and becomes the plume.
+2. **The domain risk half-materialised.** The `1e-2 n_cr` front hit the 2450 `d_e` wall at
+   **τ 78.2**; the bulk `0.1 n_cr` contour only reached **1302 `d_e`**, comfortably inside,
+   vindicating the README's extrapolation for the bulk but not for the tenuous precursor.
+
+### Why the late data survive the boundary anyway
+
+Outflow at the open boundary is **supersonic at all times — Mach 2.3 to 4.8** (local
+`C_S` from the local `T_e`). The wall is therefore causally disconnected from the ablation
+region and cannot feed back on it, so **local quantities near the critical surface are sound
+to τ 108**. What is *not* sound is anything integrated over the band: edge `n_e` climbs
+through the `1e-2` band floor at **τ 93**, so `ζ_front`, `L_n` and `Te_mean_plume` are
+truncation-contaminated from **τ ≈ 102** and `ζ_front` pins at the wall (244.7 `d_i0`).
+
+### Gates
+
+| Gate | Value | Verdict |
+|---|---|---|
+| G1 `ω_pe dt` | 0.783 at 2× compression | PASS |
+| G2 `dz/λ_D` | 58 cold target | INFO (G3 makes it meaningful) |
+| G3 grid heating | inherited from `ic6_off` — measured **negative** | PASS |
+| G4 `ray_cfl` | 0.25 | PASS |
+| G5 ppc | 500 | PASS |
+| G6 energy closure | **(ΔKE+ΔFE)/E_abs = 0.876** | see below |
+| G7 `dz` | 0.5 `d_e`, unchanged | INFO |
+
+**G6, with the loss fraction quoted beside it as the gate requires:** 53.5 % of *macro*particles
+left the domain but only **0.89 %** of the *weight* — the escaping population is the
+low-weight, high-energy tail of the exponential corona. The 12.4 % deficit is energy carried
+out by those particles; its **sign is a loss**, which is the opposite of the grid-heating
+signature and consistent with G3's negative result.
+
+### No shock
+
+Ion phase space is a clean self-similar rarefaction fan, `u_z` rising linearly to 5–8
+`C_S(target)` at the wall, with **no reflected population**. As expected for pure ablation —
+recorded because the project gates the word "shock" on this diagnostic.
+
+### Tooling note
+
+`laser_report.py` prints `f_abs peak` and `f_abs final` as **instantaneous** samples. Here
+both read `1.0000` while the run-mean was `0.823` and the instantaneous value oscillates
+between 0.75 and 1.00 late (0.08–1.00 early). The parent's quoted "`f_abs` still 0.992" is
+the same kind of sample. **Quote a time-mean over a stated window instead.**
+
+### Media
+`media/P4/P4_lez_kin_ic6_long/{movie_fields,movie_phase}.mp4`, `laser_history.png`,
+`laser_profile.png`, `checks.png`, `gates.png`.
