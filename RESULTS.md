@@ -3703,3 +3703,103 @@ Of the three separated on 2026-08-18:
 Cost note: `f_abs` is now 0.637 against FLASH's 0.870 and plume `T_e` is 1.25× its own
 Manheimer value, so this leg is over-performing its absorbed flux by a wider margin than
 before — unchanged in kind from the parent, and still unexplained.
+
+---
+
+## 2026-08-18 (final, last but one) — Fig. 2 replicated: the corona is LOAD-BEARING, FLASH's conduction is sound, and the two codes are in different transport regimes
+
+`scripts/fig2_ic.py` (new), `studies/plume_structure/d12_transport.py` (new). Analysis
+only. `runs/P4/P4_lez_kin_bg5` launched (see below).
+
+### Fig. 2 — the paper's own acceptance test for an initial condition
+The paper initialises PIC from the FLASH 0.1 ns snapshot and shows four panels: `n_e`,
+`T_e`, flow speed, and **laser power absorption**, claiming "identical laser power
+absorption profiles". **Panel (d) is the test that matters**: the corona is not required to
+match FLASH pointwise, it is required to *absorb the same way*.
+
+Replicated at t = 0.1 ns, each leg on its own `d_i0`:
+
+| leg | `m_i/m_e` | ζ(critical surface) | max `T_e` | **peak `P_abs` at ζ** |
+|---|---|---|---|---|
+| **FLASH** | — | **0.27** | 379.4 eV | **0.27** |
+| `flashic` (exponential corona, 378.3 eV) | 2698 | **0.23** | 419.5 eV | **0.28** |
+| `kin_bg` (Gaussian corona, 100 eV) | 2698 | 4.08 | 107.2 eV | **4.13** |
+| `flashic_ct` | 100 | 1.17 | 53.0 eV | 1.95 |
+
+### The corona is NOT a smoothing approximation — it decides where the laser lands
+This answers the question directly. Moving from the fitted exponential corona to the
+analytic Gaussian moves the **peak deposition from ζ = 0.28 to ζ = 4.13**, a factor **15 in
+position**, and the critical surface from 0.23 to 4.08. It is consistent with what
+`CLAUDE.md` already records — `L_n/w_t` 0.19 → 0.75 took the optical depth to the turning
+point from 0.14 to 5.60 and `f_abs(0)` from 0.248 to **1.000**. The corona sets the
+absorption *regime*, not the amount. **No late-time comparison is meaningful until the IC
+passes panel (d).**
+
+And `flashic`'s IC **passes it**: deposition peak 0.28 vs 0.27, critical surface 0.23 vs
+0.27, the 378.3 eV plateau against FLASH's 379, and a velocity ramp that overlies FLASH's
+to ζ ≈ 7. **So the earlier characterisation of that IC as a "mixed-unit transfer" that was
+2.638× too hot is too strong**: judged by the paper's own criterion the absolute-eV corona
+is *correct*, because it is a handoff of FLASH's state, not a prediction of the reduced-mass
+steady state the run will later relax toward. Those are different criteria and this file
+previously conflated them.
+
+### MY BUG: `flashic_ct` and `flashic_res` carry a corona 5.19× too extended
+When `mass_ratio` went 2698 → 100 I rescaled the temperatures, the drift and `max_step`,
+but **not the corona geometry**. `scale_length_de` = 6.955 and `corona_offset_de` = 2.3144
+were derived in FLASH ζ and converted assuming `d_i0` = 10 `d_e`; at `m_i/m_e` = 100 the
+proton skin depth is 1.925 `d_e`, so in normalised units that corona is **5.19× too wide**
+and should have been 1.339 and 0.4456 `d_e`. It is why `flashic_ct`'s critical surface sits
+at ζ = 1.17 against FLASH's 0.27. The reservoir A/B is unaffected — both legs carried the
+same corona, so it remains a valid A/B — but **neither `_ct` nor `_res` was ever a good
+match to FLASH's IC**, and their absolute agreement numbers should not be quoted.
+
+### (1) FLASH's flux limiter is NOT the explanation — hypothesis not supported
+I proposed that FLASH's flat plateau might be an artifact of its flux limiter, which would
+have made part of the discrepancy FLASH's error. **The delivered checkpoints say
+otherwise.** Restricted to the compared plume (1e-2 ≤ `n_e/n_cr` ≤ 1):
+
+* **median `fllm` = 0.969**, i.e. the limiter removes ~3 % of the classical flux
+* 93 % of cells are limited at all, but only **6 % are cut by more than half**
+
+My first look reported 46 % of cells cut by more than half — that was the **whole domain**,
+dominated by the cold chamber and the dense target interior, neither of which is compared.
+**In the plume, FLASH is running essentially classical Spitzer-Härm.** The plateau is
+physics, not a fudge factor.
+
+### (2) The two codes are in DIFFERENT transport regimes — and FLASH is the valid one
+`Kn = λ_ei/L_T`, density-weighted over the same band. Spitzer-Härm requires `Kn` ≲ 0.06:
+
+| leg | median `Kn` | % of cells `Kn` > 0.06 |
+|---|---|---|
+| **FLASH** | **0.018 – 0.024** | 20 – 25 % |
+| `kin_bg` (2698) | **0.13 – 0.16** | 65 – 78 % |
+| `flashic` (2698) | 0.19 – 4.0 | 71 – 91 % |
+| `flashic_ct` (100) | 0.04 – 0.25 | 25 – 91 % |
+
+**FLASH sits just inside its own model's validity; the PIC legs sit well outside it.** So
+the codes *should* disagree on `T_e` shape — a plateau is what a local diffusive closure
+produces and a kinetic code has no obligation to reproduce it.
+
+**Two caveats, both load-bearing.** (a) The PIC `T_e` is a binned particle moment, so a
+pointwise `dT_e/dz` is dominated by shot noise; unsmoothed, `flashic` reports `Kn` = 19,
+which is a noise floor rather than a plasma statement. The table above smooths `T_e` over 9
+cells before differentiating — FLASH, a fluid solution, is left unsmoothed, which is the
+like-for-like choice. (b) **`Kn` is computed from the very `T_e` profile whose shape is the
+thing being explained**, so it partly restates the symptom. The non-circular content is
+FLASH's own number: 0.02, i.e. FLASH passes its own validity test, so the gap is ours to
+explain rather than FLASH's.
+
+### `P4_lez_kin_bg5` launched — the clean 2698 leg
+`P4_lez_kin_flashic`'s IC (which passes Fig. 2) with a background of **1e-5 `n_cr`**, the
+paper's stated PIC floor, instead of `kin_bg`'s 1e-3 — which is **33 940×** the 1e-10 g/cm³
+chamber it stands for, and which moved the plume front **1.8×** between bg3 and bg4. The
+paradox it tests: **the leg with the correct IC (`flashic`, `f_abs` 0.358) agrees worse than
+the leg with the wrong one (`kin_bg`, 0.769)**, which suggests the dense background is doing
+the work as a tamper. ~1 h 30 m.
+
+**Cost note recorded before it bites again:** the complete 10-pair collision set (adding
+ambient self- and target↔ambient collisions) ran at **0.058 s/step against 0.0068 — 8.5×,
+ETA 12 h 28 m** — because every pair touching an ambient species walks all 5376 cells while
+the target occupies ~1000. Cut back to the target-only 3 pairs, matching both parents, so
+the run differs from `flashic` in exactly one thing. The background is therefore
+collisionless, as in every earlier leg — deliberate, and noted rather than silent.
