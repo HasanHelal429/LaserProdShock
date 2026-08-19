@@ -98,18 +98,25 @@ def series(kin, hyb, want=LEGS):
     for should not cost a pass over its plotfiles, and should not be able to
     fail the figure by being absent.
     """
-    raw = {}
+    # Each run's ION MASS comes from its own config -- P4_lez_kin_flashic_ct runs
+    # m_i = 100 m_e where the others run 2698, and that is 27x in T_e,SS and 27x in the
+    # tau unit. Using the module default for every leg mislabels one of them.
+    def _sc(run_dir):
+        from laserprod import config as lpconfig
+        return X.warpx_scales(float(lpconfig.load(run_dir)["reference"]["mass_ratio"]))
+
+    raw, scs = {}, {}
     if "FLASH" in want:
         raw["FLASH"] = X.flash_series(X.FLASH_DIR, "lez1d")
     if "kinetic" in want:
-        raw["kinetic"] = X.warpx_particles(_require_dir(kin, "kinetic run"),
-                                           X.SP_KIN)
+        d = _require_dir(kin, "kinetic run"); scs["kinetic"] = _sc(d)
+        raw["kinetic"] = X.warpx_particles(d, X.SP_KIN, sc=scs["kinetic"])
     Hf = None
     if "hybrid" in want:
-        raw["hybrid"] = X.warpx_particles(_require_dir(hyb, "hybrid run"),
-                                          X.SP_HYB)
+        d = _require_dir(hyb, "hybrid run"); scs["hybrid"] = _sc(d)
+        raw["hybrid"] = X.warpx_particles(d, X.SP_HYB, sc=scs["hybrid"])
         # The hybrid has no electron macroparticles, so its T_e is the Te FIELD.
-        Hf = X.warpx_fields(hyb)
+        Hf = X.warpx_fields(hyb, sc=scs["hybrid"])
     out = {}
     for name, S in raw.items():
         rows = []
@@ -125,7 +132,7 @@ def series(kin, hyb, want=LEGS):
             sc["tau"] = s["tau"]
             # Reduced forms, derived here so the talk figure and the notebook
             # figure cannot disagree about what "reduced" means.
-            ref = X.TE_REF if name == "FLASH" else X.TSS_REDUCED
+            ref = X.TE_REF if name == "FLASH" else scs[name]["tss"]
             Tp = sc.get("Te_mean_plume", np.nan)
             sc["Te_red"] = Tp / ref if np.isfinite(Tp) else np.nan
             vv = sc.get("v_at_0p1", np.nan)
@@ -487,11 +494,21 @@ def main():
         for side in ("top", "right"):
             ax[j].spines[side].set_visible(False)
         if k == "Te":
-            # Each leg has its OWN Manheimer target: T_e,SS ~ mu^(1/3), and the
-            # WarpX legs run 18.36x lighter. Drawing only 823 eV is the error
-            # RESULTS.md 2026-08-18 retracts.
+            # Each leg has its OWN Manheimer target: T_e,SS ~ mu^(1/3). Drawing only
+            # 823 eV is the error RESULTS.md 2026-08-18 retracts -- and drawing a single
+            # "reduced" line is the NEXT error, since the legs no longer share an ion
+            # mass. One dashed line per distinct m_i actually on the panel.
+            from laserprod import config as lpconfig
             ax[j].axhline(X.TE_REF, color="0.45", ls=":", lw=1.2)
-            ax[j].axhline(X.TSS_REDUCED, color="0.45", ls="--", lw=1.2)
+            for run_dir in (a.kinetic, a.hybrid):
+                try:
+                    mr = float(lpconfig.load(run_dir)["reference"]["mass_ratio"])
+                except Exception:
+                    continue
+                v = X.warpx_scales(mr)["tss"]
+                ax[j].axhline(v, color="0.45", ls="--", lw=1.2)
+                ax[j].text(0.4, v + 10, f"$m_i/m_e$={mr:.0f} ({v:.0f} eV)",
+                           fontsize=8, color="0.35")
             ax[j].set_ylim(0, 1000)
         if k == "Te_red":
             # One line now, because each leg carries its own reference.

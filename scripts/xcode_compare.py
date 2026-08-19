@@ -368,6 +368,7 @@ PALETTE = ("#c1441a", "#7a3fa0", "#2a8a5f", "#b8860b")     # WarpX legs, in orde
 # from opposite directions (front 2.03x vs 0.50x), which is the whole result.
 LEGS_DEFAULT = (("kinetic, analytic IC", "runs/P4/P4_lez_kin_bg"),
                 ("kinetic, FLASH IC", "runs/P4/P4_lez_kin_flashic"),
+                ("kinetic, FLASH IC, mi=100", "runs/P4/P4_lez_kin_flashic_ct"),
                 ("hybrid", "runs/P4/P4_lez_hyb_bg3"))
 
 
@@ -527,7 +528,8 @@ def figure(data, legs, out):
         ax[0, c].set_title(rf"$\tau$ = {tau:.1f}", loc="left", fontsize=9.5,
                            fontweight="bold")
         ax[1, c].axhline(TE_REF, color="0.35", ls=":", lw=1.0)
-        ax[1, c].axhline(TSS_REDUCED, color="0.35", ls="--", lw=1.0)
+        for v, col in {round(q["sc"]["tss"], 1): q["colour"] for q in legs}.items():
+            ax[1, c].axhline(v, color=col, ls="--", lw=1.0, alpha=0.55)
         ax[1, c].set_ylim(0, 1100)
         ax[2, c].set_ylim(-0.5, 6.0)
         ax[2, c].axhline(0.0, color="0.7", lw=0.7)
@@ -544,9 +546,11 @@ def figure(data, legs, out):
     ax[1, 0].text(0.03, TE_REF, f" {TE_REF:.0f} eV real $m_i$",
                   transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
                   color="0.25")
-    ax[1, 0].text(0.03, TSS_REDUCED, f" {TSS_REDUCED:.0f} eV reduced $m_i$",
-                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
-                  color="0.25")
+    for q in legs:
+        ax[1, 0].text(0.03, q["sc"]["tss"],
+                      f" {q['sc']['tss']:.0f} eV  ($m_i/m_e$={q['sc']['mass_ratio']:.0f})",
+                      transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=6.5,
+                      color=q["colour"])
     fig.suptitle("FLASH (real $m_i$) vs the WarpX legs (reduced $m_i$), on the normalised "
                  "axes. $T_e$ and $v$ are solid inside the comparison band and faded "
                  "outside. Overdense interiors are NOT comparable ($n_{max}$ 795 $n_{cr}$ "
@@ -592,17 +596,28 @@ def history(legs, out):
         ax[j].set_title(lab, fontsize=9.5)
         ax[j].grid(alpha=0.15)
         ax[j].set_xlim(0, 27.5)
+    # ONE LINE PER DISTINCT ION MASS. The legs no longer share a mass ratio -- flashic_ct
+    # runs m_i = 100 m_e against the others' 2698 -- so a single "reduced m_i" line would
+    # be the wrong target for at least one curve on the panel.
     ax[0].axhline(TE_REF, color="0.35", ls=":", lw=1.0)
-    ax[0].axhline(TSS_REDUCED, color="0.35", ls="--", lw=1.0)
-    ax[0].set_ylim(0, 1000)
     ax[0].text(0.5, TE_REF + 12, f"Manheimer, real $m_i$ ({TE_REF:.0f} eV)", fontsize=7,
                color="0.25")
-    ax[0].text(0.5, TSS_REDUCED + 12, f"Manheimer, REDUCED $m_i$ ({TSS_REDUCED:.0f} eV)",
-               fontsize=7, color="0.25")
+    seen = set()
+    for leg in legs:
+        v = round(leg["sc"]["tss"], 1)
+        if v in seen:
+            continue
+        seen.add(v)
+        ax[0].axhline(v, color=leg["colour"], ls="--", lw=1.0, alpha=0.55)
+        ax[0].text(0.5, v + 12, f"$m_i/m_e$ = {leg['sc']['mass_ratio']:.0f}  ({v:.0f} eV)",
+                   fontsize=7, color=leg["colour"])
+    ax[0].set_ylim(0, 1000)
     ax[0].legend(loc="lower right", fontsize=8)
     fig.suptitle("The four quantities that survive the mass rescaling. FLASH has real "
-                 "$m_i$; the WarpX legs are 18.36x lighter, so each is plotted against its "
-                 "OWN $d_{i0}$ and $d_{i0}/C_{S0}$.", fontsize=10)
+                 "$m_i$; each WarpX leg is plotted against its OWN $d_{i0}$, "
+                 "$d_{i0}/C_{S0}$ and $T_{e,SS}(\\mu)$ -- and they do NOT share an ion "
+                 "mass (2698 $m_e$, except $m_i$=100 which is 27x lighter again).",
+                 fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(out, dpi=135)
     print(f"  figure: {out}")
@@ -625,16 +640,18 @@ def main():
     banner()
     print(f"\nManheimer steady state  T_e,SS = 5.94 mu^(1/3) Z^(-1/3) lambda^(4/3) I^(2/3)")
     print(f"  real aluminium          : {TE_REF:.0f} eV")
-    print(f"  at the REDUCED ion mass : {TSS_REDUCED:.1f} eV   "
-          f"(mu is down {RESCALE:.2f}x, and T_e,SS ~ mu^(1/3))")
-    print("  ^ this is the reference the WarpX legs must be judged against, NOT 823 eV.")
+    print("  ^ each WarpX leg is judged against ITS OWN value below, NOT 823 eV.")
     print("\nLEGS")
     for leg in legs:
         q = absorbed(leg["path"])
         print(f"  {leg['label']:22s} {leg['path']:34s} "
               f"{'hybrid' if leg['hybrid'] else 'kinetic':8s} "
               + (f"<f_abs> {q['f_mean']:.3f}  E_abs {q['E_abs']:.4e} J/m2"
-                 if q else "(no run.log)"))
+                 if q else "(no run.log)")
+              + f"  | m_i/m_e {leg['sc']['mass_ratio']:6.0f}  mu {leg['sc']['mu']:6.1f}"
+                f"  T_e,SS {leg['sc']['tss']:6.1f} eV"
+                f"  d_i0 {leg['sc']['di0']/DE_CR:5.2f} d_e"
+                f"  tau {leg['sc']['tau']*1e12:.4f} ps")
     print(f"  {'FLASH (rad off)':22s} {FLASH_DIR.split('/')[-1]:34s} "
           f"{'radhydro':8s} <f_abs> 0.870  E_abs 8.2740e+07 J/m2 "
           f"(in its own, 18.36x longer, time base)")
@@ -728,10 +745,13 @@ def figure_reduced(data, legs, out):
     ax[1, 0].text(0.03, 1.0, " each leg's own Manheimer value",
                   transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
                   color="0.25")
+    ss_txt = ", ".join(f"$m_i/m_e$={q['sc']['mass_ratio']:.0f}$\\to${q['sc']['tss']:.0f} eV"
+                       for q in legs)
     fig.suptitle("SIMILARITY-REDUCED. Each leg against its OWN $T_{e,SS}(\\mu)$ and its own "
-                 "measured sound speed -- $T_{e,SS}\\propto\\mu^{1/3}$, so a leg 18.36x "
-                 "lighter is EXPECTED 2.64x cooler. What remains here is real "
-                 "disagreement; what vanishes was the unit map.", fontsize=9.5, y=0.995)
+                 "measured sound speed -- $T_{e,SS}\\propto\\mu^{1/3}$, so a lighter leg is "
+                 "EXPECTED cooler and that is the unit map, not disagreement. The legs do "
+                 "NOT share an ion mass: FLASH$\\to$823 eV, " + ss_txt +
+                 ". What remains here is real.", fontsize=9.0, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.972))
     fig.savefig(out, dpi=135)
     print(f"  figure: {out}")
