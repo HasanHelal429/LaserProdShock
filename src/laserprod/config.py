@@ -279,6 +279,46 @@ def validate(cfg: dict) -> list[str]:
                     raise ValueError(
                         f"collisions.pairs names unknown species {str(nm)!r}; "
                         f"this run has {sorted(known)}")
+    # --- target injector block (optional) ---
+    # Same principle as the collisions block: a species name the deck never creates, or a
+    # box outside the domain, aborts inside WarpX at startup -- after the queue has handed
+    # over the GPU. Catch it at config time.
+    inj = cfg.get("injector") or {}
+    if inj.get("enabled"):
+        from . import deck as _deck          # local import: deck imports config
+        known = set(_deck._species_table(cfg))
+        for key in ("species", "lo_de", "hi_de", "density_over_ncr", "ppc_reference",
+                    "tau_over_wpe"):
+            if inj.get(key) is None:
+                raise ValueError(f"injector.enabled requires injector.{key}")
+        for key in ("species", "neutralizing_species"):
+            nm = inj.get(key)
+            if nm is not None and str(nm) not in known:
+                raise ValueError(f"injector.{key} names unknown species {str(nm)!r}; "
+                                 f"this run has {sorted(known)}")
+        lo, hi = float(inj["lo_de"]), float(inj["hi_de"])
+        if hi <= lo:
+            raise ValueError(f"injector.hi_de ({hi}) must exceed injector.lo_de ({lo})")
+        ax = (cfg.get("geometry") or {}).get("axis") or {}
+        alo, ahi = ax.get("lo_de"), ax.get("hi_de")
+        if alo is not None and ahi is not None and not (float(alo) <= lo < hi <= float(ahi)):
+            raise ValueError(f"injector box [{lo}, {hi}] d_e is not inside the domain "
+                             f"[{alo}, {ahi}] d_e")
+        # The injector REPLENISHES a deficit; pinning above the initial slab density would
+        # make it a source rather than a reservoir, and the run would not be comparable to
+        # one without it.
+        tgt = (cfg.get("plasma") or {}).get("target") or {}
+        n_t = tgt.get("density_over_ncr")
+        if n_t is not None and float(inj["density_over_ncr"]) > float(n_t) * 1.001:
+            raise ValueError(
+                f"injector.density_over_ncr ({inj['density_over_ncr']}) exceeds the "
+                f"target's own density ({n_t}); the injector replenishes a DEFICIT, so a "
+                f"higher value makes it a particle source and G6 will not close")
+        if float(inj["tau_over_wpe"]) <= 0:
+            raise ValueError("injector.tau_over_wpe must be positive")
+        if int(inj["ppc_reference"]) <= 0:
+            raise ValueError("injector.ppc_reference must be positive")
+
     # lnLambda: a constant knob, or evaluated per cell from the local (n_e, T_e).
     # See units.coulomb_log_for for what each mode is and which one is physical.
     if str(las.get("coulomb_log_mode", "constant")) not in COULOMB_LOG_MODES:

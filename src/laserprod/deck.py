@@ -478,6 +478,50 @@ def render(cfg: dict) -> str:
                 a(f"{nm}.ndt_supercycle = {int(col['intervals'])}")
         a("")
 
+    # --- target injector: the SEMI-INFINITE RESERVOIR ------------------------
+    # Ported from PSC's InjectFoil (Source/Particles/TargetInjector/). Each application it
+    # deposits the measured density of `species` and, inside [lo, hi], replenishes the
+    # deficit toward `density` on the relaxation time `tau`, co-injecting
+    # `neutralizing_species` in exact charge balance at the same positions so the
+    # injection adds ZERO net charge.
+    #
+    # WHY THIS EXISTS IN A LASER RUN. FLASH ablates 0.275 % of a 795 n_cr x 295 d_e solid
+    # over 27 tau -- an effectively infinite reservoir -- while a PIC slab capped at
+    # 40 n_cr loses 5-15 % and stops being the same object. That is decision D5, and it
+    # shows up as a PLATEAU-AND-CLIFF profile where FLASH has a smooth exponential
+    # (studies/plume_structure/, 2026-08-18: zero macroparticles beyond zeta = 70 against
+    # FLASH still at 7.5e-3 n_cr at zeta = 100). Pinning the slab converts a disassembling
+    # foil back into a solid.
+    #
+    # PIN THE REAR, NOT THE FACE. The box deliberately stops short of the ablation front:
+    # replenishing the cells the laser is currently eating would suppress the very
+    # dynamics being measured. `lo_de`/`hi_de` are in d_e on the same axis as the rest of
+    # the geometry, so the natural choice is the rear part of the slab.
+    inj = cfg.get("injector") or {}
+    if inj.get("enabled"):
+        sp = str(inj["species"])
+        a("# --- target injector (semi-infinite reservoir, decision D5) -----------")
+        a(f"target_injector.species              = {sp}")
+        neut = inj.get("neutralizing_species")
+        if neut:
+            a(f"target_injector.neutralizing_species = {neut}")
+        a(f"target_injector.intervals            = {int(inj.get('intervals', 1))}")
+        # tau is quoted in 1/wpe, the only clock the deck already carries symbolically.
+        a(f"target_injector.tau                  = {_num(inj['tau_over_wpe'])}/wpe")
+        a(f"target_injector.lo                   = {_num(inj['lo_de'])}*de")
+        a(f"target_injector.hi                   = {_num(inj['hi_de'])}*de")
+        a(f"target_injector.density              = {_num(inj['density_over_ncr'])}*ncr")
+        a(f"target_injector.reference_density    = "
+          f"{_num(inj.get('reference_density_over_ncr', inj['density_over_ncr']))}*ncr")
+        a(f"target_injector.ppc_reference        = {int(inj['ppc_reference'])}")
+        # Injected particles are COLD -- they stand for undisturbed solid, so they carry
+        # the SOLID temperatures, not the corona's. The ion u_std divides by mass_ratio
+        # exactly as the species blocks above do.
+        a(f"target_injector.{sp}.u_std = sqrt(th_ts)")
+        if neut:
+            a(f"target_injector.{neut}.u_std = sqrt(th_tis/mass_ratio)")
+        a("")
+
     solver = (cfg.get("solver") or {})
     if str(solver.get("type", "em")) == "hybrid":
         hyb = solver.get("hybrid") or {}
