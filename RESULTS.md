@@ -3278,3 +3278,147 @@ plume energetics, which is out of reach by construction.
   negatives**: the compiler merges string literals, so `uz_mean_function(x,y,z)` appears
   only inside `ux_mean_functionuy_mean_functionuz_mean_function`. Use a substring search, or
   better, check WarpX's own `Unused ParmParse` list after a smoke run.
+
+---
+
+## 2026-08-18 (final) — The ablation profiles agree better than the figure says: the raw-eV axes carried most of the "mismatch", and D1's "absorption is unfixable" is too strong
+
+**Environment.** No new WarpX runs. Analysis only, on the existing legs
+(`P4_lez_kin_bg`, `P4_lez_kin_flashic`, `P4_lez_hyb_bg3`, FLASH `Ablation_prod_08-17`),
+with `/opt/anaconda3/envs/physics/bin/python`. `scripts/xcode_compare.py` gains
+`figure_reduced()` → `media/xcode/profiles_reduced.png`; `TEST_PLAN.md` §12.2 and criteria
+A2/A3/A4/A6 corrected. 321 tests pass.
+
+### The question
+"The ablation profiles are not matching." Asked of `media/xcode/profiles.png`, that is
+true as drawn — FLASH's `T_e` sits at ~950 eV and the WarpX legs at ~350, and FLASH's
+`v_z/C_S0` runs 1.4× above them. But `profiles.png` plots `T_e` in **raw eV on a shared
+axis** and `v` against `C_S0` evaluated at **823 eV for both codes**, and the 2026-08-18
+retraction earlier in this file already established that neither is the comparable
+quantity. The figure had not been rebuilt to match the retraction.
+
+### How much of the "mismatch" is the axes
+Median |relative difference| against FLASH, over the underdense band
+`1e-2 ≤ n_e/n_cr ≤ 1`, interpolated onto FLASH's `ζ` grid. RAW is `profiles.png` as it
+stood; RED divides `T_e` by each leg's **own** `T_e,SS(µ)` and `v` by the sound speed at
+each leg's **own measured** plume `T_e`.
+
+| τ | leg | A2 `T_e` RAW | A2 RED | A4 `v_z` RAW | A4 RED |
+|---|---|---|---|---|---|
+| 6.7 | kinetic, analytic IC | 59.1 % | **18.6 %** | 56.9 % | 35.3 % |
+| 13.5 | kinetic, analytic IC | 61.7 % | **25.8 %** | 39.2 % | **9.8 %** |
+| 20.3 | kinetic, analytic IC | 63.4 % | **26.6 %** | 34.7 % | 18.5 % |
+| 27.0 | kinetic, analytic IC | 62.9 % | **30.2 %** | 31.8 % | 15.2 % |
+| 13.5 | hybrid | 68.8 % | **29.2 %** | 38.6 % | **15.6 %** |
+| 20.3 | hybrid | 75.8 % | **39.7 %** | 38.7 % | 16.4 % |
+| 27.0 | hybrid | 78.1 % | **42.3 %** | 22.8 % | 18.1 % |
+
+**The normalisation is worth a factor 2–2.5× on both `T_e` and `v_z`**, and A4 reaches
+9.8 % — inside its 10 % tolerance — for the kinetic leg at τ = 13.5. Nothing was re-run;
+this is the same data on the axes §12.2 should always have specified.
+
+### A1 was being measured with the wrong metric
+Point-wise `|Δn_e|/n_e` over the band reads 59–70 % for the kinetic leg at late τ and
+looks like a failure. It is not a meaningful number on a profile that falls **four
+decades** across the plume: at FLASH's `L_n` = 21.4, a `ζ` shift of 0.5 reads as 60 %.
+In log space the same comparison is **0.33 dex (kinetic) and 0.21 dex (hybrid) at
+τ = 27** — a factor ~2 in density at fixed `ζ`, equivalently a plume-front shift of 16.3
+and 10.3 `ζ` out of ~95. **Quote A1 in dex or as an equivalent `ζ` shift, never as a
+point-wise percentage.**
+
+### RETRACTION: "at a reduced mass ratio one can match the ablation dynamics or the absorption, not both"
+That claim (2026-08-18, the D1 entry) is **too strong, and the counter-evidence was
+already in this file**. Its argument holds `T_e` fixed while shrinking the corona:
+`d_i0` is 4.29× smaller, so a normalised-matched corona is 4.29× shorter and was said to
+be unable to carry FLASH's optical depth. But `κ_ib` is not invariant under the map —
+it *rises* by the compensating factor:
+
+```
+κ_ib ∝ n_e² T_e^(−3/2)  at matched n_e/n_cr (λ₀ and n_cr are real in both codes)
+T_e,SS ∝ µ^(1/3)   ⇒   κ ∝ µ^(−1/2)
+L      ∝ d_i0 ∝ µ^(1/2)
+τ_abs  = ∫κ dz ∝ µ^0     ← INVARIANT
+```
+
+The similarity transfer is **optical-depth preserving**, and that is why the paper's
+approach works at all. Checked against our own numbers: from the measured plume
+temperatures (FLASH 839 eV, kinetic 347 eV) the predicted absorbed-fraction ratio is
+**0.877**, and the measured `f_abs` ratio for `P4_lez_kin_bg` is **0.769/0.870 = 0.884**.
+Agreement to **0.8 %**.
+
+### So `P4_lez_kin_flashic`'s absorption deficit is a deck bug, not a limit
+Its IC transferred **three of four quantities in similarity units and one in absolute
+units**:
+
+| IC element | transferred as | consistent? |
+|---|---|---|
+| corona shape, `L_n` = 6.955 `d_e` | FLASH `ζ` × 10 — normalised | yes |
+| corona anchor `n_cr`, offset 2.31 `d_e` | `n_e/n_cr` | yes |
+| drift `v/C_S0` = 0.548 + 0.05598 `ζ` | normalised to WarpX's `C_S0` | yes |
+| **corona `T_e` = 378.3 eV, `T_i` = 115.6 eV** | **absolute eV, straight from FLASH** | **no** |
+
+At the reduced mass ratio the corresponding corona is `378.3 × 18.363^(−1/3)` =
+**143.4 eV**. Setting it 2.638× too hot suppresses `κ_ib` by `2.638^1.5` = **4.29×** —
+which is the whole of its `f_abs` = 0.358 against the analytic leg's 0.769, and the whole
+reason it ends up at 0.54× its own Manheimer value while every other leg sits near 1.0.
+The stale §12.2 rule ("temperatures in absolute eV") is what licensed it.
+
+**Concrete fix, one config edit and a 1 h 27 m GPU re-run:**
+
+```yaml
+theta_e_init: 2.8061e-4   # 143.4 eV  (was 7.4032e-4 = 378.3 eV)
+theta_i_init: 8.5747e-5   #  43.8 eV  (was 2.2622e-4 = 115.6 eV)
+```
+
+**Prediction, stated in advance so it can be falsified:** the re-run lands at
+`f_abs` ≈ 0.7–0.8 and `T_e`/own-SS ≈ 1, i.e. it reproduces the analytic leg's energetics
+*while* keeping the correct exponential corona and critical-surface position — which is
+what would let it beat the analytic leg on `ζ_front` and `L_n`. If instead it over-absorbs
+to `f_abs` → 1 and stays there, the self-limiting `κ ∝ T^(−3/2)` picture is wrong at this
+corona and that is the more interesting result.
+
+### What is left after all of the above — the genuinely open item
+**The `T_e` SHAPE, and only that.** In reduced variables at τ = 27 FLASH is a flat
+plateau at 1.0–1.15 × its own `T_e,SS` across the whole plume; the kinetic leg sits *on*
+that plateau out to ζ ≈ 40 and then **rises** past 2.5; the hybrid is a hump peaking at
+1.45 near ζ ≈ 30–50 and falling either side. The magnitudes now agree where the plume
+carries mass — it is the outer, tenuous region that differs, which is exactly where a
+kinetic tail and a diffusive plateau should part company.
+
+This is unchanged from the earlier entry's ranking, but it is now the *only* item on the
+list rather than one of four, and it has a decisive test that has still never been run:
+**D3 Appendix C, the electron thermal conductivity gate.** The e–i half passed today; the
+conductivity half distinguishes "genuine non-local kinetic transport, and therefore a
+result" from "wrong conductivity, and therefore a bug". Until it runs, the `T_e` shape
+cannot be quoted as either.
+
+### The one lever that removes the whole class of problem
+Every correction in this entry is a power of `µ`. Raising `m_i/m_e` from 2698 toward real
+aluminium's 49542 drives `µ^(1/3)` → 1 and makes the reduced and raw axes coincide.
+Cost scales as `µ` (steps to a fixed τ): the current kinetic leg is 1 h 27 m on one GPU,
+so real mass is ~27 h, and an intermediate `µ` = 10792 (4×) is ~5.8 h. **A two- or
+three-point sweep in `µ` is the cleanest possible demonstration of convergence** — if the
+reduced-variable residuals shrink as `µ` rises, convergence is shown; if they plateau,
+what remains is the kinetic physics and is a result. Nothing else in Phase 4 settles that
+question as directly.
+
+### Consequences
+- `TEST_PLAN.md` §12.2 rewritten with the correction inline, and **A2/A3 now read
+  `T_e/T_e,SS(own µ)`, A4 reads `V_z/C_S(own measured T_e)`, A6 names 312 eV for the
+  reduced-mass legs.** The old text is quoted in the correction block rather than deleted.
+- `media/xcode/profiles_reduced.png` is the panel the acceptance criteria are read on.
+  `profiles.png` is kept — it is the raw-eV view, and it is the one that misleads.
+- Ranked, what to do next: (1) the `flashic` corona-temperature re-run, ~1.5 h, settles
+  the last energetics discrepancy; (2) D3 Appendix C, settles the `T_e` shape; (3) the
+  `µ` sweep, settles convergence as such; (4) re-run `P4_lez_kin_bg` at
+  `collisions.intervals: 1` (~72 min) to retire the 10–15 % cadence uncertainty on the
+  leg the benchmark is quoted from.
+
+### What I first believed and why it was wrong
+That the mismatch needed a new run. It did not — three of the four contributions were in
+the analysis, and the fourth (`flashic`'s absorption) is a two-line config edit rather
+than the structural limit the D1 entry recorded. **The 2026-08-18 retraction of the
+823 eV reference was applied to `xcode_compare.py`'s printed table and to two annotation
+lines, but never to the figure's axes or to `TEST_PLAN.md`'s acceptance criteria** — so
+the project has been reading its own benchmark against a reference it had already
+retired. When a retraction lands, grep for every place the retracted number is used.

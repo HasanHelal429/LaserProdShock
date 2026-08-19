@@ -609,9 +609,97 @@ def main():
     data, _ = collect(legs)
     table(data, legs)
     figure(data, legs, os.path.join(a.outdir, "profiles.png"))
+    figure_reduced(data, legs, os.path.join(a.outdir, "profiles_reduced.png"))
     history(legs, os.path.join(a.outdir, "history.png"))
     return 0
 
+
+
+
+# ---------------------------------------------------------------------------------------
+# The same profiles in SIMILARITY-REDUCED variables.
+# ---------------------------------------------------------------------------------------
+def figure_reduced(data, legs, out):
+    """The same three rows, each leg divided by its OWN references.
+
+    WHY THIS EXISTS. The mass-ratio reduction is not a rescaling of z and t alone.
+    Manheimer's steady state carries T_e,SS ~ mu^(1/3), so a leg run 18.36x lighter is
+    EXPECTED to sit 2.638x cooler, and its flow correspondingly slower, at the same
+    normalised zeta and tau. Plotting T_e in raw eV on a shared axis therefore shows a
+    2.4x "disagreement" that is the unit map working, not the codes disagreeing --
+    TEST_PLAN 12.2's rule "temperatures in absolute eV" and criterion A6's 823 eV both
+    predate the 2026-08-18 retraction and are stale.
+
+    Reduced variables, each leg against ITS OWN reference:
+        n_e/n_cr                            unchanged; already a similarity variable
+        T_e / T_e,SS(own mu)                FLASH / 823, WarpX / 312 -- both near 1
+        v_z / C_S(own MEASURED plume T_e)   removes the sqrt(T) a cool plume carries;
+                                            d["v"] is v/C_S0 at the 823 eV reference, so
+                                            the correction is a divide by sqrt(T/823)
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    names = ["FLASH"] + [q["label"] for q in legs]
+    colour = {"FLASH": COLS["FLASH"]}
+    style = {"FLASH": ("-", 2.0)}
+    for j, leg in enumerate(legs):
+        colour[leg["label"]] = leg["colour"]
+        style[leg["label"]] = (("--", "-.", ":")[j % 3], 1.5)
+    ref_ss = {n: (TE_REF if n == "FLASH" else TSS_REDUCED) for n in names}
+
+    n = len(TAUS)
+    fig, ax = plt.subplots(3, n, figsize=(3.5 * n, 9.6), sharex=True)
+    for c, tau in enumerate(TAUS):
+        for name in names:
+            d = data[tau].get(name)
+            if d is None:
+                continue
+            ls, lw = style[name]
+            inb = np.isfinite(d["ne"]) & (d["ne"] >= BAND[0]) & (d["ne"] <= BAND[1])
+            ax[0, c].semilogy(d["zeta"], np.maximum(d["ne"], 1e-9), color=colour[name],
+                              lw=lw, ls=ls, label=name)
+            # the density-weighted plume T_e of THIS leg at THIS tau sets both corrections
+            Tp = scalars(d["zeta"], d["ne"], d["Te"], d["v"]).get("Te_mean_plume", np.nan)
+            rows = []
+            if d["Te"] is not None:
+                rows.append((1, np.asarray(d["Te"], float) / ref_ss[name]))
+            if d["v"] is not None and np.isfinite(Tp) and Tp > 0:
+                rows.append((2, np.asarray(d["v"], float) / np.sqrt(Tp / TE_REF)))
+            for r, y in rows:
+                ax[r, c].plot(d["zeta"], np.where(inb, y, np.nan), color=colour[name],
+                              lw=lw, ls=ls)
+                ax[r, c].plot(d["zeta"], np.where(inb, np.nan, y), color=colour[name],
+                              lw=lw * 0.7, ls=ls, alpha=0.20)
+        ax[0, c].axhline(1.0, color="0.4", ls=":", lw=0.9)
+        ax[0, c].set_ylim(1e-4, 5e3)
+        ax[0, c].set_title(rf"$\tau$ = {tau:.1f}", loc="left", fontsize=9.5,
+                           fontweight="bold")
+        ax[1, c].axhline(1.0, color="0.35", ls="--", lw=1.0)
+        ax[1, c].set_ylim(0, 2.6)
+        ax[2, c].set_ylim(-0.5, 8.0)
+        ax[2, c].axhline(0.0, color="0.7", lw=0.7)
+        ax[2, c].set_xlabel(r"$\zeta = z/d_{i0}$")
+        for r in range(3):
+            ax[r, c].set_xlim(-8, 110)
+            ax[r, c].grid(alpha=0.15)
+            if c:
+                ax[r, c].tick_params(labelleft=False)
+    ax[0, 0].set_ylabel(r"$n_e/n_{cr}$")
+    ax[1, 0].set_ylabel(r"$T_e\ /\ T_{e,SS}(\mathrm{own}\ \mu)$")
+    ax[2, 0].set_ylabel(r"$v_z\ /\ C_S(\mathrm{own\ measured}\ T_e)$")
+    ax[0, 0].legend(loc="lower left", fontsize=8, framealpha=0.9)
+    ax[1, 0].text(0.03, 1.0, " each leg's own Manheimer value",
+                  transform=ax[1, 0].get_yaxis_transform(), va="bottom", fontsize=7,
+                  color="0.25")
+    fig.suptitle("SIMILARITY-REDUCED. Each leg against its OWN $T_{e,SS}(\\mu)$ and its own "
+                 "measured sound speed -- $T_{e,SS}\\propto\\mu^{1/3}$, so a leg 18.36x "
+                 "lighter is EXPECTED 2.64x cooler. What remains here is real "
+                 "disagreement; what vanishes was the unit map.", fontsize=9.5, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.972))
+    fig.savefig(out, dpi=135)
+    print(f"  figure: {out}")
 
 if __name__ == "__main__":
     raise SystemExit(main())

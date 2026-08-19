@@ -1656,14 +1656,26 @@ Our convention (`src/laserprod/units.py`) is the *real electron, light ion* one 
 axis implies. FLASH, which has no such freedom, really is 800 µm.
 
 **Rule for this phase: compare in NORMALISED units — `(z/d_i0, t/(d_i0/C_S0))`, each code
-using its OWN `d_i0` — with densities in `n_e/n_cr` and temperatures in absolute eV. Never
-overlay two codes on a µm axis in this phase.**
+using its OWN `d_i0` — with densities in `n_e/n_cr` and **temperatures against each code's
+OWN `T_e,SS(µ)`**. Never overlay two codes on a µm axis, and never on a raw-eV axis, in
+this phase.**
+
+> **CORRECTED 2026-08-18** (RESULTS.md, "Phase 4 three-way comparison"). This paragraph
+> used to read "temperatures in absolute eV … temperature is the one absolutely-scaled
+> quantity, and it is absolute precisely because the laser pins it." **That is wrong.**
+> The laser pins Manheimer's steady state, and that steady state carries `µ^(1/3)`:
+> `T_e,SS = 5.94 µ^(1/3) Z^(-1/3) λ^(4/3) I^(2/3)`. At the paper's reduced ion mass µ is
+> 18.363× smaller, so the WarpX legs' own target is **823 / 18.363^(1/3) = 312 eV**, and a
+> leg sitting at 347 eV against FLASH's 839 eV is at **1.11× its own prediction**, not
+> "2.4× too cold". Plotting `T_e` in raw eV on a shared axis shows a 2.4× disagreement
+> that is the unit map working. Velocities inherit the same factor through `C_S ∝ √T_e`
+> and must be divided by the sound speed at each leg's **measured** plume `T_e`; doing so
+> takes the rarefaction coefficient from 1.45× disagreement to **1.002×**.
 
 What survives the rescaling, and is therefore the actual content of the benchmark:
-`n_e/n_cr`, `T_e` and `T_i` in **eV**, the shape and integral of `P_abs`, and every
-dimensionless ratio in §12.6. Temperature is the one absolutely-scaled quantity, and it is
-absolute precisely because the laser pins it — which is the whole reason this benchmark
-bites, and why a scale-free heater run could never do this job.
+`n_e/n_cr`, `T_e/T_e,SS(own µ)`, the shape and integral of `P_abs`, and every dimensionless
+ratio in §12.6. `media/xcode/profiles_reduced.png` is the panel these criteria are read on;
+`profiles.png` keeps the raw-eV axes and is the one that misleads.
 
 A second consequence: WarpX has **real `c` and real `m_e`** and cannot reproduce PSC's
 `m_e c²` = 60 keV. We therefore match the *dimensionless* physics (`n_e/n_cr`, `T_e` in eV,
@@ -1776,11 +1788,11 @@ All at `t` = 0.2, 0.4, 0.6, 0.8 ns, over the **underdense** region `n_e < n_cr`:
 | # | Quantity | Tolerance | Source |
 |---|---|---|---|
 | A1 | `n_e(z)/n_cr` | 20 % | paper §III.A |
-| A2 | `T_e(z)` [eV] | 20 % | paper §III.A |
-| A3 | `T_i(z)` [eV] | 20 % | paper §III.A |
-| A4 | `V_z(z)` | 10 % | paper §III.A |
+| A2 | `T_e(z) / T_e,SS(own µ)` — **not** raw eV, see §12.2 | 20 % | paper §III.A |
+| A3 | `T_i(z) / T_e,SS(own µ)` — **not** raw eV | 20 % | paper §III.A |
+| A4 | `V_z(z) / C_S(own MEASURED plume T_e)` | 10 % | paper §III.A |
 | A5 | `P_abs(z)/n_e` deposition profile | shape + integral | paper Fig. 3(e) |
-| A6 | `T_e` plateau vs `T_e,SS` = 823 eV | factor ~1; the paper's own runs exceed it late | Eq. (15) |
+| A6 | `T_e` plateau vs **that leg's own** `T_e,SS` (823 eV real `m_i`; **312 eV** at the reduced `m_i`) | factor ~1; the paper's own runs exceed it late | Eq. (15) |
 | A7 | critical-surface speed | `V_z(z_cr)` ≈ 0.8 `C_S` (the paper's *measured* value, not the Mach-1 SS assumption) | paper §III.B |
 | A8 | rarefaction `n_e = n_cr e^(−z/C_S t)`, `V_z = C_S + z/t` | nominal agreement | Eqs. (16)–(17) |
 
