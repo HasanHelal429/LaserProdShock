@@ -4914,3 +4914,67 @@ mass give a smaller temperature rise. That is the next thing to measure directly
 PSC's laser module gave **≈5.10** at the critical surface. Domain-mean vs point value are not
 directly comparable, but the coefficient match is **not** established. The conclusion does not
 depend on it: it rests on `f_abs` being matched while `T_e` is not.
+
+---
+
+## 2026-08-20 (deposition) — **where the energy lands is NOT the discriminator**; the partition is
+
+Direct measurement, `P4_lez_kin_ic6_pscheat` re-run with `profile_intervals` = 22120 (divisible
+by `laser.intervals` = 10, so the dumps actually fire — the same LCM trap as `ic6_long`).
+5 deposition profiles, τ_own 0 → 4.31. Physics unchanged; `--verify` OK.
+
+### The hypothesis, and its refutation
+
+RESULTS 2026-08-19 (deposition) found WarpX's median deposition ζ **1.35–1.82× smaller** than
+FLASH's, and I proposed the energy was landing in **denser** plasma — same joules over more
+mass, so a smaller temperature rise. **Measured, that is wrong.**
+
+| τ_own | `⟨n_e⟩_dep` WarpX | `⟨n_e⟩_dep` FLASH | median ζ ratio |
+|---|---|---|---|
+| 0.00 | 0.707 | 0.707 | 1.13 |
+| 1.08 | 0.634 | 0.547 | 1.52 |
+| 2.16 | 0.738 | 0.644 | 2.01 |
+| 3.24 | **0.485** | 0.654 | 1.38 |
+| 4.31 | **0.488** | 0.666 | 1.26 |
+
+Both codes deposit at `n_e` ≈ **0.5–0.7 `n_cr`** — at the critical surface, as they should —
+and **late in the run WarpX deposits into *less* dense plasma than FLASH**, the opposite of
+the hypothesis. The profiles overlay across four decades
+(`media/P4/P4_lez_kin_ic6_pscheat/paper_fig3e_bytime.png`) and the median-ζ ratio *converges*
+1.52 → 1.26 once the heating is PSC-equivalent. The earlier 1.35–1.82× was measured on the
+un-fixed `ic6`, where the temperature floor was distorting the coefficient.
+
+### What the energy actually does
+
+The laser deposits into **electrons only** (`laser_deposition.species = targ_electrons`), so
+every joule in the ion column arrived there from the electrons. At τ_own 5.39:
+
+| run | `E_abs` | `ΔE_e` | `ΔE_i` | electron share |
+|---|---|---|---|---|
+| control | 2.380e5 | **−1.443e4** | +1.941e5 | **−0.08** |
+| **no collisions** | 1.563e5 | +2.402e4 | +1.261e5 | **0.16** |
+| floor 20 eV | 5.257e5 | +1.620e5 | +2.711e5 | 0.37 |
+| PSC-equiv | 4.367e5 | +8.657e4 | +2.429e5 | 0.26 |
+
+**Ions take 74 % of the absorbed energy — and 84 % with collisions switched entirely off.**
+So the electron→ion transfer is **not collisional**: it is the ambipolar field doing work on
+the ions, i.e. the absorbed energy is promptly converted into plume *directed* motion instead
+of staying as electron heat. In the production control the electrons **net lose** energy.
+
+### The plume band, for scale
+At τ_own 5.39 the 1e-2…1 `n_cr` band holds `N` = 3.18e21 electrons/m² in WarpX against
+**2.38e22 in FLASH** (7.5× fewer), each at **188 eV against 653 eV** (3.5× cooler). FLASH's
+band *count* grows 6.4× over the window as its target ablates into it; WarpX's grows 2.8×.
+
+### Standing eliminations
+Initial conditions (equivalent), laser kernel (cross-validated 8e-9), collision cadence
+(refuted), Perez `σ_max` cap (inactive on e–i, wrong-signed), collisions entirely (~25 % of the
+gap), temperature floor (real, ~⅓ of the gap), full PSC-equivalent heating (`f_abs` matched,
+`T_e` unmoved), and now **deposition location**. What remains is the **energy partition**:
+WarpX converts absorbed energy into ion motion where FLASH holds `T_i/T_e` = 0.33 and PSC
+keeps `T_e` at 0.92× FLASH on the *same* absorbed fraction.
+
+### The gap in the evidence
+PSC's energy partition is **not** measured — my PSC `T_i` normalisation is still wrong (it
+reads ~16× `T_e`, a missing mass factor). Fixing it is now the single most valuable next step,
+because PSC absorbing what WarpX absorbs while staying hot is the whole remaining puzzle.

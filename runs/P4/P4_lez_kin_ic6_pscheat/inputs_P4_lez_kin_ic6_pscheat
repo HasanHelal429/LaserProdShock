@@ -180,7 +180,7 @@ laser_deposition.ray_cfl              = 0.25
 laser_deposition.intervals            = 10
 # per-cell (coords, n_e, H, P_abs) dump. ANALYSE THE STEP-0 TABLE: later
 # dumps drift as the kicks move electrons.
-laser_deposition.profile_intervals    = 27648
+laser_deposition.profile_intervals    = 22120
 laser_deposition.profile_prefix       = diags/laserdep_profile
 
 # --- diagnostics ---

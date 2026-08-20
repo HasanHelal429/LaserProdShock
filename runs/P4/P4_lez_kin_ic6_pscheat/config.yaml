@@ -44,7 +44,7 @@ laser:
   coulomb_log_mode: nrl               # PSC computes lnLambda per cell
   intervals: 10
   ray_cfl: 0.25               # gate G4
-  profile_intervals: 27648
+  profile_intervals: 22120   # divisible by laser.intervals=10 -> 5 real dumps
   beam:
     profile: uniform          # paper: "spatially uniform intensity, normally incident"
     rays_per_cell: 1
