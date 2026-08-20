@@ -4727,3 +4727,44 @@ both be true, and that tension is now the thing to resolve.**
 PSC's `T_i` normalisation (my read gives 7200–8000 eV, ~16× `T_e`, certainly a missing mass
 factor in my reader). PSC's `f_abs` at an overdense target. Both need fixing before the
 finished run is analysed.
+
+---
+
+## 2026-08-19 (collision cadence) — supercycling is NOT the cause; the operator's RATE is
+
+`runs/P4/P4_lez_kin_ic6_coll1` — `P4_lez_kin_ic6` with `collisions.intervals` 10 → 1 and
+**nothing else changed** (`laser.intervals` stays 10; deck diff is `max_step` and the three
+`ndt_supercycle` lines only). 110592 steps, 14 min, `--verify` OK. `P4_lez_kin_ic6` is the
+matched control and its dumps already land on the comparison times.
+
+| τ_own | `T_e` ndt=10 → ndt=1 | `T_i/T_e` ndt=10 → ndt=1 | FLASH `T_e` | PSC `T_e` |
+|---|---|---|---|---|
+| 0.00 | 377.2 → 377.2 | 0.308 → 0.308 | 378.3 | 371.3 |
+| 1.35 | 131.8 → **126.7** | 1.216 → **1.069** | 472.4 | 454.7 |
+| 2.70 | 119.3 → **106.5** | 1.198 → **1.089** | 559.3 | 516.0 |
+| 5.39 | 123.4 → **121.2** | 1.172 → **1.173** | 646.3 | 562.9 |
+
+**Falsified.** Collisions every step give a small, transient improvement in `T_i/T_e` that has
+**completely vanished by τ 5.39**, and `T_e` ends *lower*, not higher — the correct direction
+for more equilibration but nowhere near enough. WarpX still runs at **0.19 × FLASH** where PSC
+runs at 0.87.
+
+**What this clears and what it leaves.** The cadence is no longer a suspect: the
+over-equilibration is set by the collision operator's *rate*, not its application frequency.
+Remaining differences between the two codes' collision setups (RESULTS same date, above):
+
+1. **WarpX has no reduced-parameter correction of any kind**, where PSC applies two explicit
+   ones — an overall `(511/60)²` = 72.5× for its reduced speed of light, and
+   `√(1836.15/ReducedMassRatio)` = **4.285×** on ion–ion for the reduced mass ratio.
+2. **Different regimes**: PSC's own counters put **78 %** of its collisions in the large-angle
+   branch here, while WarpX's Perez `σ_max` cap engages on ~1.7 % of the production plume.
+3. **Species treatment**: WarpX runs three separately-configured pairwise operators; PSC pairs
+   all particles in a cell without separating by species.
+4. lnΛ runs the *wrong way* to explain anything — PSC's collision value ≈8.28 exceeds WarpX's
+   6.3 by 31 %, so PSC should equilibrate faster, and does not.
+
+The Perez `σ_max` cap (D3's "1.5 capped point") is now the leading suspect, followed by the
+absence of a mass-ratio correction.
+
+**Cost**: 0.0076 s/step vs the control's 0.0023 — **3.3×** for `intervals: 1`, well above the
+~1.15× that D3's "10–15 % at `ndt` = 10" would suggest.
