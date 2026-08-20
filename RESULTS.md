@@ -4624,3 +4624,106 @@ absorption physics is right; the transport is what is not.
 regenerated with the thick leg. `paper_fig3` is NOT generated for this run: its 8.99 τ dump
 spacing is too coarse for the paper's 0–19 τ window (two of the four times snap to one dump).
 `P4_lez_kin_ic6` remains the paper-comparison leg.
+
+---
+
+## 2026-08-19 (PSC preliminary) — the WarpX discrepancy is **electron–ion over-equilibration**, not the laser, not the IC
+
+`~/psc-raytrace/run_ourflash` at 11 % (through FLASH `t` = 0.20 ns). PSC runs the **same
+reduced mass ratio** as the WarpX legs (`m_p/m_e` = 100 ⇒ `m_Al/m_e` = 2698) and the **same
+IB kernel**, so it isolates what is WarpX-specific. Preliminary, but the three comparisons
+below are already decisive.
+
+### 1. The laser deposition modules are the same function
+
+Operator-level cross-validation was completed 2026-08-03: PSC's `get_lnlambda` vs our `nrl`
+agree to **0.000e+00** over 1681 points, the IB coefficient to **6.7e-16**, and compiled
+WarpX C++ vs PSC to **8e-9**. What differs is how it is *applied*:
+
+| | WarpX `ic6` | PSC |
+|---|---|---|
+| Coulomb log | **constant 6.3** | **per-cell, ≈5.10** measured at the critical surface |
+| application cadence | every **10** steps | every **1** step |
+| turning point | marched at `ray_cfl` = 0.25 | analytic closed form (and it needed the NaN guard, this session) |
+| collisions | every 10 steps | every 10 steps — **matched** |
+
+lnΛ 6.3 vs 5.1 makes WarpX's coefficient **1.23×** larger per unit path. Yet measured `f_abs`
+is similar (WarpX 0.478 at τ 27; PSC 0.47–0.56) and **both sit near half of FLASH's 0.870**.
+So the absorbed fraction is a shared PIC-vs-FLASH gap, not a PSC-vs-WarpX one.
+*Caveat*: PSC's `f_abs` diagnostic is documented valid only for **sub-critical** profiles, and
+this target is overdense — so PSC's absorbed fraction is not yet quotable.
+
+### 2. The initial conditions are equivalent — this is ruled out
+
+Measured at the handoff (FLASH `t` = 0.1 ns), each code as it actually starts:
+
+| | `ζ_cr` | `ζ_front` | `L_n` | `T_e` plume |
+|---|---|---|---|---|
+| FLASH (truth) | 0.273 | 3.430 | 0.716 | 378.3 eV |
+| PSC (interpolated FLASH) | 1.016× | 1.307× | 1.107× | 0.981× |
+| WarpX `ic6` (4-parameter analytic fit) | 1.123× | 1.011× | 0.971× | 1.002× |
+
+On the underdense ramp *where the laser is absorbed* the profiles agree to a few percent
+(at ζ = 2: FLASH 0.0926, PSC 0.0894, WarpX 0.0892 `n_cr`). **The analytic fit is as good a
+starting point as the interpolated profile.**
+
+### 3. Where it actually diverges: temperature, not hydrodynamics
+
+All three codes at the **same absolute time**:
+
+| t | code | `ζ_front` | `L_n` | `T_e` plume |
+|---|---|---|---|---|
+| 0.15 ns | FLASH | 5.91 | 1.35 | **472 eV** |
+| | PSC | 1.28× | 1.21× | **0.96×** |
+| | WarpX | 1.09× | 1.15× | **0.32×** |
+| 0.20 ns | FLASH | 10.85 | 2.40 | **559 eV** |
+| | PSC | 0.98× | 1.05× | **0.92×** |
+| | WarpX | 0.88× | 0.99× | **0.22×** |
+
+**WarpX's density structure tracks FLASH as well as PSC's does. Only its temperature is
+wrong.**
+
+### The mechanism: WarpX equilibrates `T_e` and `T_i` within one ion response time
+
+The `T_i` moment was validated against the config's own IC (measured 116.3 eV vs
+`theta_i_init` = 115.6 eV; `T_e` 377.2 vs 378.3).
+
+| τ_own | `T_e` | `T_i` | `T_i/T_e` |
+|---|---|---|---|
+| 0.00 | 377.2 | 116.3 | **0.308** — matches FLASH's 0.293 |
+| 1.35 | 131.8 | 160.2 | **1.216** |
+| 2.70 | 119.3 | 143.0 | 1.198 |
+| 5.39 | 123.4 | 144.7 | 1.172 |
+
+FLASH holds `T_i/T_e` = 0.29–0.33 for its whole run. **WarpX destroys the `T_e ≫ T_i` state —
+the paper's headline result — inside one τ.** Total electron energy is *not* lost (it grows
+3.6× by τ 27), so this is an **energy-partition** failure, not an absorption failure: the
+absorbed energy is thermalised into the ions instead of staying in the electrons.
+
+That also explains why the hydrodynamics survives: equilibration redistributes energy between
+species without immediately changing the total pressure driving the expansion, so `ζ_front`
+and `L_n` stay close to FLASH while `T_e` collapses.
+
+### Two hypotheses tested and DISCARDED
+
+- **Diagnostic binning.** `warpx_particles` bins 400 cells over 2500 `d_e` (6.25 `d_e`/bin)
+  against a corona scale length of 6.955 `d_e`. Refining to 12500 bins (0.20 `d_e`, matching
+  PSC's grid) moved `T_e` at τ 2.7 from 121.5 → **110.4 eV** — *down*, not up. The 4× deficit
+  is physical, not an artifact.
+- **The reduced mass ratio.** PSC runs the identical ratio and does *not* show the collapse.
+  This **undercuts the conduction hypothesis** from the thick-target entry above, which
+  attributed the WarpX overshoot to 4.285×-slower electron transport on the ion clock. Same
+  ratio, different answer ⇒ the ratio is not sufficient.
+
+### Where this points
+WarpX's Coulomb collision operator (`type: coulomb`, Perez et al. 2012 with the `σ_max` cap,
+`intervals: 10`, global lnΛ = 6.3). Note PSC rescales its collision frequency explicitly for
+the reduced parameters (`nudt0 *= ReducedSoL² (511000/temp_phys)²`); WarpX has no equivalent
+rescaling. **The D3 gate passed e–i thermalisation against Lezhnin Eq. (B1) — which is itself
+an equilibration formula — so "matches B1" and "over-equilibrates relative to PSC/FLASH" can
+both be true, and that tension is now the thing to resolve.**
+
+### Not yet quotable
+PSC's `T_i` normalisation (my read gives 7200–8000 eV, ~16× `T_e`, certainly a missing mass
+factor in my reader). PSC's `f_abs` at an overdense target. Both need fixing before the
+finished run is analysed.
