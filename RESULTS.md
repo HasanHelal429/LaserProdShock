@@ -4768,3 +4768,56 @@ absence of a mass-ratio correction.
 
 **Cost**: 0.0076 s/step vs the control's 0.0023 — **3.3×** for `intervals: 1`, well above the
 ~1.15× that D3's "10–15 % at `ndt` = 10" would suggest.
+
+---
+
+## 2026-08-19 (root cause) — it is **absorption**, not collisions: `Tlocalfrac` ≈ 0 and WarpX absorbs 3–6× too little
+
+`runs/P4/P4_lez_kin_ic6_nocoll` — `ic6` with `collisions.enabled: false`, deck differing from
+`ic6_coll1` by **exactly the removed collision block**. 3 min, `--verify` OK, zero
+`pairwisecoulomb` entries in `warpx_used_inputs`.
+
+### The σ_max cap, cleared without a rebuild
+
+Two independent arguments: (i) `sigma_eff = min(π b0² lnΛ, σ_max)` can only **reduce** `s12`,
+so removing the cap makes equilibration *faster* — the wrong direction; (ii) on **e–i**, the
+channel governing `T_e`↔`T_i`, `(π b0² lnΛ)/σ_max` = **0.055 / 0.255 / 1.18** at
+n = 0.01 / 0.1 / 1 `n_cr` (120 eV) — essentially inactive across the plume band. It *is*
+strongly active on **i–i** (3–680), but i–i moves no energy between species.
+
+### Collisions off: three-quarters of the gap survives
+
+| τ_own | ndt=10 | ndt=1 | **OFF** | FLASH | PSC |
+|---|---|---|---|---|---|
+| 2.70 `T_e` | 119.3 | 106.5 | **176.7** | 559.3 | 516.0 |
+| 2.70 `T_i/T_e` | 1.198 | 1.089 | **0.468** | 0.325 | — |
+| 5.39 `T_e` | 123.4 | 121.2 | **162.5** | 646.3 | 562.9 |
+
+Collisions drive the `T_i/T_e` inversion, but `T_e` recovers only 0.19× → **0.25×** FLASH.
+
+### The root cause: `f_abs`
+
+| τ_own | WarpX `ic6` | PSC | FLASH |
+|---|---|---|---|
+| 0.50 | **0.153** | 0.47 | 0.870 |
+| 2.70 | **0.218** | 0.56 | 0.870 |
+| 5.39 | **0.322** | ~0.5 | 0.870 |
+
+**WarpX absorbs 3× less than PSC and 4–6× less than FLASH** on the same IC with a kernel
+cross-validated to 8e-9. Its electrons therefore cool (377 → 177 eV even with collisions off)
+where FLASH's heat (378 → 559 eV) — expansion beats the drive.
+
+**Leading candidate: `Tlocalfrac` ≈ 0.0000 for the entire run.** `temperature_mode: local`
+never delivers a measured per-cell `T_e`, so the IB coefficient uses the **fallback**
+`electron_temperature` = 378.3 eV rather than the ~120 eV plume. `K ∝ T^(-3/2)` makes that a
+**5.6×** under-estimate — the size of the deficit. Gate G5 says "Watch `Tlocalfrac`"; it was
+not watched. Note the sign is the *opposite* of G5's stated worry (it warns per-cell noise
+biases absorption HIGH; here the fallback biases it LOW).
+
+**Confirmation still needed**: `temperature_mode: constant` at ~130 eV should raise `f_abs`
+~5×; and/or raise ppc until `Tlocalfrac` is O(1).
+
+### RETRACTED
+**The collision hypothesis.** RESULTS 2026-08-19 (PSC preliminary) said "the WarpX discrepancy
+is electron–ion over-equilibration". **Demoted**: real and collision-driven, but only ~25 % of
+the `T_e` gap. Cadence and `σ_max` are cleared; absorption is the primary cause.
