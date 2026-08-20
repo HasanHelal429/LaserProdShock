@@ -1,0 +1,205 @@
+meta:
+  run_id: P4_lez_kin_ic6_tfloor
+  phase: 4
+  deck: inputs_P4_lez_kin_ic6_tfloor
+  description: CHECK A -- lower laser.temperature_floor_theta from its default (= electron_temperature
+    = 378.3 eV) to 20 eV. LaserDeposition.cpp:703 sets m_theta_floor = m_theta_e, and the
+    gate at :1017 accepts a measured cell temperature ONLY if kT > kT_floor. The plume is
+    ~120 eV, so the measurement is never accepted, Tlocalfrac reads 0, and K is evaluated
+    at 378.3 eV everywhere. K ~ T^-3/2 makes that a 5.6x under-estimate of absorption.
+    PREDICTION -- Tlocalfrac becomes O(1), f_abs rises ~5x toward PSC/FLASH, T_e rises.
+  reference: TEST_PLAN.md 12; decision register runs/P4/README.md (D1-D8)
+
+reference:
+  # Aluminium at the paper's REDUCED proton mass ratio m_p/m_e = 100:
+  #   m_Al/m_e = 26.98 * 100 = 2698.
+  # NOTE the unit trap (TEST_PLAN 12.2): deck.py forms di = de*sqrt(mass_ratio),
+  # which is the ALUMINIUM skin depth (51.94 d_e). The paper's d_i0 is the PROTON
+  # skin depth at n_cr, = 10 d_e. Every comparison figure uses the PAPER's d_i0.
+  length_scale: critical
+  mass_ratio: 2698.0
+  charge_state: 13
+
+laser:
+  wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
+  intensity: 1.0e17           # = 1e13 W/cm^2, the paper's value
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 13.0                 # fully ionised Al, as in FLASH and PSC
+  coulomb_log: 6.3            # NRL e-i at n_cr, T_e = 823 eV, Z = 13 -> 6.3.
+                              # The paper applies ONE GLOBAL lnLambda box-wide; our
+                              # operator can do per-cell (the lnLambda column). See
+                              # TEST_PLAN 12.8 risk 4 -- record BOTH, do not silently
+                              # switch.
+  temperature_mode: local
+  temperature_floor_theta: 3.914e-5   # 20 eV (was defaulting to th_t = 378.3 eV)
+  intervals: 10
+  ray_cfl: 0.25               # gate G4
+  profile_intervals: 27648
+  beam:
+    profile: uniform          # paper: "spatially uniform intensity, normally incident"
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 10.0    # paper's n_max,PIC. Their Appendix A scan (2/5/10/20 n_cr)
+                              # finds T_e matches FLASH only for n_max >= 5 n_cr. Real
+                              # solid Al is ~700 n_cr -- so the OVERDENSE interior is a
+                              # different object here than in FLASH, and TEST_PLAN 12.6
+                              # excludes n_e > n_cr from the acceptance criteria.  [D5]
+    thickness_de: 45          # = 4.5 d_i0 (paper), with d_i0 the PROTON skin depth
+    center_de: -22.5          # solid-vacuum interface at z = 0, as in both codes
+    # THE FLASH-FITTED CORONA (from P4_lez_kin_flashic). Fitted over 1e-3..1 n_cr to the
+    # delivered FLASH run at t = 0.1 ns: an exponential of scale 6.955 d_e anchored at n_cr,
+    # which sits 2.3144 d_e in front of the target face. rms(ln n) = 0.107 against the
+    # Gaussian's 0.361, and a Gaussian cannot be tuned into it -- its local scale length
+    # L^2/(2z) varies through the corona, so matching L_n at 0.1 n_cr forces the critical
+    # surface out to 24-42 d_e where FLASH has it at 2.31.
+    corona_profile: exponential
+    scale_length_de: 6.955
+    corona_density_over_ncr: 1.0
+    corona_offset_de: 2.3144
+    shape: planar
+    theta_e_init: 7.4032e-4    # 100 eV -- the 0.1 ns ablation layer, NOT the 290 K cold
+                              # solid. PSC never sees the cold solid; it starts after it.
+    theta_i_init: 2.2622e-4   # 115.6 eV -- FLASH's corona T_i, so T_e/T_i = 3.27 at t=0
+    theta_e_solid: 3.914e-5   # 20 eV in the SOLID. NOT FLASH's 0.1377 eV: the cold solid is
+    theta_i_solid: 3.914e-6   # Debye-unresolvable, so this is a known departure, not a fit.
+    # The handoff state is a rarefaction ALREADY IN MOTION: FLASH's corona carries
+    # v/C_S0 = 0.548 + 0.05598 zeta, reaching 4-5 C_S0 at its tip. Starting it at rest is
+    # visible in the comparison as an early front-position excess.
+    drift_uz_de: [1.5271e-3, 1.5593e-4]    # 10 eV; the paper's T_e/T_i >> 1 is a headline result
+  ambient: null               # paper: "We do not introduce any chamber gas ... since we
+                              # are unable to fully capture the physics at such low
+                              # densities." FLASH needs one (1e-10 g/cm^3); PIC does not.
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1                     # [D7] paper verified 1D == quasi-1D in BOTH codes
+  normal_axis: z
+  dz_over_de: 0.5             # paper uses 0.2 (5 cells/d_e); 0.5 is the project default
+                              # and the first rung of the resolution ladder
+  axis:
+    lo_de: -50                # ~5 d_i0 behind the interface, holding the 45 d_e target
+    hi_de: 2450             # 2500 d_e total. The paper's 1000 d_e box does NOT hold
+                              # this run: MEASURED 2026-08-13, the front reaches 949.8
+                              # of 950 d_e at 24.6 ps -- 45% through -- and is pinned
+                              # there for the remaining 30 ps. Before that it is clean
+                              # (T_e passes 866 eV at 24.6 ps, within 5% of the 823 eV
+                              # steady state); after, T_e climbs to 2.9x SS because the
+                              # confined plasma cannot expand and the critical surface
+                              # collapses to 3.2 d_e. The paper's comparison times
+                              # 0.2/0.4/0.6/0.8 ns map to 10.9/21.9/32.8/43.7 ps here,
+                              # so 1000 d_e delivers only the first TWO of four.
+  boundary:
+    axis:
+      # ASYMMETRIC, and both faces are deliberate.
+      #
+      # lo = REFLECTING (the target REAR). The target spans -45..0 d_e with the wall at
+      # -50, so only 4.5 d_e sit behind it. With an ABSORBING rear the laser-driven
+      # compression reaches the wall and PILES UP: measured on P4_lez_kin_bg, the global
+      # max(n_e) sat at z = -48.2 d_e from ~7 ps on (3.05 n_cr against a plume peak of
+      # 1.14), nearly charge-neutral, so compressed target material rather than a sheath.
+      # Quoting it as a plume density inverted the A1 verdict -- raw peak ratio 0.37 where
+      # the interior ratio is 0.98. Reflecting stands for the rest of a thicker target
+      # (the paper's choice) and removes the artificial rear mass loss.
+      #
+      # hi = OPEN (the plume side). Reflecting there turns the fast tail around and makes
+      # counterstreaming the single electron fluid cannot represent: 44% returning ions
+      # behind a density slit of 1e10x contrast. The plume must be allowed to leave.
+      lo: reflecting
+      hi: open
+numerics:
+  density_min_frac: 1e-06
+  arena_init_size_mb: 3072
+  cfl: 0.35
+  particle_shape: 2
+  max_grid_size: 5000         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
+                              # is 7.9x faster with one box than with the default
+                              # decomposition, which is only 1.2x (project memory). The
+                              # default splits a 2000-cell domain into small boxes and the
+                              # per-box launch overhead dominates. Harmless on CPU.
+  max_step: 110592            # tau_own 5.39; ic6's dump cadence kept so times match
+                              # 26.9 ion response times == the paper's 1 ns pulse.
+                              #
+                              # THIS IS 54.66 ps OF WarpX TIME, NOT 1000 ps. The two are
+                              # the same physical state under the reduced mass ratio: time
+                              # scales as L/v ~ sqrt(m)*sqrt(m) = m, so the factor is the
+                              # FULL mass-ratio reduction 1836/100 = 18.36, not its square
+                              # root. (Lengths carry sqrt(1836/100) = 4.29 -- see
+                              # TEST_PLAN 12.2. Different quantities, different powers.)
+                              # Any plot of this run against the paper on a picosecond
+                              # axis is wrong by 18.36x.
+  ppc:
+    target: 500               # [D6] first rung of the ladder 500 -> 2000 -> 10000.
+                              # The paper's 1e5 ppc buys only the 1e-5 n_cr tail (~18 GPU-h).
+                              # NOTE: the paper's ppc is quoted AT n_cr with equal weights,
+                              # so its ppc scales with density; ours does not. Not the same
+                              # convention -- compare resolved dynamic range, not the number.
+    ambient: 0
+
+collisions:                   # ==== NOT YET EMITTED BY deck.py -- see TEST_PLAN 12.3 ====
+  enabled: true               # The paper: "auxiliary simulations with either collisions or
+                              # laser heating turned off demonstrated drastically different
+                              # plasma evolution." This run is meaningless without them.
+  type: coulomb               # WarpX BinaryCollision, pairwise Coulomb
+  intervals: 10               # production cadence; these runs test ABSORPTION
+  coulomb_log: 6.3            # single global value, matching the paper's simplification
+  pairs:                      # names must match the species the deck emits
+    - [targ_electrons, targ_electrons]
+    - [targ_electrons, targ_ions]
+    - [targ_ions, targ_ions]
+
+diagnostics:
+  plotfile_intervals: 27648   # 20 dumps; the paper compares at 0.2/0.4/0.6/0.8 ns
+  field_intervals: 6912
+  phase_intervals: 27648      # f(v_z) vs local Maxwellian is a headline result (their Fig 8)
+  reduced_intervals: 1024
+
+gates:
+  omega_pe_dt_max: 1.2        # at 10 n_cr: sqrt(10)*0.175 = 0.55, passes
+  dz_over_lambdaD_max: 8.0    # WILL WARN in the cold dense target, as in every prior run
+  ppc_target_min: 500
+  compression_factor: 2.0
+
+controls:
+  laser_off: P4_lez_kin_ic6_off   # ITS OWN control. This inherited `P4_lez_kin_off` from
+                              # the config chain, which is the control for a DIFFERENT deck
+                              # -- Gaussian corona, 100 eV, four decades of dynamic range.
+                              # A G3 subtraction is only meaningful against a run that
+                              # differs in the laser and nothing else.
+
+  sibling_hybrid: P4_lez_hyb  # identical physics, different electron closure
+  sibling_flash: P4_lez_flash
+  ppc_ladder: [500, 2000, 10000]
+  ray_cfl_ladder: studies/p4_ray_cfl (TO BE RUN -- the existing studies/exit_overshoot
+    ladder was measured on a 1.5 n_cr target with NO interior critical surface. This run
+    is 10 n_cr, so the ray turns inside the plasma and G4's non-monotonicity warning
+    genuinely applies. The deposition profile is acceptance criterion A5, so the ladder
+    is not optional bookkeeping here -- rerun 0.05/0.10/0.25/0.50 at THIS target density
+    before the production run.)
+  collision_gate: paper Appendix B (e-i thermalisation vs Eq. B1) and Appendix C
+    (conductivity) MUST pass before this run is believed -- TEST_PLAN 12.8 risk 1
+
+targets:
+  # The hard, sign-checked anchor. Eq. (15) of the paper carries Z^(-1/3), NOT Z^(+1/3);
+  # a text extraction of the PDF drops the minus sign. With mu = 26.98, Z = 13,
+  # lambda = 1.064 um, I = 1e13 W/cm^2:
+  T_e_SS_eV: 823.0
+  C_S_km_s: 195.0
+  d_i0_real_um: 7.256
+  ion_response_time_ps: 37.2
+  pulse_in_response_times: 26.9
+  # Acceptance, from the paper's own tolerances (TEST_PLAN 12.6), underdense region only:
+  tol_n_e: 0.20
+  tol_T_e: 0.20
+  tol_T_i: 0.20
+  tol_V_z: 0.10
+  critical_surface_speed_over_Cs: 0.8   # the paper's MEASURED value, not the SS Mach-1
+  note: This run is expected to PASS all of A1-A8. It is the leg with the fewest closure
+    assumptions, so if it disagrees with FLASH the fault is most likely ours (collisions
+    under a reduced mass ratio -- see controls.collision_gate), not FLASH's.

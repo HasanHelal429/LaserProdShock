@@ -4821,3 +4821,51 @@ biases absorption HIGH; here the fallback biases it LOW).
 **The collision hypothesis.** RESULTS 2026-08-19 (PSC preliminary) said "the WarpX discrepancy
 is electron–ion over-equilibration". **Demoted**: real and collision-driven, but only ~25 % of
 the `T_e` gap. Cadence and `σ_max` are cleared; absorption is the primary cause.
+
+---
+
+## 2026-08-19 (floor) — the temperature floor confirmed: `f_abs` doubles, but only ~⅓ of the `T_e` gap closes
+
+Two single-variable runs against the `P4_lez_kin_ic6` control, on identical dump times.
+
+**Source finding first.** `LaserDeposition.cpp:703` sets `m_theta_floor = m_theta_e` — the
+floor **defaults to `electron_temperature`** — and the gate at :1017 accepts a measured
+per-cell temperature **only if `kT > kT_floor`**. With `electron_temperature` = `th_t` =
+378.3 eV and a ~120 eV plume, the measurement is never accepted: `Tlocalfrac` = 0 and `K` is
+evaluated at 378.3 eV everywhere.
+
+| τ_own | control `f_abs`/`Tloc` | **A: floor 20 eV** | **B: ppc 2000** |
+|---|---|---|---|
+| 0.50 | 0.142 / 0.000 | **0.308 / 0.233** | 0.126 / **0.000** |
+| 2.70 | 0.217 / 0.000 | **0.545 / 0.394** | 0.187 / **0.000** |
+| 5.39 | 0.319 / 0.000 | **0.634 / 0.667** | 0.268 / **0.000** |
+
+- **A confirms the diagnosis.** `Tlocalfrac` activates at step 0 (0.001 → 0.43); `f_abs`
+  doubles into PSC's 0.47–0.56 band; `E_abs` to τ 5.39 rises **2.2×** (2.38e5 → 5.26e5 J).
+- **B is the null that makes A interpretable.** At **4× the particles** `Tlocalfrac` is still
+  **0.000** and `f_abs` is unchanged. The blocker is the floor, not statistics
+  (`min_macroparticles_per_cell` defaults to 4, trivially met at 500 ppc).
+
+### But it does not close the gap
+
+| τ_own | `T_e`/FLASH: control | nocoll | **floor 20 eV** | ppc 2000 | PSC |
+|---|---|---|---|---|---|
+| 2.70 | 0.213 | 0.316 | **0.330** | 0.238 | 0.923 |
+| 5.39 | 0.191 | 0.251 | **0.308** | 0.223 | 0.871 |
+
+Doubling the absorbed energy buys ~+55 % of `T_e`, from 0.19–0.21× to **0.31–0.33×** FLASH.
+WarpX remains **~3× below** FLASH and PSC. Removing collisions entirely buys a similar +50 %.
+Neither effect, nor plausibly both together, accounts for a 4–5× deficit.
+
+### Standing conclusion
+Two **real, confirmed defects** are now on the record — a temperature floor that halves the
+absorbed energy, and a collisional `T_i/T_e` inversion absent from FLASH and PSC — and
+**together they explain roughly half the discrepancy**. The remainder is still open. Note
+`Vskip` = 0.9466 at t = 0 (the ray march skips 95 % of the domain as empty) is the next thing
+I would look at, since it bounds where absorption can occur at all.
+
+### Recommendation for production decks
+Set `laser.temperature_floor_theta` explicitly and well below the expected plume temperature.
+Leaving it to default to `electron_temperature` silently pins the IB coefficient to the
+initial temperature for the whole run. Gate G5's "watch `Tlocalfrac`" should become a hard
+check: `Tlocalfrac` ≈ 0 in `local` mode means the mode is not doing anything.
