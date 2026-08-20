@@ -5147,3 +5147,47 @@ any of the physics modules.
 (−1.7936e5 J against +1.9436e5 J). There is no laser, no absorption and no temperature floor
 in play; the drain runs on its own. That run is the cheapest reproducer for anyone taking this
 upstream.
+
+---
+
+## 2026-08-20 (Debye) — PRELIMINARY: resolution is **cleared**. The electron drain is converged in `dz`
+
+`runs/P4/P4_lez_kin_off_dz125` at 81 % (τ_own 4.54 of 5.39). Laser OFF, so no absorption, no
+temperature floor, no collisional heating — the cleanest reproducer of the drain. Deck differs
+from `P4_lez_kin_ic6_off` in `dz_over_de` (0.5 → 0.125), the step count for the same physical
+time, and a domain truncation that removes only empty cells (the laser-off plume reaches
+158 `d_e` by τ 5.4 and the corona has no particles beyond ~82 `d_e` at t = 0).
+
+| τ_own | control `dz`=0.5 | **`dz`=0.125** | ratio | `E_i/E_i0` ctrl / fine |
+|---|---|---|---|---|
+| 0.50 | 0.887 | 0.864 | 0.974 | 1.466 / 1.555 |
+| 1.35 | 0.795 | 0.801 | 1.009 | 1.725 / 1.862 |
+| 2.70 | 0.739 | 0.757 | 1.025 | 1.843 / 2.083 |
+| 4.04 | 0.722 | 0.731 | 1.013 | 1.925 / 2.218 |
+
+**A 4× refinement — `dz/λ_D` from 29.2 to 7.3, i.e. from 3.6× over gate G2's budget to inside
+it — moves the electron energy loss by 1–2.5 %.** The drain is ~27 % at both. The ions gain
+*more* at the finer resolution, the opposite of a numerical artifact being cured.
+
+**Outcome 2, as pre-registered.** Debye under-resolution is not the cause. This was the
+prediction recorded in the run's README before launching, on the strength of the 511 keV PSC
+run (2.92× resolution change, 5 % partition change).
+
+### What this leaves
+The electron→ion transfer in WarpX's kinetic electrons is **converged in spatial resolution**.
+Combined with everything already eliminated, that points at either (a) genuinely correct
+ambipolar physics that PSC and the WarpX hybrid both suppress, or (b) something in the electron
+push / current deposition that does not improve with `dz`.
+
+### The missing control, and it is cheap
+**PSC has never been run with the laser off.** A free expansion converting electron thermal
+energy into ion directed energy is real physics; the question is whether PSC's free expansion
+does it at the same rate. That is the like-for-like test and it costs PSC nothing extra (no ray
+march). Until it exists, "WarpX drains and PSC does not" rests on runs where PSC also had a
+laser resupplying its electrons.
+
+### Operational note
+The first launch of this run **died on GPU out-of-memory** — another user took 9.5 GB on each
+card in the ~1 minute between my pre-flight check (both GPUs free) and the launch. Checking
+`nvidia-smi` is necessary but not sufficient on a shared box; `scripts/queue_run.sh` exists to
+wait for capacity and should be used.

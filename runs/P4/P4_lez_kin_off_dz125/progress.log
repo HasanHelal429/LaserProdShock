@@ -1,0 +1,21 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_kin_off_dz125
+# logging_started 2026-08-20T12:46:14  total_steps=442368  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-20T12:46:42 | 6635/442368 ( 1.5%) | 0h15m | 0.1402 s/step(wall) | 0.0041 s/step(warpx) | ETA ~16h57m | x33.88 | load 2.6 | laser OFF (I0 = 0)
+2026-08-20T12:46:44 | 7004/442368 ( 1.6%) | 0h00m | 0.0043 s/step(wall) | 0.0042 s/step(warpx) | ETA ~0h31m | x1.03 | load 2.6 | laser OFF (I0 = 0)
+2026-08-20T12:50:12 | 47125/442368 (10.7%) | 0h19m | 0.0052 s/step(wall) | 0.0050 s/step(warpx) | ETA ~0h34m | x1.03 | load 3.2 | laser OFF (I0 = 0)
+2026-08-20T12:50:14 | 47389/442368 (10.7%) | 0h04m | 0.0052 s/step(wall) | 0.0050 s/step(warpx) | ETA ~0h34m | x1.03 | load 3.2 | laser OFF (I0 = 0)
+2026-08-20T12:54:43 | 90548/442368 (20.5%) | 0h23m | 0.0062 s/step(wall) | 0.0056 s/step(warpx) | ETA ~0h36m | x1.11 | load 3.0 | laser OFF (I0 = 0)
+2026-08-20T12:54:44 | 90826/442368 (20.5%) | 0h08m | 0.0062 s/step(wall) | 0.0056 s/step(warpx) | ETA ~0h36m | x1.11 | load 3.0 | laser OFF (I0 = 0)
+2026-08-20T12:59:13 | 136655/442368 (30.9%) | 0h28m | 0.0059 s/step(wall) | 0.0057 s/step(warpx) | ETA ~0h29m | x1.03 | load 3.4 | laser OFF (I0 = 0)
+2026-08-20T12:59:15 | 136992/442368 (31.0%) | 0h13m | 0.0059 s/step(wall) | 0.0057 s/step(warpx) | ETA ~0h29m | x1.03 | load 3.4 | laser OFF (I0 = 0)
+2026-08-20T13:03:15 | 181191/442368 (41.0%) | 0h32m | 0.0054 s/step(wall) | 0.0056 s/step(warpx) | ETA ~0h23m | x0.96 | load 3.1 | laser OFF (I0 = 0)
+2026-08-20T13:03:16 | 181550/442368 (41.0%) | 0h17m | 0.0054 s/step(wall) | 0.0056 s/step(warpx) | ETA ~0h23m | x0.96 | load 3.1 | laser OFF (I0 = 0)
+2026-08-20T13:06:46 | 222070/442368 (50.2%) | 0h35m | 0.0052 s/step(wall) | 0.0055 s/step(warpx) | ETA ~0h18m | x0.93 | load 3.0 | laser OFF (I0 = 0)
+2026-08-20T13:06:48 | 222439/442368 (50.3%) | 0h20m | 0.0052 s/step(wall) | 0.0055 s/step(warpx) | ETA ~0h18m | x0.93 | load 3.1 | laser OFF (I0 = 0)
+2026-08-20T13:10:48 | 270650/442368 (61.2%) | 0h39m | 0.0050 s/step(wall) | 0.0054 s/step(warpx) | ETA ~0h14m | x0.92 | load 3.1 | laser OFF (I0 = 0)
+2026-08-20T13:10:49 | 271020/442368 (61.3%) | 0h24m | 0.0050 s/step(wall) | 0.0054 s/step(warpx) | ETA ~0h14m | x0.92 | load 3.1 | laser OFF (I0 = 0)
+2026-08-20T13:14:19 | 315300/442368 (71.3%) | 0h43m | 0.0047 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h10m | x0.89 | load 3.2 | laser OFF (I0 = 0)
+2026-08-20T13:14:21 | 315675/442368 (71.4%) | 0h28m | 0.0047 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h10m | x0.89 | load 3.2 | laser OFF (I0 = 0)
+2026-08-20T13:17:23 | 353923/442368 (80.0%) | 0h31m | 0.0048 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h07m | x0.90 | load 3.9 | laser OFF (I0 = 0)
+2026-08-20T13:17:52 | 359996/442368 (81.4%) | 0h46m | 0.0047 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h06m | x0.90 | load 3.6 | laser OFF (I0 = 0)
