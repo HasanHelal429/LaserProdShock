@@ -1,6 +1,12 @@
 # P4_lez_kin_ic6_ppc2k
 
-**Phase.** 4, `TEST_PLAN.md` §12. See `config.yaml` `meta.description` for the full
+**Phase.** 4, `TEST_PLAN.md` §12.
+
+**Question.** Is `Tlocalfrac` = 0 caused by particle STATISTICS rather than the
+temperature floor? `min_macroparticles_per_cell` defaults to 4, so 500 ppc should already
+satisfy it -- but this is the control that makes `P4_lez_kin_ic6_tfloor` interpretable.
+ppc 500 -> 2000 with the floor untouched. PREDICTED NULL.
+ See `config.yaml` `meta.description` for the full
 statement of the check and its prediction, and RESULTS.md 2026-08-19 (root cause) for the
 finding these two runs test.
 
@@ -14,6 +20,22 @@ everywhere. `K ∝ T^(-3/2)` makes that a **5.6×** under-estimate.
 
 **Controls.** `P4_lez_kin_ic6` (the production configuration) on identical dump times, and
 each other — A changes the floor, B changes ppc, neither changes anything else.
+
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -50                                                  z = +2450
+
+  #  target flat top : 10 n_cr, 45 d_e thick, centred at -22.5 d_e
+  ~  coronal ramp   : exponential, L_n = 6.955 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 5000 cells, dz = 0.5 d_e, dt = 0.09885 fs, 110592 steps = 10.93 ps
+```
 
 ## Result
 **NULL, exactly as predicted.** 16 min, `reached max_step`, `--verify` OK, ppc = 2000 in

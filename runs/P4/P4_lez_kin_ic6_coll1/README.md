@@ -51,6 +51,22 @@ operator's cross-section cap and its reduced-parameter handling.
 more frequent. D3 measured collisions at ~10–15 % of step cost at `ndt` = 10, so expect
 roughly **8–12 min**.
 
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -50                                                  z = +2450
+
+  #  target flat top : 10 n_cr, 45 d_e thick, centred at -22.5 d_e
+  ~  coronal ramp   : exponential, L_n = 6.955 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 5000 cells, dz = 0.5 d_e, dt = 0.09885 fs, 110592 steps = 10.93 ps
+```
+
 ## Result
 **Outcome 2 — the prediction is FALSIFIED. Supercycling is NOT the cause.** 14 min,
 `reached max_step`, `--verify` OK.

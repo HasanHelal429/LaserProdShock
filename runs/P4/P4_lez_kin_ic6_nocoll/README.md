@@ -38,6 +38,22 @@ and collisional absorption both vanish, so `f_abs` will change too. This is a *d
 bound*, not a physics run, and its `T_e` is an upper bound on what removing collisional
 coupling can buy.
 
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -50                                                  z = +2450
+
+  #  target flat top : 10 n_cr, 45 d_e thick, centred at -22.5 d_e
+  ~  coronal ramp   : exponential, L_n = 6.955 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 5000 cells, dz = 0.5 d_e, dt = 0.09885 fs, 110592 steps = 10.93 ps
+```
+
 ## Result
 **Outcome 2 — the collision hypothesis is RETIRED.** 3 min, `reached max_step`, `--verify` OK,
 and `warpx_used_inputs` contains **zero** `pairwisecoulomb` entries.
