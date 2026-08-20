@@ -4978,3 +4978,60 @@ keeps `T_e` at 0.92× FLASH on the *same* absorbed fraction.
 PSC's energy partition is **not** measured — my PSC `T_i` normalisation is still wrong (it
 reads ~16× `T_e`, a missing mass factor). Fixing it is now the single most valuable next step,
 because PSC absorbing what WarpX absorbs while staying hot is the whole remaining puzzle.
+
+---
+
+## 2026-08-20 (partition) — **PSC keeps ⅔ of the energy in electrons; WarpX gives ¾ to ions**
+
+The missing measurement is in. I did **not** fix the PSC `T_i` normalisation — I found a better
+route: PSC's moment dump already carries `KEe` and `KEi`, the per-species kinetic energy
+densities, so the partition is read directly and no temperature convention is needed.
+
+### Why the `T_i` route was abandoned (recorded, since I chased it first)
+Calibrating the read-back against the IC files I supplied: `T_e` returns at **0.983×** the
+input (the electron formula is right) and `n_e`/`n_i` = **13.000** exactly (so `NNi` is the
+true ion density) — but `T_i` returns at **45×**. Per cell that factor is not constant at all:
+it spans **1.02 → 906**, spread p75/p25 = 8.6, and correlates with local density at
+**−0.84**. So `Sxxi+Syyi+Szzi` is an **uncentered** second moment — it contains the bulk flow,
+not just the thermal spread — and PSC loads ions at `NNpart`/Z per cell, i.e. **77 per cell at
+`n_cr` and <1 per cell at 1e-2 `n_cr`**, so the outer plume is badly sampled. There is no
+single factor to divide out, which is why the earlier "7200 eV" was meaningless.
+
+### The partition, from PSC's own `KEe`/`KEi`
+
+| `t_FLASH` | PSC electron share of the **gain** |
+|---|---|
+| 0.109 ns | 0.682 |
+| 0.145 ns | 0.693 |
+| 0.200 ns | 0.677 |
+| 0.264 ns | 0.653 |
+
+Steady at **0.65–0.69**. Against WarpX at τ_own 5.39:
+
+| code / configuration | electron share of the energy gain |
+|---|---|
+| **PSC** | **0.65–0.69** |
+| WarpX, PSC-equivalent heating | **0.26** |
+| WarpX, production control | **−0.08** (electrons net LOSE) |
+| WarpX, collisions OFF | **0.16** |
+
+**The partition is inverted.** PSC retains about two-thirds of the absorbed energy in the
+electrons; WarpX delivers about three-quarters of it to the ions. That is the whole remaining
+discrepancy, and it explains why PSC reaches `T_e` = 0.92× FLASH while absorbing no more than
+WarpX does.
+
+### What it is not
+Not collisional — WarpX gives ions **84 %** with collisions switched entirely off, *more* than
+with them on. The transfer is the **ambipolar field doing work on the ions**, i.e. absorbed
+energy going into plume directed motion rather than electron heat. Not the deposition location
+either: both codes deposit at `n_e` ≈ 0.5–0.7 `n_cr` (2026-08-20, deposition).
+
+### Where that leaves the investigation
+Eliminated: initial conditions, laser kernel, collision cadence, `σ_max` cap, collisions
+entirely, temperature floor, PSC-equivalent heating, deposition location. **Surviving
+candidate: the electron→ion energy transfer through the self-consistent field.** The one
+first-order setup difference not yet tested is the **reduced speed of light** — PSC runs
+`m_e c²` = 60 keV, WarpX the full 511 keV — which changes the electron thermal speed relative
+to `c` and hence the sheath/ambipolar dynamics. WarpX cannot reduce `c`, so testing this needs
+either a PSC run at `m_e c²` = 511 keV or an analytic estimate of the ambipolar partition's
+dependence on it.
