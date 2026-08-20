@@ -5092,3 +5092,58 @@ and the electrons *still* lose, so it is the **drain**, not the supply.
 This makes the 511 keV PSC run (`run_ourflash_511keV`, launched 2026-08-20) more pointed, not
 less: PSC and WarpX differ in the electron push mainly through the **reduced speed of light**
 (60 keV vs 511 keV), and that run measures whether PSC's partition survives at full `c`.
+
+---
+
+## 2026-08-20 (511 keV) — the reduced speed of light is NOT the cause. **The defect is WarpX's kinetic electron treatment**
+
+`runs` → `~/psc-raytrace/run_ourflash_511keV`. PSC rebuilt with `ReducedSoL` = 3000/511000, i.e.
+`m_e c²` = **511 keV, full `c`**, against the paper's 60 keV. 64 000 steps, t_FLASH 0.1 → 0.1996 ns,
+**1 h 45 m**, zero NaN. Verified at runtime: `K_temperature` = 511000.000, `K_time` = 1.0381e-14 s,
+`dt` = 1.557 fs — all matching prediction. ICs regenerated into `ic_ourflash_511keV/` because
+`K_temperature` *is* `m_e c²`; reusing the 60 keV files would have loaded the plasma 8.5× too hot.
+
+### Result
+
+| t_FLASH | PSC 60 keV | **PSC 511 keV** |
+|---|---|---|
+| 0.110 | 0.682 | **0.656** |
+| 0.130 | 0.686 | **0.671** |
+| 0.150 | 0.692 | **0.616** |
+| 0.170 | 0.688 | **0.616** |
+| 0.190 | 0.681 | **0.660** |
+
+**PSC keeps ~⅔ of the absorbed energy in its electrons at full `c` just as at 60 keV.** The
+change is ~5 %, against the factor needed to explain WarpX. And because PSC ties collision
+strength to `ReducedSoL`, this run also weakened collisions by **72.5×** — so the partition is
+insensitive to the speed of light *and* to collisionality, two variables at once.
+
+### The investigation, closed to one candidate
+
+Electron share of the energy gain, time-matched (τ_own 0.5 → 5.4):
+
+| code | electron share |
+|---|---|
+| PSC, 60 keV | 0.68 → 0.68 |
+| PSC, 511 keV | 0.66 → 0.62 |
+| **WarpX hybrid (fluid electrons)** | **0.98 → 0.70** |
+| **WarpX kinetic (PIC electrons)** | **−3.49 → −0.08** |
+
+Everything else has been eliminated by measurement: initial conditions (equivalent on the
+absorbing ramp), the laser kernel (cross-validated 8e-9), collision cadence (refuted), the
+Perez `σ_max` cap (inactive on e–i and wrong-signed), collisions entirely (only ~25 % of the
+gap), the temperature floor (real, ~⅓ of the gap, now fixed), PSC-equivalent heating (`f_abs`
+matched, `T_e` unmoved), deposition location (same density, 0.5–0.7 `n_cr` in both), and now
+the reduced speed of light.
+
+**What survives: WarpX's kinetic electrons drain energy into the ions in a way PSC's kinetic
+electrons and WarpX's own fluid electrons do not.** The same operator, target, mass ratio and
+collision settings produce opposite partitions depending only on whether WarpX's electrons are
+particles or a fluid. That localises the defect to the **electron push / field solve**, not to
+any of the physics modules.
+
+### The clearest single piece of evidence
+`P4_lez_kin_ic6_off` — **laser off** — loses 35 % of its electron energy to the ions
+(−1.7936e5 J against +1.9436e5 J). There is no laser, no absorption and no temperature floor
+in play; the drain runs on its own. That run is the cheapest reproducer for anyone taking this
+upstream.
