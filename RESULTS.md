@@ -5191,3 +5191,58 @@ The first launch of this run **died on GPU out-of-memory** — another user took
 card in the ~1 minute between my pre-flight check (both GPUs free) and the launch. Checking
 `nvidia-smi` is necessary but not sufficient on a shared box; `scripts/queue_run.sh` exists to
 wait for capacity and should be used.
+
+---
+
+## 2026-08-20 (PSC control) — **RETRACTION: the electron drain is real physics, and PSC drains FASTER than WarpX**
+
+`~/psc-raytrace/run_ourflash_off` — PSC at the 60 keV baseline with `do_part_heating = 0`
+(laser genuinely off, verified: zero LASERDEP lines), 22 000 steps, t_FLASH 0.1 → 0.2 ns.
+This is the control that had never been run, and it overturns the conclusion built on its
+absence.
+
+Matched on the FLASH clock — each code by its own validated mapping (PSC: `t_F` = 0.1 ns +
+elapsed, validated by its profile agreement; WarpX: `t_F` = (`τ_own` + 2.696)·`TAU_F`):
+
+| `t_F` | **PSC laser OFF** | **WarpX laser OFF** |
+|---|---|---|
+| 0.127 ns | **0.723** | 0.863 |
+| 0.145 ns | **0.637** | ~0.80 |
+| 0.173 ns | **0.563** | 0.756 |
+| 0.200 ns | **0.518** | **0.739** |
+
+### RETRACTED
+**"WarpX's kinetic electrons drain energy into ions in a way PSC's do not."** (RESULTS
+2026-08-20, hybrid / 511 keV entries.) **False.** With no laser, *both* codes convert electron
+thermal energy into ion energy, and **PSC does it faster** — losing 48 % against WarpX's 26 %
+over the same interval. The drain is **real ambipolar physics**, and WarpX is the more
+conservative of the two. Every conclusion resting on "the defect is WarpX's kinetic electron
+push" is withdrawn, including the localisation to the field solve.
+
+This also explains the `dz` test cleanly: the drain was converged in resolution because it was
+never numerical.
+
+### What the difference actually is: RESUPPLY, not drain
+With the laser on, over the same window:
+
+| | electron energy relative to start, `t_F` 0.1 → 0.2 ns |
+|---|---|
+| PSC laser ON | 1.000 → **5.507** |
+| PSC laser OFF | 1.000 → 0.518 |
+| WarpX laser ON (`pscheat`) | 1.000 → ~1.2 |
+| WarpX laser OFF | 1.000 → 0.739 |
+
+At **comparable absorbed fractions** (PSC 0.47–0.56, WarpX `pscheat` 0.42–0.46) PSC's electron
+energy grows **5.5×** and WarpX's **1.2×**. So the same absorbed joules produce a far larger
+relative gain in PSC.
+
+### Leading candidate: the size of the electron reservoir
+PSC's fixed macroparticle weight puts its density floor at `n_cr`/NPPC = **1e-3 `n_cr`**;
+WarpX's uniform 500 ppc carries electrons down to `density_min_frac` = **1e-5 `n_cr`**. WarpX
+therefore heats a **larger, colder electron population** with the same energy. I noted this
+difference earlier and set it aside as "plume representation, not heating" — that judgement
+was wrong, and it is now the leading explanation. It is also the one form of mass dilution I
+never tested: I measured and cleared the deposition *location*, not the *reservoir*.
+
+**Next test**: WarpX with `density_min_frac` raised so its resolved electron population matches
+PSC's 1e-3 `n_cr`, at otherwise identical settings.
