@@ -5035,3 +5035,60 @@ first-order setup difference not yet tested is the **reduced speed of light** �
 to `c` and hence the sheath/ambipolar dynamics. WarpX cannot reduce `c`, so testing this needs
 either a PSC run at `m_e c²` = 511 keV or an analytic estimate of the ambipolar partition's
 dependence on it.
+
+---
+
+## 2026-08-20 (hybrid) — the hybrid does **not** have the floor bug, and it partitions energy like PSC. The defect is specific to WarpX's **kinetic electrons**
+
+Checked `P4_lez_hyb_bg3` against every defect found in the kinetic legs.
+
+### 1. Temperature floor — NOT present
+`Tlocalfrac` = **0.994–1.000** for the whole run, against 0.000 in the kinetic legs. Two
+reasons: `temperature_mode = hybrid_fluid` takes `T_e` from the Ohm's-law field, which is
+defined in every cell without particle statistics; and its floor is `electron_temperature` =
+1.957e-4 = **100 eV**, below its ~400 eV plume, so it never binds. The kinetic legs inherited
+a 378.3 eV floor against a ~120 eV plume.
+
+### 2. Absorbed fraction — same deficit
+`f_abs` 0.169 (τ 2.7) → 0.450 (τ 27), against FLASH's 0.870. So even with a **correctly
+functioning local temperature**, a WarpX-family run absorbs about half of FLASH — the same
+level as the floor-fixed kinetic runs (0.42–0.46) and PSC (0.47–0.56). This cleanly separates
+the two defects: the floor bug is *not* what makes WarpX absorb less than FLASH.
+
+### 3. Energy partition — the hybrid behaves like PSC
+
+**Correction to RESULTS 2026-08-20 (partition):** that entry compared WarpX at τ_own 5.39
+against PSC over τ_own 0.4–4.3 — **mismatched times**, which understated the gap. Time-matched,
+electron share of the energy gain:
+
+| τ_own | kin control | kin PSC-equiv | kin no-coll | **hybrid** | PSC |
+|---|---|---|---|---|---|
+| 0.50 | **−3.49** | −1.55 | −0.23 | **0.979** | 0.65–0.69 |
+| 1.35 | **−2.23** | −0.74 | −0.28 | **0.923** | " |
+| 2.70 | **−0.99** | −0.10 | −0.13 | **0.857** | " |
+| 4.04 | −0.37 | 0.15 | −0.01 | **0.780** | " |
+| 5.39 | −0.08 | 0.31 | 0.16 | **0.701** | " |
+
+A negative share means the electrons **lose energy in absolute terms** while the ions gain —
+at τ 0.5 the control's electrons shed 78 % of what its ions take up, *while the laser is
+heating them*.
+
+**The hybrid, with fluid electrons, tracks PSC. The kinetic legs, with PIC electrons, do the
+opposite.** Same laser operator, same target, same mass ratio, same collision settings.
+
+### What this points at, and a reinterpretation
+The defect is specific to **WarpX's kinetic electrons draining energy into ions**. Note this
+was already visible and was read the other way: RESULTS 2026-08-19 (G3) recorded that
+`P4_lez_kin_ic6_off` — **laser off** — has its electrons **cool by 35 %**, with the loss
+appearing in the ions (−1.7936e5 J against +1.9436e5 J, closing to 8 %). That was logged as
+evidence of *no grid heating*, which it is. But in the light of PSC and the hybrid it is also
+evidence of an **electron energy sink that operates with no laser at all**, and the ambipolar
+drain outrunning the laser resupply is exactly what the numbers above show.
+
+With PSC-equivalent heating the resupply is matched to PSC (`f_abs` 0.42–0.46 vs 0.47–0.56)
+and the electrons *still* lose, so it is the **drain**, not the supply.
+
+### Consequence for the running test
+This makes the 511 keV PSC run (`run_ourflash_511keV`, launched 2026-08-20) more pointed, not
+less: PSC and WarpX differ in the electron push mainly through the **reduced speed of light**
+(60 keV vs 511 keV), and that run measures whether PSC's partition survives at full `c`.
