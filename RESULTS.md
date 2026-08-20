@@ -4869,3 +4869,48 @@ Set `laser.temperature_floor_theta` explicitly and well below the expected plume
 Leaving it to default to `electron_temperature` silently pins the IB coefficient to the
 initial temperature for the whole run. Gate G5's "watch `Tlocalfrac`" should become a hard
 check: `Tlocalfrac` ≈ 0 in `local` mode means the mode is not doing anything.
+
+---
+
+## 2026-08-20 — PSC-equivalent heating: **the deposition operator is exonerated**
+
+`runs/P4/P4_lez_kin_ic6_pscheat`. Three config knobs, **no code change**, chosen to remove
+every difference between WarpX's and PSC's laser heating:
+
+| knob | control | this run | PSC |
+|---|---|---|---|
+| `temperature_floor_theta` | default = `electron_temperature` = **378.3 eV** | **1 eV** | none |
+| `min_macroparticles_per_cell` | default **4** | **1** | `NNe /= 0` |
+| `coulomb_log_mode` | constant **6.3** | **`nrl`** (per cell) | per cell |
+
+(The floor is 1 eV rather than 0 because the operator asserts > 0; at 1 eV it never binds on
+a ≥100 eV plume. `nrl` is the documented "what would PSC have done here" mode — it reproduces
+PSC's `get_lnlambda` to 0.000e+00 over 1681 points.)
+
+| τ_own | | control | floor only | **PSC-equiv** | PSC | FLASH |
+|---|---|---|---|---|---|---|
+| 2.70 | `f_abs` | 0.217 | 0.545 | **0.423** | 0.47–0.56 | 0.870 |
+| 5.39 | `f_abs` | 0.319 | 0.634 | **0.461** | 0.47–0.56 | 0.870 |
+| — | `Tlocalfrac` | 0.000 | 0.23–0.67 | **1.000** | — | — |
+| 2.70 | `T_e`/FLASH | 0.213 | 0.330 | **0.290** | 0.923 | 1.000 |
+
+**`Tlocalfrac` reaches 1.000 and `f_abs` reaches PSC's band — and `T_e` does not move.**
+
+### The finding
+**At the same absorbed fraction, WarpX produces ~3× less plume electron temperature than
+PSC.** Absorption is no longer the discriminator. Combined with the earlier eliminations —
+collision cadence (refuted), Perez `σ_max` cap (inactive on e–i and wrong-signed), collisions
+entirely off (only ~25 % of the gap), temperature floor (real, ~⅓ of the gap) — **the laser
+deposition operator is cleared**. The residual is downstream of absorption.
+
+### Where to look next
+The one measured asymmetry consistent with "absorption matches, temperature does not" is
+**where** the energy lands: WarpX's median deposition ζ is **1.35–1.82× smaller** than FLASH's
+(RESULTS 2026-08-19, deposition), i.e. into **denser** plasma. The same joules spread over more
+mass give a smaller temperature rise. That is the next thing to measure directly.
+
+### Caveat
+`lnLmean` reads **1.01** in this run — the NRL expression floors at 1 in most cells — where
+PSC's laser module gave **≈5.10** at the critical surface. Domain-mean vs point value are not
+directly comparable, but the coefficient match is **not** established. The conclusion does not
+depend on it: it rests on `f_abs` being matched while `T_e` is not.
