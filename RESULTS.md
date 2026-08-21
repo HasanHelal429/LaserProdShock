@@ -5578,3 +5578,59 @@ The paper scanned 2/5/10/20 `n_cr` (Appendix A) and gate G1 binds: `ω_pe dt` �
 `n_cr` already reads 0.783 at 2× compression against a limit of 2, so **20 `n_cr` is about the
 ceiling** at the current `cfl` — a 2× step, not the 80× that would match FLASH. Whether a 2×
 change moves `T_e` measurably against the 12 % noise floor is the question.
+
+---
+
+## 2026-08-20 (Appendix A) — the solid-sink hypothesis is REFUTED, and the clock mapping becomes the prime suspect
+
+### What Appendix A says
+Three relevant statements, read directly:
+1. *"nominal electron density for the fully ionized solid aluminum target is `n_e,solid` ≈ 700
+   `n_cr`"* — the paper knows its 10 `n_cr` PIC target is **70× under-dense**.
+2. *"electron temperature matches only when `n_max` ≳ 5 `n_cr`"* — `T_e` **is** sensitive to
+   this knob, and 10 `n_cr` clears their bar.
+3. *"Higher values of `n_max` lead to sharper electron temperature slopes close to the solid
+   target, tending toward the plasma profiles obtained by FLASH."*
+Also: the `m_e c²` = {20, 60, 200} keV and `m_p/m_e` = {100, 400} scans "demonstrate good
+convergence", consistent with our own 511 keV null.
+
+### RETRACTED: the solid is not the discriminator
+Previous entry attributed the plume deficit to **45 % of the absorbed energy conducting into
+WarpX's under-dense solid**. Measured in PSC, that is wrong:
+
+| | solid `⟨T_e⟩` start → end | solid share of `U_e` | plume `⟨T_e⟩` |
+|---|---|---|---|
+| **PSC** | **3.70 → 48.20 eV** | **0.653** | **562.9 eV** |
+| WarpX `cs_ppc4k` | 1.26 → 9.7 eV | 0.579 | 181.8 eV |
+
+**PSC's solid heats 13× and takes a *larger* share of the electron energy — and its plume is
+still 3× hotter.** Both codes lose energy to the solid; PSC loses more. The sink is real but
+it is **not** what separates them.
+
+### What the numbers now point at: the clock
+At "matched" τ the two codes have not absorbed comparable energy at all:
+
+| | real time simulated | `E_abs` |
+|---|---|---|
+| FLASH, `t_F` 0.1 → 0.30 ns | 200 ps | 1.74e7 J/m² |
+| PSC, `t_F` 0.1 → 0.264 ns | 164 ps | 8.2e6 J/m² |
+| **WarpX, τ_own 0 → 5.39** | **10.9 ps** | **4.4e5 J/m²** |
+
+**WarpX simulates 10.9 ps of real time where FLASH simulates 200 ps**, because `TAU_W` =
+`TAU_F`/18.36 — a similarity transform, not equal wall-clock physics. It therefore absorbs
+**~40× less energy in absolute terms**, into a plume band holding **8.4× fewer electrons**.
+
+Absorbed energy per plume electron: **WarpX 724 eV vs FLASH 4488 eV, ratio 0.161** — against a
+measured plume `T_e` ratio of **0.281**. Same order, and in the same direction.
+
+**So the plume `T_e` deficit may be arithmetic, not physics**: WarpX is being compared to FLASH
+at a time when it has had far less energy per electron delivered, because the τ mapping assumes
+a similarity scaling whose validity for *energy* (as opposed to length and time) has never been
+checked in this project.
+
+### The thing to settle next, before any more knobs
+**Is `TAU_W` = `TAU_F`/18.36 the correct clock for comparing these codes?** PSC — same reduced
+mass ratio — uses the **real** `d_i0` and `C_S0` and maps 1:1 onto FLASH's clock, and it agrees
+with FLASH. WarpX's `xcode_compare` uses the **reduced** `d_i0` and a clock 18.36× faster. Both
+cannot be right. That single question now governs every cross-code number in this campaign, and
+it is a derivation, not a run.
