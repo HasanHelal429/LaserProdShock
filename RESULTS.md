@@ -5284,3 +5284,57 @@ where WarpX's grows 1.2× over t_F 0.1 → 0.2 ns. Not the drain, not the reserv
 deposition. What differs is how efficiently absorbed energy becomes *electron thermal* energy
 rather than ion motion — and both codes' laser modules deposit as momentum kicks to electrons.
 The kick implementation itself is the last untouched piece.
+
+---
+
+## 2026-08-20 (kick) — the momentum kick is IDENTICAL; and the "resupply" framing was contaminated
+
+### The kick is eliminated
+Both codes apply the same isotropic Gaussian kick, component-wise:
+
+| | formula | energy added |
+|---|---|---|
+| PSC `PIC_part_kick` | `Dp = sqrt((2/3)·P_norm·heating_every·dt)`, Box–Muller normal | `⟨Δp²⟩ = 2P dt` ⇒ `P dt` |
+| WarpX `LaserDeposition.cpp:2090` | `du = sqrt((2/3)·H·dth)·N(0,1)` | `⟨Δu²⟩ = 2H dt` ⇒ `m_e H dt` |
+
+Structurally the same, and `dt_dep = gap * dt` confirms WarpX **does** scale by its 10-step
+supercycle, so it is not under-depositing. Both spread a cell's absorbed power over its
+electrons so the cell total is `P_abs·dt` regardless of `n_e`. **The kick is not the
+difference.**
+
+### RETRACTION of the framing, not just a candidate
+"At comparable `f_abs`, PSC's electron energy grows **5.5×** where WarpX's grows **1.2×**"
+(RESULTS 2026-08-20, PSC control / reservoir) is **contaminated by different baselines**.
+
+`E_e0` is dominated by the solid, which holds ~97 % of the electrons — and the two codes start
+it at very different temperatures:
+
+| | solid `T_e` at t = 0 |
+|---|---|
+| WarpX (`theta_e_solid`) | **20.0 eV** |
+| PSC (from the FLASH IC) | **1.26 eV** (areal-weighted) |
+
+**WarpX's baseline is ~16× larger.** Rescaling both gains into the same units, WarpX gains
+≈0.46 `E_e0(WarpX)` and PSC ≈0.31 — i.e. **WarpX may absorb *more* into its electrons in
+absolute terms, not less.** The 5.5× vs 1.2× contrast is largely an artefact of dividing by
+different numbers. Any conclusion phrased as "PSC resupplies better" is withdrawn.
+
+The 20 eV solid is a **deliberate, documented** WarpX departure (`CLAUDE.md`: *"NOT FLASH's
+0.1377 eV: the cold solid is Debye-unresolvable"*) — at 1.26 eV, `dz/λ_D` would be 318 instead
+of 80.
+
+### What survives, un-normalised
+Two facts involve no baseline division and still stand:
+1. **Plume `T_e`**: WarpX 165–187 eV against PSC 455–563 eV and FLASH 472–646 eV.
+2. **Share of the energy *gain***: WarpX 0.26–0.31, PSC 0.65–0.69.
+
+Taken with the correction above, these say WarpX puts a comparable or larger amount of energy
+into its electrons but **the plume band stays cold** — so the energy is going somewhere other
+than the plume. The obvious somewhere is the **solid**, which in WarpX starts 16× hotter and
+holds 97 % of the electrons.
+
+### Next candidate
+`theta_e_solid` — 20 eV vs FLASH/PSC's ~0.14–1.3 eV. It was chosen for Debye resolvability,
+not physics, and it is now the largest untested IC difference between the codes. A run at a
+colder solid is the test; the stated risk is that `dz/λ_D` in the solid rises from 80 to ~300
+and the run may be unstable, which is exactly why the departure was made.
