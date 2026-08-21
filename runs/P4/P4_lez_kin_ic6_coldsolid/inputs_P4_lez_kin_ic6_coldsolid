@@ -205,7 +205,7 @@ diag_fields.fields_to_plot = Ez Ey By Bx jz rho rho_targ_electrons rho_targ_ions
 # diag_phase: particles only, subsampled -- PHASE SPACE IS THE ARBITER of a
 # shock claim (density/B streaks of a decaying magnetosonic pulse look
 # shock-like; only phase space shows whether ions are reflected).
-diag_phase.intervals     = 27648
+diag_phase.intervals     = 4608
 diag_phase.diag_type     = Full
 diag_phase.fields_to_plot = none
 diag_phase.species       = targ_ions

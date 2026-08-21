@@ -5387,3 +5387,23 @@ That is worth stating plainly rather than continuing to guess: the remaining dif
 **not** in any parameter either code exposes, so the next step is not another knob but a
 direct comparison of the two codes' *evolved* electron distribution functions on the same
 profile — or taking the discrepancy to the PSC authors with the reproducer set built today.
+
+### Media added 2026-08-20
+`media/P4/P4_lez_kin_ic6_coldsolid/movie_phase_vs_psc.mp4` (30 frames, `scripts/psc_phase_movie.py`).
+
+**What it is.** PSC as configured writes **no particle data** — every `OUT_part*` /
+`OUT_particle_parallel` call in `VLI.f` is commented out — so there is no PSC phase space to
+compare against. The movie therefore overlays WarpX's **true** ion phase space
+(per-macroparticle `(ζ, v_z/C_S0)` from `diag_phase`) on PSC's **mean** ion flow
+(`⟨v_z⟩ = NVzi/NNi`, a ratio of two moments needing no mass factor — unlike its pressure
+tensor, whose normalisation is unresolved) and FLASH's flow profile. It is **not** a
+distribution-function comparison and must not be presented as one.
+
+**What it shows.** WarpX's ions form a clean self-similar rarefaction fan that lies **on PSC's
+mean flow** across the whole plume, with FLASH slightly above both. This is consistent with
+every other un-normalised measure: the two PIC codes agree on ion dynamics, density and front
+position, and disagree **only** on electron temperature. Whatever the remaining defect is, it
+does not show up in the ion phase space.
+
+`coldsolid` was re-run with `phase_intervals` 27648 → 4608 for the frame count; physics
+unchanged, `--verify` OK.

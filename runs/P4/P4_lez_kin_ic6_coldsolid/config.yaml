@@ -162,7 +162,7 @@ collisions:                   # ==== NOT YET EMITTED BY deck.py -- see TEST_PLAN
 diagnostics:
   plotfile_intervals: 27648   # 20 dumps; the paper compares at 0.2/0.4/0.6/0.8 ns
   field_intervals: 6912
-  phase_intervals: 27648      # f(v_z) vs local Maxwellian is a headline result (their Fig 8)
+  phase_intervals: 4608       # 24 dumps, for the phase-space movie
   reduced_intervals: 1024
 
 gates:
