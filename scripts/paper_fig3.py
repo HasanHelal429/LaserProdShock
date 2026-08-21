@@ -152,6 +152,17 @@ def main():
     ap.add_argument("--v-lim", type=float, nargs=2, default=None, metavar=("LO", "HI"))
     ap.add_argument("--out", default="paper_fig3")
     ap.add_argument("--report", action="store_true", help="print the times actually used")
+    ap.add_argument("--psc", metavar="DATADIR",
+                    help="add PSC as a third leg (dotted) from its moment dumps. PSC's clock "
+                         "is t_F = 0.1 ns + elapsed, its own validated mapping. n_e and T_e "
+                         "come from NNe and (Sxxe+Syye+Szze)/(3 NNe); its ION temperature is "
+                         "NOT drawn -- Sxxi is an UNCENTERED moment (it contains bulk flow) "
+                         "and reads 45x high, RESULTS 2026-08-20.")
+    ap.add_argument("--psc-nfloor", type=float, default=1e-2, metavar="N_CR",
+                    help="PSC-specific mask (default 1e-2, a decade above --nfloor). PSC's "
+                         "ppc scales with density -- NNpart/Z per cell means <1 ion and ~10 "
+                         "electrons per cell at 1e-2 n_cr -- so its moments are "
+                         "noise-dominated in the far plume where WarpX's fixed ppc is not.")
     a = ap.parse_args()
 
     import matplotlib.pyplot as plt
@@ -167,6 +178,23 @@ def main():
     sc = xc.warpx_scales(mr)
 
     F = xc.flash_series(a.flash_dir, a.flash_base)
+    PSC = None
+    if a.psc:
+        sys.path.insert(0, "/home/hhelal/psc-raytrace")
+        from read_pmt import assemble
+        QE_, MP_ = 1.602176634e-19, 1.67262192e-27
+        K_TEMP_ = 60000.0
+        K_VEL_ = np.sqrt(3000.0 * QE_ / MP_) / np.sqrt(0.05 / 100.0)
+        DT_PSC = 4.54439445e-15
+        PSC = []
+        for st, zi, Q in assemble(a.psc, want=("NNe", "Sxxe", "Syye", "Szze", "NVze")):
+            zi = zi[1:-1]; Q = {k: np.asarray(v, float)[1:-1] for k, v in Q.items()}
+            ne_ = Q["NNe"]
+            te_ = np.where(ne_ > 0, (Q["Sxxe"] + Q["Syye"] + Q["Szze"])
+                           / (3 * np.maximum(ne_, 1e-30)) * K_TEMP_, np.nan)
+            v_ = np.where(ne_ > 0, Q["NVze"] / np.maximum(ne_, 1e-30), np.nan) * K_VEL_ / xc.CS0_F
+            PSC.append(dict(tF=0.1 + st * DT_PSC * 1e9, zeta=zi * 0.02,
+                            ne=ne_, Te=te_, v=v_))
     W = xc.warpx_particles(a.run_dir, xc.SP_KIN, sc=sc)
     D = [] if a.no_depo else warpx_depo(a.run_dir, sc)
     # dt = cfl * dz / c, with dz = dz_over_de * d_e,cr -- read both from the config
@@ -243,6 +271,13 @@ def main():
                                 if j == 0 else None))
             if wy is not None:
                 axj.plot(w["zeta"], wy, "--", color=col, lw=1.5, alpha=0.95)
+            if PSC is not None and key in ("ne", "Te", "v"):
+                q = min(PSC, key=lambda d: abs(d["tF"] - t_ns))
+                if abs(q["tF"] - t_ns) < 0.02:
+                    py_ = q[key] if key == "ne" else mask_low(q[key], q["ne"], a.psc_nfloor)
+                    if py_ is not None and a.tnorm == "tss" and key == "Te":
+                        py_ = py_ / xc.TE_REF
+                    axj.plot(q["zeta"], py_, ":", color=col, lw=1.8, alpha=0.95)
 
     for j, (key, lab, log) in enumerate(panels):
         axj = ax[j]
@@ -305,9 +340,11 @@ def main():
     h, l = ax[0].get_legend_handles_labels()
     ax[0].legend(h, l, fontsize=8, ncol=len(a.times), loc="upper right", frameon=False)
     from matplotlib.lines import Line2D
-    ax[1].legend(handles=[Line2D([], [], color="#444", ls="-", lw=1.6, label="FLASH"),
-                          Line2D([], [], color="#444", ls="--", lw=1.5, label=f"WarpX {run_id}")],
-                 fontsize=8, loc="upper right", frameon=False)
+    hs = [Line2D([], [], color="#444", ls="-", lw=1.6, label="FLASH"),
+          Line2D([], [], color="#444", ls="--", lw=1.5, label=f"WarpX {run_id}")]
+    if PSC is not None:
+        hs.append(Line2D([], [], color="#444", ls=":", lw=1.8, label="PSC"))
+    ax[1].legend(handles=hs, fontsize=8, loc="lower right", frameon=False)
 
     fig.suptitle("Lezhnin et al. 2025 Fig. 3, recreated: FLASH vs WarpX profile evolution\n"
                  f"{run_id}   |   clocks aligned, WarpX sampled at "

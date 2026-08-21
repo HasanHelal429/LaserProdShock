@@ -5456,3 +5456,28 @@ still a null, but none of them should be read as a measured small effect in eith
 Eleven times the particle count at the absorption region closes at most a fifth of the
 discrepancy: **0.28 × FLASH against PSC's 0.87–0.96**. Sampling is a contributor, not the
 cause.
+
+### Media added 2026-08-20 — the three-way profile comparison
+`media/P4/P4_lez_kin_cs_ppc4k/fig3_vs_psc.png`, via a new `--psc` leg on `paper_fig3.py`
+(FLASH solid, WarpX dashed, **PSC dotted**), at FLASH `t` = 0.15 / 0.20 / 0.25 ns, raw eV.
+
+**What it shows, in one figure — the whole investigation:**
+
+| panel | FLASH | PSC | WarpX (4000 ppc) |
+|---|---|---|---|
+| (a) `n_e` | — | overlays FLASH across 4 decades | overlays FLASH across 4 decades |
+| **(b) `T_e`** | **470–640 eV** | **~480–600 eV, on FLASH** | **~200–230 eV** |
+| (c) `T_i` | 160–240 eV | not drawn | comparable, peaks higher at the target |
+| (d) `v_z` | — | tracks FLASH | slightly below FLASH |
+
+**WarpX matches FLASH and PSC on density, ion temperature and flow, and misses on electron
+temperature alone — by 3×.** After a day of elimination that is the residual, stated as a
+picture.
+
+Two drawing decisions, both recorded in the script:
+* PSC's **ion** temperature is not drawn at all: `Sxxi` is an **uncentered** moment (it
+  contains bulk flow) and reads 45× high with a per-cell spread of 1.02–906.
+* PSC gets its own mask, `--psc-nfloor` = 1e-2, a decade above WarpX's. PSC's ppc scales with
+  density — `NNpart`/Z per cell means **<1 ion and ~10 electrons per cell at 1e-2 `n_cr`** —
+  so its moments are noise-dominated in the far plume where WarpX's fixed ppc is not. The
+  residual jitter in panels (b) and (d) beyond ζ ≈ 8 is PSC sampling, not physics.
