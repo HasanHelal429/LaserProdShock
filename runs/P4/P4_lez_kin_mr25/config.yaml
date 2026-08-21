@@ -88,7 +88,7 @@ geometry:
                               # and the first rung of the resolution ladder
   axis:
     lo_de: -25                # ~5 d_i0 behind the interface, holding the 45 d_e target
-    hi_de: 1225             # 2500 d_e total. The paper's 1000 d_e box does NOT hold
+    hi_de: 1223             # 2500 d_e total. The paper's 1000 d_e box does NOT hold
                               # this run: MEASURED 2026-08-13, the front reaches 949.8
                               # of 950 d_e at 24.6 ps -- 45% through -- and is pinned
                               # there for the remaining 30 ps. Before that it is clean
@@ -121,7 +121,7 @@ numerics:
   arena_init_size_mb: 1024
   cfl: 0.35
   particle_shape: 2
-  max_grid_size: 2500         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
+  max_grid_size: 2496         # = the WHOLE domain, deliberately. On a GPU a 1D WarpX run
                               # is 7.9x faster with one box than with the default
                               # decomposition, which is only 1.2x (project memory). The
                               # default splits a 2000-cell domain into small boxes and the

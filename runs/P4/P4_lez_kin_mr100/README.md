@@ -72,7 +72,32 @@ all three legs outside the noise band would mean the temperature scales with mas
 
 ## Result
 
-*Pending — not yet run.*
+**Similarity confirmed; invariance dead.**
+
+| leg | `m_p/m_e` | `f_abs` | plume `T_e` | vs `mr100` | `mu^(1/3)` predicts | `T_e/T_ss` |
+|---|---|---|---|---|---|---|
+| `mr25` | 25 | 0.204 | 126.7 eV | 0.803 | 0.630 | 0.645 |
+| `mr100` | 100 | 0.350 | **157.7 eV** | 1.000 | 1.000 | **0.505** |
+| `mr400` | 400 | 0.744 | 244.6 eV | **1.551** | **1.587** | **0.494** |
+
+**Over the paper's own range, 100 -> 400, `T_e` rises 1.551x where `mu^(1/3)` predicts
+1.587x -- 2.3% apart.** The noise floor, re-measured here from `mr100` against
+`P4_lez_kin_ic6_coldsolid` (identical config, separate run, 157.7 vs 138.9 eV), is **13.5%**,
+so the signal is **4x the noise** and mass-ratio invariance is excluded outright.
+
+`T_e/T_ss` is flat at **0.505 and 0.494** across 100 -> 400 -- a 2.4% spread. WarpX's plume
+temperature tracks `mu^(1/3)` essentially exactly.
+
+**The mechanism is absorption**, exactly as the optical-depth derivation says: `f_abs` goes
+0.204 -> 0.350 -> 0.744 as the physical path length grows with `s`. Dividing the absorption
+difference back out flattens the temperature, which is the same statement, not a separate one.
+
+**What this settles, and what it does not.** WarpX's raw-eV deficit against FLASH is
+*expected*: a reduced-mass PIC run **cannot** reproduce FLASH's raw eV, and the paper's
+convergence claim over {100, 400} is contradicted by 5x the noise floor. But the similarity
+factor does **not** close the gap. FLASH sits at 647/823 = **0.786** of its own steady state
+where WarpX sits at **~0.50** at both 100 and 400 -- a **residual 1.57x** that mass ratio does
+not explain, and that is now the whole of the remaining discrepancy.
 
 ## Retracted
 

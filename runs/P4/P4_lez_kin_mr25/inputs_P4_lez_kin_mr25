@@ -14,7 +14,7 @@
 # Derived scales (1D, lengths in d_e,critical = 0.1693 um):
 #   n_cr = 9.848e+26 m^-3   d_e,cr = lam0/2pi = 0.1693 um
 #   target 10 n_cr (d_e = 0.0536 um)   ambient: VACUUM
-#   dt = 0.0989 fs   t_end = 2.7330 ps   n_cell = 2500
+#   dt = 0.0989 fs   t_end = 2.7330 ps   n_cell = 2496
 #   GATE G1 omega_pe*dt: 0.553 initial, 0.783 at compression; hits 2 at 130.61 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 58
 #   predicted absorption: tau(flat top) = 10.5, f_abs ~ 1.000
@@ -51,7 +51,7 @@ my_constants.th_ti  = 0.00022622
 
 # --- domain ---
 my_constants.zlo = -25.*de
-my_constants.zhi = 1225.*de
+my_constants.zhi = 1223.*de
 
 # --- time / solver ---
 #
@@ -68,9 +68,9 @@ warpx.cfl     = 0.35
 warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 
 # --- grid (dz = 0.5 d_e; z = propagation axis) ---
-amr.n_cell        = 2500
+amr.n_cell        = 2496
 amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)
-amr.max_grid_size = 2500
+amr.max_grid_size = 2496
 amrex.the_arena_init_size = 1073741824  # 1024 MiB -- see numerics.arena_init_size_mb
 geometry.dims     = 1
 geometry.prob_lo  = zlo
