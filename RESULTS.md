@@ -5696,3 +5696,65 @@ rewritten**: notably `P4_lez_kin_thick` used 200 `d_e` — numerically close to 
 
 **Consequence if it holds**: every Phase-4 WarpX run has been geometrically 4.285× too small
 and clocked 18.36× too fast, and every cross-code ratio in this notebook is affected.
+
+---
+
+## 2026-08-20 (RETRACTION) — the clock claim is wrong; PSC's source settles it, and the question inverts
+
+I claimed above that WarpX's target is 4.285× too thin and its clock 18.36× too fast.
+**That is refuted by PSC's own `INIT_param.f`.**
+
+```fortran
+DI0_code = (ReducedMassRatio)**(0.5)              ! mass ratio IS in the LENGTH norm
+TD0_code = ReducedMassRatio/((ReducedSoL)**(0.5)) ! and in the TIME norm
+K_temperature = temp_phys / ReducedSoL            ! mass ratio is ABSENT from T
+```
+
+PSC normalises **length and time by the similarity transform** and reports **temperature as
+raw eV**. That is *exactly* what `xcode_compare` does for WarpX — `z/d_i0,own`, `t/tau_own`,
+`T` in raw eV. **The conventions are identical.** In ζ both targets are 4.5 `d_i0`; the
+"4.285× too thin" was an artifact of comparing microns, which the `xcode_compare` docstring
+explicitly warns against. **No rescaled run is needed, and none was launched.**
+
+### The factor is real, though, and it is exact
+`μ^(1/3)` = 2.6382 and `√μ^(2/3)` = 2.6382 are **the same number**, and that is not a
+coincidence: it is precisely the factor that leaves the IB optical depth `∫K dz`,
+`K ∝ n²Z lnΛ T^(-3/2)`, invariant when lengths scale by `√μ`. So a reduced-mass run at equal
+`f_abs` is *expected* to sit `2.638×` cooler in raw eV.
+
+**WarpX's entire measured range, 0.26–0.38× FLASH, brackets 1/2.638 = 0.379.** WarpX is doing
+what the similarity transform says it should.
+
+### PSC at the REAL electron rest energy — a clean null
+| PSC leg | `K_temperature` | plume `⟨T_e⟩` @ ~100 ps |
+|---|---|---|
+| `run_ourflash` | 60 keV | **516.1 eV** |
+| `run_ourflash_511keV` | **511 keV** | **508.8 eV** |
+
+**1.4% apart.** The reduced speed of light is not the discriminator — confirming the earlier
+null from the other direction. PSC reaches ~509 eV with a *real* electron where WarpX reaches
+182 eV.
+
+### The question has inverted
+Measured against each code's **own** analytic steady state (`T_ss` = 823/`μ^(1/3)` = 312 eV
+for a reduced-mass run, 823 eV for real Al):
+
+| | plume `T_e` | own `T_ss` | ratio |
+|---|---|---|---|
+| FLASH | ~647 eV | 823 | **0.79** |
+| WarpX | 182 eV | 312 | **0.58** |
+| PSC | 509 eV | 312 | **1.63** |
+
+**On the μ-corrected basis it is PSC that is the outlier**, overshooting its own steady state
+by 63%, while WarpX undershoots by 42% — a 1.35× gap to FLASH, not 3×.
+
+### The one decisive experiment left
+Everything now turns on **whether the plume `T_e` actually scales as `μ^(1/3)`**. The paper's
+own `m_p/m_e` = {100, 400} scan reports *"good convergence"* — but `μ^(1/3)` over a 4× mass
+change is `4^(1/3)` = **1.587**, a 59% shift that "good convergence" would exclude. So the
+paper's evidence says `T_e` is **mass-ratio-invariant**, which would mean the similarity
+argument does **not** apply to the measured temperature and WarpX's deficit is real after all.
+
+**The two readings make opposite, cleanly separable predictions, and a single WarpX
+mass-ratio scan settles it — no PSC, no FLASH, no cross-code normalisation involved.**
+That is the next run, and it replaces the rescaled run this entry retracts.
