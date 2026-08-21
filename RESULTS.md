@@ -5338,3 +5338,52 @@ holds 97 % of the electrons.
 not physics, and it is now the largest untested IC difference between the codes. A run at a
 colder solid is the test; the stated risk is that `dz/λ_D` in the solid rises from 80 to ~300
 and the run may be unstable, which is exactly why the departure was made.
+
+---
+
+## 2026-08-20 (cold solid) — FALSIFIED. The solid is not the sink either
+
+`runs/P4/P4_lez_kin_ic6_coldsolid` = `pscheat` with `theta_e_solid` 20 → **1.26 eV**, matching
+the areal-weighted solid temperature PSC gets from the FLASH IC. Deck diff is the single
+`th_ts` line. 6 min, `--verify` OK, **no NaN, no instability** at `dz/λ_D` ≈ 318 in the solid.
+
+| τ_own | pscheat (20 eV) | **coldsolid (1.26 eV)** | FLASH |
+|---|---|---|---|
+| 2.70 plume `T_e` | 171.3 (0.306×) | **147.0 (0.263×)** | 559.3 |
+| 5.39 plume `T_e` | 186.6 (0.289×) | **166.6 (0.258×)** | 646.3 |
+| 5.39 e share | 0.312 | 0.450 | — |
+| `E_e0` | 5.077e5 J | **1.704e5 J** | — |
+
+Removing **66 %** of the initial electron energy did **not** warm the plume — it is slightly
+*colder* at both later times. The electron share and `E_e/E_e0` do rise, but those are exactly
+the baseline-sensitive measures the previous entry warned about: a smaller denominator.
+**Retracted**: the "absorbed energy is going into the solid" hypothesis.
+
+### The state of the search
+Every difference identified between the codes has now been tested and eliminated:
+
+| candidate | verdict |
+|---|---|
+| initial conditions | equivalent on the absorbing ramp |
+| laser kernel | cross-validated to 8e-9 |
+| collision cadence | refuted (`intervals` 1 ≡ 10) |
+| Perez `σ_max` cap | inactive on e–i, and wrong-signed |
+| collisions entirely | only ~25 % of the gap |
+| **laser temperature floor** | **REAL DEFECT, ~⅓ of the gap, fixed** |
+| PSC-equivalent heating | `f_abs` matched, `T_e` unmoved |
+| deposition location | same density, 0.5–0.7 `n_cr` in both |
+| reduced speed of light | 0.68 → 0.62–0.67, insensitive |
+| Debye resolution | converged in `dz` (4× refinement, 1–2 %) |
+| electron drain | **retracted** — real physics, PSC drains *faster* |
+| electron reservoir | <4 %, wrong direction |
+| momentum kick | structurally identical |
+| solid temperature | this entry — no effect |
+
+**The robust, un-normalised fact that survives all of it**: WarpX's plume `T_e` is
+**0.26–0.38 × FLASH** in every configuration tried, while PSC on the same IC and comparable
+`f_abs` reaches **0.87–0.96 ×**. No identified setup or numerical difference accounts for it.
+
+That is worth stating plainly rather than continuing to guess: the remaining difference is
+**not** in any parameter either code exposes, so the next step is not another knob but a
+direct comparison of the two codes' *evolved* electron distribution functions on the same
+profile — or taking the discrepancy to the PSC authors with the reproducer set built today.
