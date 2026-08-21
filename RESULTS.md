@@ -5481,3 +5481,46 @@ Two drawing decisions, both recorded in the script:
   density — `NNpart`/Z per cell means **<1 ion and ~10 electrons per cell at 1e-2 `n_cr`** —
   so its moments are noise-dominated in the far plume where WarpX's fixed ppc is not. The
   residual jitter in panels (b) and (d) beyond ζ ≈ 8 is PSC sampling, not physics.
+
+---
+
+## 2026-08-20 (flow) — why `v/C_S0` is lower in WarpX: it is the temperature, seen through a moving yardstick
+
+Asked directly, and the answer decomposes cleanly.
+
+### It is not the ion pressure
+The rarefaction is driven by `p = n_i(Z T_e + T_i)`. With **Z = 13**, `Z T_e` dominates, so
+WarpX's hot ions (`T_i/T_e` ≈ 1 vs FLASH's 0.33) barely move the effective sound speed:
+`sqrt((Z T_e + T_i)_W / (Z T_e + T_i)_F)` = 0.638/0.560/0.556/0.544 against
+`sqrt(T_e)` alone = 0.621/0.548/0.543/0.530. **Ion pressure is not holding the flow up.**
+
+### The metric was doing much of the work
+`v_at_0p1` samples the flow **at a density contour**, and WarpX puts that contour in a
+different place. Over `P4_lez_kin_ic6_long` out to FLASH's limit:
+
+| τ_own | `L_n` W/F | `ζ(0.1 n_cr)` W / F | `v@0.1` W/F | `v@ζ=3` W/F | `v@ζ=6` W/F |
+|---|---|---|---|---|---|
+| 5.39 | 0.895 | 7.4 / 10.8 | 0.502 | 0.561 | 0.582 |
+| 10.78 | 0.714 | 11.5 / 20.8 | 0.401 | 0.586 | 0.640 |
+| 16.17 | 0.602 | 17.8 / 30.6 | 0.382 | 0.740 | 0.570 |
+| 21.57 | **0.511** | **21.8 / 41.6** | **0.376** | **0.977** | 0.654 |
+
+By τ 21.6 WarpX's 0.1 `n_cr` contour sits at **half** FLASH's distance. Measured at the **same
+position** the deficit largely disappears — `v@ζ=3` reaches **0.977**.
+
+### The self-similar reading, which ties it together
+For an isothermal rarefaction `v = C_s + z/t`:
+* **At fixed `z`** the ballistic `z/t` term is *identical* between codes and only `C_s` differs,
+  so the ratio → 1 as `z/t` grows. That is exactly what `v@ζ=3` does.
+* **At a fixed density contour** the contour's own position scales as `C_s t`, so the `C_s`
+  deficit enters twice — once in `C_s`, once in where you are standing.
+* And `L_n ∝ C_s t` predicts `L_n` W/F = `sqrt(T_e)` W/F: measured **0.511 against 0.537** at
+  τ 21.6. Agreement to 5 %.
+
+**So the flow deficit is the temperature deficit, propagated through `C_s ∝ sqrt(T_e)`.** It is
+not an independent discrepancy, and its apparent magnitude (0.38× at a contour, 0.98× at fixed
+position) is set by where it is sampled.
+
+**Practical consequence**: `v_at_0p1` is a *compound* metric — it mixes flow with density
+structure. For cross-code flow comparison, quote `v` at fixed `ζ`, or quote `L_n` and `C_s`
+separately. Several earlier entries used `v_at_0p1` as if it were a clean flow measure.
