@@ -5524,3 +5524,57 @@ position) is set by where it is sampled.
 **Practical consequence**: `v_at_0p1` is a *compound* metric — it mixes flow with density
 structure. For cross-code flow comparison, quote `v` at fixed `ζ`, or quote `L_n` and `C_s`
 separately. Several earlier entries used `v_at_0p1` as if it were a clean flow measure.
+
+---
+
+## 2026-08-20 (the sink) — the kick delivers; **45 % of the absorbed energy then conducts into the under-dense solid**
+
+Chasing the chain *v ← T_e ← absorption ← kick*, the break is **after** the kick and **before**
+the plume.
+
+### The kick delivers. Energy closure is clean.
+| run | `E_abs` | `ΔE_e` | `ΔE_i` | `ΔE_field` | **closure** | weight loss |
+|---|---|---|---|---|---|---|
+| pscheat (500 ppc) | 4.542e5 | +1.091e5 | +2.406e5 | +7.264e4 | 0.930 | 0.0000 % |
+| coldsolid (500 ppc) | 3.481e5 | +1.024e5 | +1.518e5 | +5.464e4 | 0.887 | 0.0000 % |
+| **cs_ppc4k (4000 ppc)** | 3.327e5 | +1.324e5 | +1.897e5 | +8.710e3 | **0.994** | 0.0000 % |
+
+At 4000 ppc the budget closes to **0.6 %** with zero boundary loss. Every absorbed joule
+arrives. There is no leak between the ray march and the particles.
+
+### Where it goes — electron thermal energy by density region, τ_own 5.39
+| region | `N_e` [/m²] | `⟨T_e⟩` | share of `U_e` |
+|---|---|---|---|
+| **WarpX solid** (n > 1 `n_cr`) | 7.37e22 | **9.7 eV** (from **1.26**) | **57.4 %** |
+| WarpX plume (1e-2…1) | 2.87e21 | 181.8 eV | 41.7 % |
+| **FLASH solid** | **3.92e25** | **0.5 eV — did not heat** | 46.6 % |
+| FLASH plume | 2.42e22 | 646.3 eV | 52.9 % |
+
+**WarpX's solid heats 1.26 → 9.7 eV; FLASH's stays at 0.5 eV.** Warming 7.37e22 electrons by
+8.4 eV costs **1.50e5 J/m² = 45 % of the 3.327e5 J absorbed.**
+
+### Why: this is decision D5, quantified
+FLASH's solid is **795 `n_cr`**; WarpX's is **10 `n_cr`** — it holds **531× fewer electrons**
+(3.92e25 vs 7.37e22). Heat conducted from the corona into the solid therefore raises WarpX's
+solid temperature by a correspondingly larger factor: the same joules meet ~1/500 of the heat
+capacity. FLASH's solid is effectively an infinite heat sink and stays cold; WarpX's is a
+*small* one and warms up, taking nearly half the absorbed energy with it.
+
+**So the chain is: kick delivers correctly → ~45 % conducts into an under-dense solid that
+FLASH treats as an infinite sink → the plume gets what is left → `T_e` is low → `C_s` is low →
+`v/C_S0` is low.** The velocity and temperature deficits are one phenomenon, and its origin is
+the target density, not the laser module.
+
+### Why this was not visible earlier
+- The **`n_max,PIC` = 10 `n_cr`** cap is the paper's own choice, so it looked like settled setup
+  rather than a candidate.
+- `P4_lez_kin_thick` tested *thickness* (45 → 200 `d_e`), which raises areal mass but **not**
+  density — heat capacity per unit length is unchanged, and the run got *worse*.
+- The `Te_mean_plume` metric is confined to 1e-2…1 `n_cr` and never looked at the solid.
+
+### The test this implies
+Raise `plasma.target.density_over_ncr` toward FLASH's solid and see whether the plume warms.
+The paper scanned 2/5/10/20 `n_cr` (Appendix A) and gate G1 binds: `ω_pe dt` ∝ √n, and 10
+`n_cr` already reads 0.783 at 2× compression against a limit of 2, so **20 `n_cr` is about the
+ceiling** at the current `cfl` — a 2× step, not the 80× that would match FLASH. Whether a 2×
+change moves `T_e` measurably against the 12 % noise floor is the question.
