@@ -5246,3 +5246,41 @@ never tested: I measured and cleared the deposition *location*, not the *reservo
 
 **Next test**: WarpX with `density_min_frac` raised so its resolved electron population matches
 PSC's 1e-3 `n_cr`, at otherwise identical settings.
+
+---
+
+## 2026-08-20 (reservoir) — the electron-reservoir hypothesis is FALSIFIED
+
+`runs/P4/P4_lez_kin_ic6_nmin4` = `pscheat` with `density_min_frac` 1e-6 → 1e-4, i.e. floor
+`1e-4 × 10 n_cr` = **1e-3 `n_cr`, exactly PSC's** `n_cr`/NPPC. Deck diff against the control is
+the two `density_min` lines only. 5 min, `--verify` OK.
+
+| τ_own | pscheat (1e-6) | **nmin4 (PSC's floor)** | FLASH |
+|---|---|---|---|
+| 2.70 `T_e` | 171.3 (0.306×) | **165.1 (0.295×)** | 559.3 |
+| 5.39 `T_e` | 186.6 (0.289×) | **187.5 (0.290×)** | 646.3 |
+| 5.39 e share | 0.312 | **0.302** | — |
+
+**<4 % change, in the wrong direction at two of three times.** Matching PSC's electron
+reservoir does not recover the temperature. **Retracted**: the reservoir-size explanation for
+the resupply difference (RESULTS 2026-08-20, PSC control).
+
+### It does reconcile with `studies/ppc_ladder`
+That study measured 473.2 → 361.6 eV on this same knob — but on the **analytic Gaussian
+corona, `L_n` = 27 `d_e`**, which spans 1 → 1e-5 `n_cr` over ~311 `d_e`, so lowering the floor
+adds ~125 `d_e` of tenuous plasma. The FLASH-fitted exponential (`L_n` = 6.955) covers the same
+decades in ~80 `d_e` and adds only ~32 `d_e`. **The floor is a strong lever on a long corona
+and a weak one on a short one.** The earlier *shape* result is untouched; only the transfer of
+its *magnitude* result to the current IC fails.
+
+### Standing after a full day of elimination
+Eliminated by measurement: initial conditions, laser kernel, collision cadence, `σ_max` cap,
+collisions entirely, temperature floor (real defect, ~⅓ of the gap, fixed), PSC-equivalent
+heating, deposition location, reduced speed of light, Debye resolution, the electron drain
+(retracted — real physics, PSC drains *faster*), and now the electron reservoir.
+
+**The open question is now precise**: at comparable `f_abs`, PSC's electron energy grows 5.5×
+where WarpX's grows 1.2× over t_F 0.1 → 0.2 ns. Not the drain, not the reservoir, not the
+deposition. What differs is how efficiently absorbed energy becomes *electron thermal* energy
+rather than ion motion — and both codes' laser modules deposit as momentum kicks to electrons.
+The kick implementation itself is the last untouched piece.

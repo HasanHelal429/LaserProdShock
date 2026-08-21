@@ -1,0 +1,14 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_kin_ic6_nmin4
+# logging_started 2026-08-20T17:00:51  total_steps=110592  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-20T17:01:21 | 11787/110592 (10.7%) | 0h00m | 0.0025 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h04m | x1.03 | load 18.2 | laser 0.227 of peak, Eabs 2.988e+04 J
+2026-08-20T17:01:51 | 22731/110592 (20.6%) | 0h01m | 0.0027 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h04m | x1.06 | load 18.6 | laser 0.489 of peak, Eabs 6.277e+04 J
+2026-08-20T17:02:21 | 33820/110592 (30.6%) | 0h01m | 0.0027 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h03m | x1.03 | load 18.3 | laser 0.269 of peak, Eabs 1.032e+05 J
+2026-08-20T17:02:51 | 45271/110592 (40.9%) | 0h02m | 0.0026 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h02m | x1.00 | load 18.5 | laser 0.567 of peak, Eabs 1.461e+05 J
+2026-08-20T17:03:21 | 56958/110592 (51.5%) | 0h02m | 0.0026 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h02m | x0.99 | load 15.9 | laser 0.429 of peak, Eabs 1.935e+05 J
+2026-08-20T17:03:51 | 69680/110592 (63.0%) | 0h03m | 0.0024 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h01m | x0.92 | load 10.6 | laser 0.357 of peak, Eabs 2.503e+05 J
+2026-08-20T17:04:21 | 82770/110592 (74.8%) | 0h03m | 0.0023 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h01m | x0.91 | load 7.3 | laser 0.427 of peak, Eabs 3.128e+05 J
+2026-08-20T17:04:52 | 95955/110592 (86.8%) | 0h04m | 0.0023 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h00m | x0.92 | load 9.0 | laser 0.376 of peak, Eabs 3.723e+05 J
+2026-08-20T17:05:22 | 107746/110592 (97.4%) | 0h04m | 0.0026 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h00m | x1.03 | load 12.5 | laser 0.656 of peak, Eabs 4.284e+05 J
+2026-08-20T17:05:52 | 110592/110592 (100.0%) | 0h05m | 0.0106 s/step(wall) | 0.0025 s/step(warpx) | ETA ~0h00m | x4.25 | load 15.1 | laser 0.443 of peak, Eabs 4.435e+05 J
+DONE 2026-08-20T17:05:52 | 110592/110592 (100.0%) | total wall 0h05m | mean 0.0027 s/step(wall) | reached max_step
