@@ -5407,3 +5407,52 @@ does not show up in the ion phase space.
 
 `coldsolid` was re-run with `phase_intervals` 27648 → 4608 for the frame count; physics
 unchanged, `--verify` OK.
+
+---
+
+## 2026-08-20 (ppc at the absorption region) — a marginal effect, and a NOISE FLOOR worth having
+
+`runs/P4/P4_lez_kin_cs_ppc4k` = `coldsolid` with ppc 500 → 4000. Deck diff is the two ppc
+lines. 36 min, `--verify` OK.
+
+**Motivation, from a direct measurement.** WarpX's fixed-ppc loading thins out as the corona
+expands; PSC's fixed-weight loading does not. Macroparticles per cell at τ 5.39:
+
+| `n_e` band | WarpX 500 ppc | PSC | **WarpX 4000 ppc** |
+|---|---|---|---|
+| 0.01–0.03 `n_cr` (front) | 42 | 17 | — |
+| **0.3–1.0 `n_cr`** (where the laser deposits) | **184** | **548** | **2003** |
+
+So WarpX has 2.5× *more* than PSC at the front but **3× fewer at the absorption region** — the
+opposite of what the phase-space movie suggests, because `diag_phase` dumps only 5 % of ions.
+
+### Result
+
+| τ_own | ppc 500 | **ppc 4000** | FLASH |
+|---|---|---|---|
+| 2.70 `T_e` | 146.4 (0.262×) | **167.9 (0.300×)** | 559.3 |
+| 5.39 `T_e` | 148.6 (0.230×) | **181.8 (0.281×)** | 646.3 |
+| 5.39 `T_i/T_e` | 1.339 | **1.022** | 0.352 |
+
+`T_e` up 15–22 %, `T_i/T_e` 1.34 → 1.02. Right direction on both.
+
+### The noise floor — measured by accident, and it matters
+The control reads `T_e` = 148.6 eV at τ 5.39 where **the same configuration measured 166.6 eV**
+before being re-run for the movie (identical physics, only `phase_intervals` changed). That is
+**12 % run-to-run scatter**, exactly what `CLAUDE.md` warns of: *"the CUDA build is not
+run-to-run reproducible AT ALL."*
+
+**A +22 % effect against 12 % scatter is ~2σ on a sample of one.** The direction is probably
+real; the magnitude is not yet quotable.
+
+**Consequence for everything reported today**: differences in plume `T_e` below **~15 %**
+measured from single CUDA runs should be treated as noise. That retrospectively softens
+several small effects reported in today's entries — the cold-solid result (0.289 → 0.258),
+the reservoir result (<4 %), and the Debye result (1–2.5 %) are all *within* this floor.
+Their conclusions stand only because they were **nulls**; a null inside the noise floor is
+still a null, but none of them should be read as a measured small effect in either direction.
+
+### Where it leaves the gap
+Eleven times the particle count at the absorption region closes at most a fifth of the
+discrepancy: **0.28 × FLASH against PSC's 0.87–0.96**. Sampling is a contributor, not the
+cause.
