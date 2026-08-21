@@ -5802,3 +5802,58 @@ sits at **1.63**, i.e. PSC shows *no* similarity factor at all where WarpX shows
 between `m_p/m_e` = 100 and 400 while WarpX's moves by 1.551×, the discrepancy is localised to
 PSC's treatment, not WarpX's — and that is a single-number result worth taking to the authors.
 It requires editing the sensitive module tree and two reruns.
+
+---
+
+## 2026-08-21 — why PSC has no `μ^(1/3)`, and the un-retraction of the physical-size claim
+
+### Why PSC doesn't show it
+`INIT_param.f` sets `K_length = DI0_phys/DI0_code` with `DI0_code = √(ReducedMassRatio)`, and
+`DI0_phys` (the *real* proton skin depth) contains no mass ratio. So **`K_length ∝ 1/√mr`**.
+Deck lengths are *"in units of de"* (`INIT_param.f:300`), so a target of 4.5 `d_i0` =
+`4.5√mr` code-`d_e` maps to a physical
+
+```
+4.5·√mr · DI0_phys/√mr  =  4.5 · DI0_phys        <-- the mass ratio CANCELS
+```
+
+and the ray-trace runs on **mapped physical units** (`PIC_part_heating.F90:252-254`:
+`NNe·K_density` cm⁻³, `TTe·K_temperature` eV, `z·K_length` cm).
+
+**So the optical depth PSC's laser sees is mass-ratio invariant by construction.** WarpX has
+no such mapping — its `d_e` **is** the real 0.1693 µm — so 4.5 `d_i0` is a physical length
+`∝ √mr`, and the optical depth moves with it. That is exactly what the scan measured.
+
+**Consequence: the paper's "good convergence" over {100, 400} is a property of the unit
+mapping, not evidence about the physics.** Our scan and the paper's scan are *different
+experiments* — ours holds the ζ-geometry fixed and lets the physical size move, PSC's holds
+the physical size fixed. Both results are correct; they are not in conflict.
+
+### UN-RETRACTION
+The 2026-08-20 entry claimed WarpX's target is **4.285× too thin**. The entry after it
+retracted that on the grounds that "the conventions are identical". **The retraction was
+wrong.** The conventions are identical *arithmetically*, but that does not make the mapped
+physical systems match: PSC *declares* its `d_e` to be 0.7256 µm where WarpX's **is** 0.1693 µm.
+Carrying the same FLASH ζ-profile (`ic_ourflash/make_ic_from_ourflash.py` maps FLASH ζ onto
+`z_code/10`, and `xcode_compare` maps it onto `z/DI0_W`):
+
+| | physical target |
+|---|---|
+| PSC | **32.65 µm** |
+| WarpX | **7.62 µm** |
+
+and the mass-ratio scan **measured** that this matters: `s` = 2 raised `f_abs` 0.350 → 0.744
+and `T_e` 157.7 → 244.6 eV. The original claim was right in substance; the scan re-derived it
+independently.
+
+### The run this implies — and it is a clean one
+To match PSC physically WarpX needs `s = 4.285`, i.e. `mass_ratio` = 2698 × 18.36 = **49542**
+— which is `m_Al/m_e` for **real aluminium**. The physically-matched WarpX run is simply the
+**real-mass run**, with the reduced mass ratio dropped entirely and no similarity factor to
+argue about.
+
+- Extrapolating the measured `T ∝ s^(2/3)` (fits 100 → 400 to 2.3%):
+  **157.7 × 2.638 = ~416 eV**, against PSC 509 and FLASH 647.
+- Cost `∝ s³` = **79× the 6-min baseline ≈ 7.9 h** on one GPU.
+
+That single run tests the residual 1.57× directly and needs no cross-code normalisation.
