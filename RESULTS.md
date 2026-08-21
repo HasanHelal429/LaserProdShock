@@ -5634,3 +5634,65 @@ mass ratio — uses the **real** `d_i0` and `C_S0` and maps 1:1 onto FLASH's clo
 with FLASH. WarpX's `xcode_compare` uses the **reduced** `d_i0` and a clock 18.36× faster. Both
 cannot be right. That single question now governs every cross-code number in this campaign, and
 it is a derivation, not a run.
+
+---
+
+## 2026-08-20 (THE CLOCK, SETTLED) — the two codes do not mean the same thing by `d_e`, and WarpX's target is **4.285× too thin**
+
+Settled from first principles, not convention.
+
+### The reduced mass ratio is implemented differently
+The paper reaches `m_p/m_e` = 100 by **increasing the electron mass**
+(*"reduced speed of light (electron rest energy) and ion–electron mass ratio (increased
+electron mass)"*), i.e. `m_e,PSC` = `m_p`/100 = **18.36 × m_e,real**. WarpX keeps the **real**
+electron mass and only lightens the ion.
+
+At the *same* `n_cr`, `d_e = c/ω_pe ∝ √m_e`, so:
+
+| | `m_e` | `d_e` at `n_cr` | `d_i0` |
+|---|---|---|---|
+| **PSC / the paper** | 18.36 × real | **0.7256 µm** | **7.261 µm** |
+| **WarpX** | real | **0.1693 µm** (= λ/2π) | **1.6934 µm** |
+| real proton skin depth at `n_cr` | — | — | **7.256 µm** |
+
+**PSC's `d_i0` is the real proton skin depth to 0.06 %** — confirmed independently by its own
+`K_length` = 7.26098e-7 m. WarpX's is **4.285× smaller**. In WarpX `d_e` = λ/2π exactly
+(`CLAUDE.md`); in PSC the skin depth and the laser wavelength are **decoupled** by the heavy
+electron.
+
+### The consequence
+Every length specified in `d_e` or `d_i0` is **4.285× smaller in WarpX**. The paper's target is
+"4.5 `d_i0`" thick:
+
+| | 4.5 `d_i0` |
+|---|---|
+| FLASH / PSC | **32.65 µm** |
+| WarpX | **7.62 µm** |
+
+**WarpX's target is 4.285× thinner than the paper's**, and `TAU_W` = `TAU_F`/18.36 =
+(1/4.285)² follows from the very same substitution — the clock and the geometry are one error,
+not two.
+
+That also explains the areal-mass gap measured earlier: FLASH's solid holds 3.92e25
+electrons/m² against WarpX's 7.37e22, a factor **532**, of which ~80 is the density cap
+(795 → 10 `n_cr`) and the remaining **~4.3× is this thickness error**.
+
+### Why the IC comparison looked fine
+`xcode_compare` measures every leg in **its own** `d_i0`, so a 4.285× physical difference is
+invisible: the ICs matched at ζ_cr 1.12×, `L_n` 0.97× while being physically 4.285× apart. The
+normalisation hid exactly the quantity that differs.
+
+### The empirical check, which is decisive
+**PSC uses the paper's convention and agrees with FLASH (`T_e` 0.87–0.96×). WarpX uses the
+real-`d_e` convention and does not (0.26–0.38×).** Same laser module, same collisions, same
+mass ratio, same IC in ζ. The convention is the difference that survived every other test.
+
+### Status and what it does NOT yet prove
+This is a **derivation plus a consistency argument**, not a run. It predicts that a WarpX target
+of 4.5 × 7.256 µm (i.e. `thickness_de` ≈ 193 at WarpX's `d_e`), with the domain, corona and
+clock rescaled to match, moves `T_e` toward FLASH. **It should be checked before anything is
+rewritten**: notably `P4_lez_kin_thick` used 200 `d_e` — numerically close to 193 — and got
+*worse*, though it changed thickness alone and left the corona, domain and clock untouched.
+
+**Consequence if it holds**: every Phase-4 WarpX run has been geometrically 4.285× too small
+and clocked 18.36× too fast, and every cross-code ratio in this notebook is affected.
