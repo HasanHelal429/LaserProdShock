@@ -5910,3 +5910,73 @@ problem — PSC exceeds what its own mass ratio permits.** The next investigatio
 PSC's heating operator, not in WarpX's normalisation. The 1.8 h length rescale is **not
 recommended**: its best case is ~318 eV and this 13-minute pair already established the
 mechanism.
+
+---
+
+## 2026-08-23 (PSC HEATING OPERATOR) — the operator is clean; **PSC's ion is real aluminium and WarpX's is 18.2× too light**
+
+### The operator itself is correct
+`PIC_part_kick` (`PIC_part_heating.F90:833-881`) is a textbook Box–Muller kick:
+`Δp_i = sqrt((2/3)·H·Δt)·N(0,1)` per component, so `⟨ΔE⟩ = H·Δt` — identical to WarpX's.
+`laser_heating_per_particle = laser_heating/(K_density·1e-6·NNe)` divides by the **physical**
+electron density, which is right: a macroparticle's velocity represents the mean of the real
+electrons it stands for, so the per-real-electron rate is what it should receive, independent
+of weight. Units check out too — `×6.24e11` is erg→eV, and the run log confirms
+`I0 = 1.0e20` erg/s/cm² = 1e13 W/cm². **Nothing is wrong in the heating operator.**
+
+### What is actually different
+```fortran
+K_mass = hydr_mass_phys / ReducedMassRatio          ! INIT_param.f:164
+MMi1   = 26.9815 * ReducedMassRatio                 ! :212, "! 47.867*1836.2"
+                                                    !   -> MMi is in CODE ELECTRON masses
+```
+```
+m_ion,phys = MMi1 · K_mass = 26.9815 · hydr_mass_phys      <-- ReducedMassRatio CANCELS
+```
+
+**PSC's ion is real aluminium at *every* `ReducedMassRatio`** (verified at 25/100/400: all
+give 1.008× real Al). Same cancellation structure as `K_length`.
+
+| | how `m_i/m_e` = 100 is reached | `m_e` | `m_ion` |
+|---|---|---|---|
+| **PSC** | make the **electron heavier** | 18.4× real | **1.008× real Al** |
+| **WarpX** | make the **ion lighter** | real | **0.055× real Al** |
+
+**The two codes' ions differ by 18.2× in physical mass.** Same `m_i/m_e`, opposite
+implementation, completely different physical system.
+
+### RETRACTION — PSC is not anomalous
+The previous entry claimed PSC sits **1.95× above its analytic ceiling** and that the next
+investigation belonged in its heating operator. **Both were wrong**: I applied the reduced-mass
+`T_ss` to PSC, whose ion is *real*. Redone with each leg's true ion mass
+(`T_ss = 823·(m_i/m_i,real)^(1/3)·f_abs^(2/3)`):
+
+| | `m_i/m_i,real` | `f_abs` | `T_ss` | measured | ratio |
+|---|---|---|---|---|---|
+| WarpX `mr100` | 0.055 | 0.350 | 154.9 | 157.7 | 1.02 |
+| WarpX `cl_psc` | 0.055 | 0.931 | 297.4 | 255.1 | 0.86 |
+| **PSC** | **1.000** | 0.764 | 687.8 | 509.0 | **0.74** |
+| FLASH | 1.000 | 0.870 | 750.0 | 647.0 | 0.86 |
+
+**Every leg now sits at 0.74–1.02 of its own steady state.** There is no anomaly anywhere —
+the whole 3× is WarpX's ion being 18.2× too light, which is exactly the `μ^(1/3)` = 2.638 the
+scan measured.
+
+### The fix that keeps `m_p/m_e` = 100 — and it fixes the length mapping too
+**Inflate WarpX's electron mass by 18.36 instead of deflating the ion.** Then `m_i/m_e` = 100
+is preserved (cheap), the ion is real aluminium (`T_ss` ceiling 823 eV), **and** since
+`d_e ∝ √m_e` the skin depth becomes 0.7256 µm — **PSC's exactly** — so the 4.285× optical-depth
+gap closes at the same time. **One change fixes both.**
+
+Cost is *not* the obstacle: `dz` and `dt` both grow 4.285×, cells fall 4.285×, and the run
+needs 18.36× more real time, so cells × steps ≈ **1.0×** — roughly the 6-minute baseline
+(~10 min at PSC's larger domain).
+
+**The obstacle is that `deck.py` hardcodes the real `m_e`** (`Mi = mass_ratio*m_e`,
+`wpe = sqrt(ncr·q_e²/(epsilon0·m_e))`, `theta = kT/(m_e c²)`). It needs a
+`reference.electron_mass_scale`. Legitimate, since both codes treat the laser as a ray-trace
+with `n_cr` a *parameter*, not a field-solved resonance — so `n_cr` stays real while `m_e`
+inflates, exactly as PSC does.
+
+**Known cost of the convention:** `λ_D ∝ √T` is mass-independent while `dz ∝ √m_e`, so
+`dz/λ_D` worsens by `4.285/√2.638` = **2.64×**. Gate G2 already warns; it will warn harder.
