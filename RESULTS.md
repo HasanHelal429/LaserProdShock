@@ -5857,3 +5857,56 @@ argue about.
 - Cost `∝ s³` = **79× the 6-min baseline ≈ 7.9 h** on one GPU.
 
 That single run tests the residual 1.57× directly and needs no cross-code normalisation.
+
+---
+
+## 2026-08-23 — PSC's length mapping, imposed on WarpX for 13 minutes: real, +62 %, and not sufficient
+
+Question asked: what preserves `m_p/m_e` = 100 and still matches PSC's unit handling?
+
+**The knob.** PSC's laser converts `z → z·K_length` before integrating, `K_length ∝ 1/√mr`,
+so at the same ζ-profile its optical depth is 4.285× WarpX's. Since `A ∝ lnΛ` enters `K`
+**linearly** and the ray path depends only on `n_e/n_cr`, **scaling lnΛ by 4.285 is
+mathematically identical to scaling every path element by 4.285.** Zero source change, 6 min
+per leg. Only `laser.coulomb_log` moved; `collisions.coulomb_log` stayed at 6.3.
+
+| leg | laser lnΛ | `f_abs` | plume `T_e` | vs baseline |
+|---|---|---|---|---|
+| `mr100` (`nrl`) | 4.75 per-cell | 0.350 | 157.7 eV | 1.000 |
+| `cl_ctrl` | 4.75 | 0.540 | 168.1 eV | 1.066 |
+| `cl_psc` | **20.35** | **0.931** | **255.1 eV** | **1.617** |
+
+**Result: confirmed against the control.** `T_e` 168.1 → 255.1 = **1.517×** vs `f_abs^(2/3)`'s
+**1.437×**, 5.6 % apart and inside the 13.5 % noise floor. `cl_psc` reaches **0.86** of its
+`f_abs`-adjusted ceiling (255.1 of 298) — the same fraction FLASH reaches of its own (0.86).
+
+**The control earned its place.** `nrl` → `constant` alone moved `f_abs` 0.350 → 0.540, since
+per-cell lnΛ tracks `T_e` and changes where the ray deposits. Without it the mode switch would
+have been credited to the 4.285×.
+
+### A dead lead worth recording
+WarpX's run log prints `lnLmean ≈ 1.0`, which looks like a floored Coulomb log and a 6×
+absorption deficit. **It is not.** The per-cell profile dump gives a plume mean of **4.75**
+(168 cells, max 6.03); the logged value is a whole-domain mean dominated by vacuum cells,
+where both codes return 1 by construction. WarpX's `ne_cm = n_e·1e-6` conversion is correct and
+its formula and floor match PSC's `get_lnlambda` exactly. **`lnLmean` is a misleading
+diagnostic — do not read it as the absorbing plasma's lnΛ.**
+
+### Where this leaves the discrepancy
+Each leg against `T_ss = 823·µ^(-1/3)·f_abs^(2/3)`:
+
+| | `f_abs` | predicted | measured | ratio |
+|---|---|---|---|---|
+| WarpX `mr100` | 0.350 | 154.9 | 157.7 | **1.02** |
+| WarpX `cl_psc` | 0.931 | 298.0 | 255.1 | 0.86 |
+| FLASH | 0.870 | 750.0 | 647.0 | 0.86 |
+| **PSC** | 0.764 | 260.7 | **509.0** | **1.95** |
+
+**WarpX and FLASH both sit at or below their analytic steady state. PSC sits at 1.95× its
+own.** At `m_p/m_e` = 100 the ceiling at full absorption is **312 eV**; PSC is at 509.
+
+**So the length mapping is real and worth +62 %, but the residual is not a WarpX units
+problem — PSC exceeds what its own mass ratio permits.** The next investigation belongs in
+PSC's heating operator, not in WarpX's normalisation. The 1.8 h length rescale is **not
+recommended**: its best case is ~318 eV and this 13-minute pair already established the
+mechanism.

@@ -46,7 +46,29 @@ reach PSC's number, and is not expected to.
 
 ## Result
 
-*Pending — not yet run.*
+**The optical-depth mechanism is confirmed, and it is NOT sufficient.**
+
+| leg | laser lnΛ | `f_abs` | plume `T_e` | vs baseline |
+|---|---|---|---|---|
+| `mr100` (`nrl` baseline) | 4.75 (per-cell) | 0.350 | 157.7 eV | 1.000 |
+| `cl_ctrl` | 4.75 | 0.540 | 168.1 eV | 1.066 |
+| `cl_psc` | **20.35** | **0.931** | **255.1 eV** | **1.617** |
+
+**The control was worth running.** The `nrl` → `constant` switch alone moved `f_abs`
+0.350 → 0.540, because per-cell lnΛ tracks `T_e` and so changes *where* the ray deposits.
+Comparing baseline to `cl_psc` would have credited that to the 4.285×.
+
+**Against the control**, which is the clean comparison: `T_e` 168.1 → 255.1 = **1.517×**,
+where `f_abs^(2/3)` predicts **1.437×** — 5.6 % apart, inside the 13.5 % noise floor. Imposing
+PSC's length mapping on WarpX's absorption integral does exactly what the derivation said.
+
+**And it lands where it should.** `cl_psc` at `f_abs` 0.931 has a ceiling of
+`312 × 0.931^(2/3)` = 298 eV; it reached **255.1**, i.e. **0.86** of it — the same fraction
+FLASH reaches of its own ceiling (647/750 = 0.86).
+
+**What it does not do.** PSC sits at **509 eV, still 2.0× above `cl_psc`**, with PSC's own
+optical depth now imposed. The length mapping is a real contributor worth **+62 %**, but it
+cannot be the whole story: **PSC exceeds what its own mass ratio permits.**
 
 ## Retracted
 
