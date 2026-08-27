@@ -1563,6 +1563,15 @@ boundaries, is the project's headline output.
 
 ## 12. Phase 4 — cross-code validation against Lezhnin 2025 (`runs/P4/`)
 
+> **Before using any number in this section, read `RESULTS.md`'s `CURRENT STATE` header.**
+> This is the *plan*; the campaign has since overturned several of the assumptions written
+> into it. In particular: **PSC's ion is real aluminium at every `ReducedMassRatio`** (the
+> ratio cancels in `MMi1·K_mass`), so the `µ^(1/3)`-reduced targets below apply to the WarpX
+> legs and **not** to PSC; the PSC leg to compare against is `run_ourflash_511keV`, not the
+> paper's 60 keV run; and `µ^(1/3)` alone is the reduction that holds across a mass sweep —
+> adding `f_abs^(2/3)` breaks it. Measured 2026-08-27, with `f_abs` matched experimentally,
+> `µ^(1/3)` accounts for the entire WarpX↔PSC difference to 4.8 % on a 13.5 % noise floor.
+
 **The question.** Every result in Phases 0–3 is self-consistent: the operator is checked
 against its own upstream, and the physics against scalings derived here. Nothing has yet
 been checked against an **independent code solving different equations**. Phase 4 closes
