@@ -1,0 +1,4 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_kin_mrreal
+# logging_started 2026-08-27T15:09:02  total_steps=2030600  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-27T15:09:32 | 5893/2030600 ( 0.3%) | 0h00m | 0.0051 s/step(wall) | 0.0049 s/step(warpx) | ETA ~2h51m | x1.04 | load 18.1 | laser 0.803 of peak, Eabs 4.171e+04 J
