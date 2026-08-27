@@ -93,8 +93,20 @@ Within this mass ratio the `f_abs^(2/3)` correction also behaves: 0.3642 → 0.4
 It is *across* the µ-sweep that it fails (see RESULTS 2026-08-27), which is why this leg
 exists.
 
-## Retracted
-nothing
+## Figures
+`media/P4/P4_lez_kin_clmatch/`
+
+| figure | what it shows |
+|---|---|
+| **`lnlambda_ladder.png`** | **the result.** Plume `T_e` vs `⟨f_abs⟩` for the four legs of the lnΛ ladder at fixed `m_i/m_e`, with PSC at 508.8 eV and PSC ÷ `µ^(1/3)` landing on the ladder. From `scripts/lnlambda_ladder.py`, which measures every point from the run dirs — nothing hardcoded |
+| `laser_history.png` | `f_abs(t)` (plateau 0.46, spiky), cumulative `E_abs` (linear — late/early `dE/dt` = 1.38, so the drive is NOT saturated), `Tlocalfrac` pinned at 1.000 (no temperature-floor contamination) |
+| `laser_profile.png` | per-cell deposition profile at the 5 profile dumps |
+| `fields_streak.png`, `fields_lineouts.png` | density and field streaks, 17 frames over 10.93 ps |
+| `phase_space.png` | ion phase space. Target-ion front (99.9th pct) 7.75 → 11.99 `C_s`(target); free expansion, no reflection — an ablation run, not a shock run |
+
+Interpolating the ladder to PSC's exact `⟨f_abs⟩` = 0.5833 gives **203.9 eV**, so
+PSC/ladder = **2.495** against `µ^(1/3)` = 2.645 — **5.7 % apart**. Comparing `clmatch`
+directly at its own 0.5629 gives 4.8 %. Both inside the 13.5 % floor.
 
 ## Retracted
 nothing

@@ -33,6 +33,7 @@ python scripts/<script>.py <run_dir> [options]
 | `compare_runs.py` | Cross-run overlay — the controlled-comparison evidence | several run dirs | `media/<name>/compare.png` | **built** |
 | `xcode_compare.py` | **Three-way FLASH / kinetic / hybrid comparison** on the normalised axes, plus the A1-A8 table | FLASH delivery + two run dirs | `media/xcode/{profiles,history}.png` | **built** |
 | `talk_xcode.py` | The same series, two or three large panels for a slide. Imports `xcode_compare`, so it cannot drift from it | same | `media/xcode/talk_ablation.png` | **built** |
+| `lnlambda_ladder.py` | **The laser-lnΛ ladder** — plume `T_e` vs time-integrated `<f_abs>` for a set of legs at fixed mass ratio, against PSC and PSC ÷ `µ^(1/3)`. Every point measured from the run dirs; legs/labels/mass-ratio/PSC-point/guide/limits/ticks all flags | run dirs under `runs/P4/` | `media/P4/<run_id>/lnlambda_ladder.png` | **built** |
 | `xcode_matrix.py` | **The FLASH/PSC/WarpX parameter matrix** — 35 rows with per-row provenance, one `ROWS` table feeding csv + xlsx + an HTML view so they cannot diverge. PSC column is `run_ourflash_511keV` | none (self-contained) | `media/xcode/xcode_matrix.{csv,xlsx,html}` | **built** |
 | `paper_fig3.py` | Recreates Lezhnin Fig. 3 (n_e, T_e, T_i, v, P_abs) with a WarpX leg, optional `--psc` third leg | run dir + FLASH delivery | `media/.../paper_fig3.png` | **built** |
 | `psc_phase_movie.py` | WarpX ion phase space against PSC's bulk flow, frame per dump | run dir + PSC data dir | `media/<ID>/psc_phase.mp4` | **built** |
