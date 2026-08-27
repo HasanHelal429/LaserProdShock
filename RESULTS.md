@@ -36,6 +36,16 @@ Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` =
 ⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
 PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.
 
+**µ^(1/3) is the whole WarpX↔PSC difference — measured, not inferred (2026-08-27).** With
+`f_abs` matched experimentally rather than corrected for (`P4_lez_kin_clmatch`, laser lnΛ
+11.2, ⟨f_abs⟩ 0.5629 against PSC's 0.5833), PSC/WarpX = **2.578 measured vs 2.709 predicted,
+4.8 % apart on a 13.5 % floor.** There is no residual for a code difference to hide in.
+
+⚠ **The `f_abs^(2/3)` term in `T_ss` does not survive the µ-sweep.** Reducing mr25/mr100/mr400
+by `µ^(1/3)·f_abs^(2/3)` gives 1529/838/495 eV — a 3.1× spread where a valid reduction gives
+one constant; `µ^(1/3)` *alone* fits to 2.3 %. So the 1.02/1.02/0.86 band above is soft, and
+the matched-`f_abs` result is the one that does not depend on it.
+
 **The finding this rests on.** PSC reaches `m_i/m_e` = 100 by making the ELECTRON 18.4×
 heavier and keeps a REAL aluminium ion; WarpX makes the ION 18.2× lighter and keeps a real
 electron. Only the ion mass sets `C_S` and the Manheimer steady state, so the whole 3× plume

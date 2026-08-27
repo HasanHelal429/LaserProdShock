@@ -512,6 +512,11 @@ Added 2026-08-27. Every one of these has already produced a wrong number in `RES
   mr25 58.35 s, mr100 345.1 s, mr400 2009 s, all one RTX 4070, all completed. The shortfall
   from `s³` is GPU underutilisation at 2.5k–10k cells and should trend back toward 3 as cells
   grow — so treat `s^2.55` as a floor, not a central estimate, when extrapolating.
+- **A new PSC run directory needs `data/{chk,etracking,itracking}` pre-created, not just
+  `data/`.** PSC takes its first checkpoint at 3 minutes of wall time
+  (`checkpoint_next = 0.05*60*60`, `INIT_param.f:386`) and `SERV_openby_p` opens
+  `data/chk/...` without creating the directory, so the run aborts there — far enough in to
+  look like a physics failure and to have written five moment dumps first.
 - **The `s` rescaling of a mass-ratio leg is 100 % MANUAL.** Nothing in `units.py`/`deck.py`
   applies it. Two families: **s¹** on `d_e`-quoted lengths (`thickness_de`, `center_de`,
   `scale_length_de`, `corona_offset_de`, `axis.lo_de`, `hi_de`, `max_grid_size`) and **s²** on
