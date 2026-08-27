@@ -295,6 +295,50 @@ def pick(series, tau, key=None):
         return None
     return cand[int(np.argmin([abs(s["tau"] - tau) for s in cand]))]
 
+def psc_norm(data_dir):
+    """PSC's SI normalisation, read from the run's OWN log rather than hardcoded.
+
+    PSC is a normalised code with two independent knobs, and the second one is easy to miss:
+
+        ReducedMassRatio  sets d_i0 and the mass unit   (100 in every run here)
+        ReducedSoL        sets m_e c^2 = 3000 eV / ReducedSoL
+
+    `run_ourflash` runs the paper's ReducedSoL = 0.05, i.e. m_e c^2 = 60 keV, while
+    `run_ourflash_511keV` runs 3000/511000, i.e. the REAL electron rest energy. K_length and
+    K_mass are identical between them, so every length and every physical mass is the same;
+    what moves is K_time (by sqrt(ReducedSoL)), the temperature unit K_temperature (by 8.52x)
+    and the collision rate (by ReducedSoL^2, 72.5x). Hardcoding the 60 keV constants and then
+    pointing a script at the 511 keV dumps reads T_e 8.52x too cold on a clock 2.92x too slow,
+    silently -- hence this reader.
+
+    Returns dict(K_temperature [eV], K_time [s], dt [s], reduced_sol, K_vel [m/s], mec2_keV).
+    K_vel converts PSC's code velocity to m/s: CS0_phys / CS0_code with the REAL proton.
+    """
+    log = os.path.join(os.path.dirname(os.path.normpath(data_dir)), "run.log")
+    if not os.path.exists(log):                       # a data dir may be passed directly
+        log = os.path.join(os.path.normpath(data_dir), "run.log")
+    got = {}
+    for ln in open(log, errors="ignore"):
+        s = ln.strip()
+        for k in ("K_temperature=", "K_time=", "dt="):
+            if s.startswith(k) and k[:-1] not in got:
+                try:
+                    got[k[:-1]] = float(s[len(k):].split()[0])
+                except (ValueError, IndexError):
+                    pass
+        if len(got) == 3:
+            break
+    missing = {"K_temperature", "K_time", "dt"} - set(got)
+    if missing:
+        raise RuntimeError(f"{log}: could not read {sorted(missing)} -- PSC's normalisation "
+                           "must come from the run, not from a default")
+    rsol = 3000.0 / got["K_temperature"]              # ReducedSoL, by K_temperature's definition
+    return dict(K_temperature=got["K_temperature"], K_time=got["K_time"],
+                dt=got["dt"] * got["K_time"],         # 'dt' is logged in CODE units
+                reduced_sol=rsol,
+                K_vel=np.sqrt(3000.0 * QE / MP) / np.sqrt(rsol / 100.0),
+                mec2_keV=got["K_temperature"] / 1e3)
+
 # ---------------------------------------------------------------------------------------
 # Scalars. All defined on the UNDERDENSE PLUME, 1e-2 <= n_e/n_cr <= 1, which is the only
 # region TEST_PLAN 12.6 admits: the WarpX target is 10 n_cr where FLASH's is 795 n_cr, so

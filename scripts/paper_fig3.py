@@ -182,10 +182,11 @@ def main():
     if a.psc:
         sys.path.insert(0, "/home/hhelal/psc-raytrace")
         from read_pmt import assemble
-        QE_, MP_ = 1.602176634e-19, 1.67262192e-27
-        K_TEMP_ = 60000.0
-        K_VEL_ = np.sqrt(3000.0 * QE_ / MP_) / np.sqrt(0.05 / 100.0)
-        DT_PSC = 4.54439445e-15
+        # PSC's units come from the run's OWN log: the 60 keV and 511 keV legs share every
+        # length but differ 8.52x in the temperature unit and 2.92x in the clock, so a
+        # hardcoded constant reads the other leg silently wrong (RESULTS 2026-08-27).
+        N_ = xc.psc_norm(a.psc)
+        K_TEMP_, K_VEL_, DT_PSC = N_["K_temperature"], N_["K_vel"], N_["dt"]
         PSC = []
         for st, zi, Q in assemble(a.psc, want=("NNe", "Sxxe", "Syye", "Szze", "NVze")):
             zi = zi[1:-1]; Q = {k: np.asarray(v, float)[1:-1] for k, v in Q.items()}

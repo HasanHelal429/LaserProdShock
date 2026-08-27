@@ -5980,3 +5980,143 @@ inflates, exactly as PSC does.
 
 **Known cost of the convention:** `λ_D ∝ √T` is mass-independent while `dz ∝ √m_e`, so
 `dz/λ_D` worsens by `4.285/√2.638` = **2.64×**. Gate G2 already warns; it will warn harder.
+
+---
+
+## 2026-08-27 — the three-code matrix's PSC column was a **cross-run mix**; it is now `run_ourflash_511keV` throughout
+
+**Environment.** No new simulation. Analysis only, `/opt/anaconda3/envs/physics/bin/python`,
+on the existing dumps of `~/psc-raytrace/run_ourflash` (60 keV, crashed at 18 %) and
+`~/psc-raytrace/run_ourflash_511keV` (511 keV, clean), and `runs/P4/P4_lez_kin_mr100`.
+
+### The defect
+`scripts/xcode_matrix.py` (commit `1d791ce`) transcribed its PSC column out of RESULTS.md in
+one pass, and the values it picked up did **not** come from the same run:
+
+| matrix row | value | actual source |
+|---|---|---|
+| `plume T_e (measured)` | 509 eV | **`run_ourflash_511keV`** @ 99.66 ps |
+| `lnLambda in plume` | ~6.0 at 509 eV | 511 keV (analytic, at the `T_e` above) |
+| `f_abs (measured)` | 0.764 | **`run_ourflash`** (60 keV) @ 165.87 ps |
+| `duration analysed` | 166 ps | 60 keV, same line |
+
+`T_ss` — and therefore the `T_e/T_ss` = 0.74 the sheet turned on — was computed by pairing a
+511 keV temperature with a 60 keV absorbed fraction measured **66 ps later**. The same pairing
+appears at RESULTS 5903 (`0.764 / 509.0 / 1.95`) and 5958 (`0.764 / 509.0 / 0.74`).
+
+**And 0.764 is the worst available value for that row.** It is the last finite `fabs` the
+60 keV run printed — step 36499 of a planned 198050 — emitted one step *after* the only NaN in
+the entire run, by a mover that was already corrupting the heap (glibc abort in
+`pic_move_part_z_`, `PIC_move_part_z.F:303`). Over the last 1000 steps `fabs` = 0.731 ± 0.052;
+the run's time-integrated mean is 0.540.
+
+### Why the 511 keV leg is the right comparison, not merely a different one
+PSC has two independent normalisation knobs and the second is easy to miss:
+
+```fortran
+K_mass    = hydr_mass_phys / ReducedMassRatio       ! INIT_param.f:164  -- no ReducedSoL
+K_length  = DI0_phys / sqrt(ReducedMassRatio)       ! :156             -- no ReducedSoL
+K_time    = TD0_phys * sqrt(ReducedSoL) / RMR       ! :157
+K_temperature = temp_phys / ReducedSoL              ! :159  == m_e c^2
+nudt0    *= ReducedSoL**2 * (511000/temp_phys)**2   ! :594  == (511000/K_temperature)^2
+```
+
+`K_length` and `K_mass` carry **no** `ReducedSoL`, so the two legs share every length and every
+physical mass — `d_e` 0.7256 µm, `d_i0` 7.261 µm, target 32.65 µm, `m_ion` 4.513e-26 kg,
+`τ` 37.098 ps, `n_cr`, `I0` — all verified identical in the logs. What moves:
+
+| | `run_ourflash` (60 keV) | `run_ourflash_511keV` |
+|---|---|---|
+| `ReducedSoL` | 0.05 | 3000/511000 |
+| `K_temperature` = `m_e c²` | 60 000 eV | **511 000 eV** |
+| `K_time` | 3.0296e-14 s | 1.03813e-14 s |
+| `dt` | 4.544 fs | 1.557 fs |
+| `c` = `K_length/K_time` | 0.0799 `c` | **0.2333 `c`** |
+| `nudt0` (logged) | 1.4970e-6 | 2.0639e-8 |
+| collision rate vs physical | **72.53×** | **1.0000×** |
+| ended | glibc abort at 18 % | clean, 64 000/64 000 |
+
+**0.2333 = 1/4.285 = 1/√18.36 exactly.** For an electron 18.36× heavy, that is *precisely* the
+`c` that keeps `m_e c²` real — i.e. the 511 keV leg sits **on** the similarity transform, and
+the paper's 60 keV leg applies a further `√(511/60)` = 2.92× cut to `c` that is **not** part of
+it. That extra cut is also what makes the 60 keV leg 72.5× over-collisional, since `nudt0`
+carries `(511000/K_temperature)²`, which is **exactly 1.0000** at 511 keV. So the 511 keV leg
+is the one that shares WarpX's electron rest energy *and* WarpX's collisionality; comparing
+WarpX against the 60 keV leg mixes a code difference with two deliberate cheats.
+
+### The corrected PSC column, measured one way
+Recipe from the working `--psc` leg of `paper_fig3.py`: `ne = NNe`, `Te = (Sxxe+Syye+Szze)/(3
+ne)·K_temperature`, n-weighted over 0.05 < `n_e/n_cr` < 1.0. `f_abs` is the final instantaneous
+`fabs` from the LASERDEP lines — **the same convention WarpX's 0.350 uses** (`f_end`, verified:
+`mr100` `f_end` = 0.3495, `cl_ctrl` 0.5402, `cl_psc` 0.9307, all matching the RESULTS tables).
+
+| | elapsed | `f_end` | `<f_abs>` | plume `T_e` | `T_ss` | ratio |
+|---|---|---|---|---|---|---|
+| PSC 60 keV, matched t | 99.98 ps | 0.522 | 0.490 | 516.1 eV | 534.8 | **0.97** |
+| PSC 60 keV, its own end | 163.60 ps | 0.693 | 0.537 | 564.3 eV | 646.0 | 0.87 |
+| **PSC 511 keV, its own end** | **99.66 ps** | **0.475** | 0.583 | **508.8 eV** | **501.1** | **1.02** |
+| *old sheet (mixed)* | *—* | *0.764* | *—* | *509 eV* | *687.8* | *0.74* |
+
+**At the matched 99.7 ps the two PSC legs agree to 5 % on `T_e/T_ss`** (0.97 vs 1.02) and to
+1.4 % on `T_e` (516.1 vs 508.8) — the switch corrects bookkeeping, not physics. The old 0.74
+was an artifact of the cross-run pairing, nothing more.
+
+### Consequence for the sheet's headline
+With every leg on `f_end` and its own ion mass:
+
+| | `m_i/m_i,real` | `f_abs` | `T_ss` | measured | ratio |
+|---|---|---|---|---|---|
+| WarpX `mr100` | 0.055 | 0.350 | 154.9 | 157.7 | **1.02** |
+| **PSC 511 keV** | 1.000 | 0.475 | 501.1 | 508.8 | **1.02** |
+| FLASH | 1.000 | 0.870 | 750.0 | 647.0 | 0.86 |
+
+**The two PIC codes now land on the same number.** The band tightens from 0.74–1.02 to
+0.86–1.02, and the one leg that sits below is the fluid code. This strengthens the
+2026-08-23 conclusion rather than changing it: the entire plume-temperature gap is WarpX's
+ion being 18.2× too light, and nothing in PSC is anomalous.
+
+### A second, independent correction found on the way
+The matrix said PSC's **collision** operator uses "NRL per-cell". **It does not.** The per-cell
+NRL formula (`get_lnlambda`, `PIC_part_heating.F90:882`) belongs to the *laser* operator only.
+The binary-collision operator uses a single global constant set once at `INIT_param.f:584`:
+
+```fortran
+lnlambda = 23.0d0 - log(sqrt(num_dens_phys)*Z_eff/(temp_phys)**(3.0/2.0))
+```
+
+with `num_dens_phys` = `n_cr` = 9.849e20 cm⁻³ and `temp_phys` = 3000 eV, giving
+**lnΛ = 8.275, global, floored at 1**, entering only through `nudt0`. So the row is
+`8.28 global` (PSC) vs `6.3 global` (WarpX) — the same *kind* of treatment, 1.31× apart, not
+per-cell vs global. `INIT_param.f:115` even carries `! TODO: make lnlambda an output`.
+
+The measured in-plume lnΛ was also low. Recomputing NRL cell-by-cell from each code's dumped
+`n_e` and `T_e` (bit-exact with what its laser operator saw) gives **6.27** for PSC (336 cells,
+4.95–7.17) against the sheet's analytic "~6.0", and 6.25 for the 60 keV leg — so it is not a
+leg difference. Against WarpX's 4.75 the gap is 1.32×, not 1.26×.
+
+### Two caveats now recorded in the sheet
+1. **The legs are not τ-matched.** PSC reaches 2.69 `τ_own`, WarpX 5.39, FLASH 26.96, and PSC's
+   plume `T_e` is still rising at cutoff — **509 eV is a lower bound.** The 60 keV leg reached
+   4.41 τ, so switching legs trades physical `c` for a shorter window. Closing that costs a
+   PSC rerun at `nmax` ≈ 105 000 (~2.9 h at the observed 1 h 45 m for 64 000 steps).
+2. **The 511 keV `T_e` trajectory is non-monotonic**: 377 → 459 eV by 40.5 ps, collapsing to
+   279 eV at 59.2 ps, recovering to 508.8 eV at the end. The collapse coincides exactly with
+   `fabs` pinned at 1.000 for steps 27560–37429 — the ray-march saturating, the case the
+   paper's own Appendix A says `f_abs` is not validated for. The 60 keV leg rises smoothly
+   (371 → 564 eV) over the same span. The endpoint sits on a recovery limb.
+
+### Tooling: a latent bug that would have bitten anyone repeating this
+`paper_fig3.py` and `psc_phase_movie.py` both **hardcoded the 60 keV constants** —
+`K_TEMP_ = 60000.0`, `DT_PSC = 4.54439445e-15`, and `K_VEL` built from `ReducedSoL = 0.05`.
+Pointing `--psc` at the 511 keV dumps would have read `T_e` **8.52× too cold** on a clock
+**2.92× too slow**, silently and with no error. Both now call a new
+`xcode_compare.psc_norm(data_dir)`, which parses `K_temperature`, `K_time` and `dt` out of the
+run's own `run.log` and derives `ReducedSoL` and `K_vel` from them. Verified to reproduce all
+three hardcoded 60 keV constants exactly, and `paper_fig3.py --psc <511keV>` now runs clean.
+`psc_phase_movie.py`'s `--psc` default moved to the 511 keV leg.
+
+### OPEN ITEM — FLASH's `f_abs` = 0.870 was not re-derived
+Every PIC leg in the table above is `f_end` from LASERDEP. FLASH's 0.870 comes from
+`DELIVERY.md` and its convention was **not** checked against that. If it is a run-mean, FLASH's
+0.86 ratio is not on the same footing as the other two and would move. Cheap to settle; not
+settled here.

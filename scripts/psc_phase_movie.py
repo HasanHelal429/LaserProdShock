@@ -26,13 +26,18 @@ import xcode_compare as xc                                   # noqa: E402
 from laserprod import plotting as lpp                        # noqa: E402
 from read_pmt import assemble                                # noqa: E402
 
-DT_PSC = 4.54439445e-15
 QE, MP = 1.602176634e-19, 1.67262192e-27
 
 
 def psc_flow(datadir):
-    """(t_F [ns], zeta, <v_z>/C_S0_FLASH) per PSC moment dump."""
-    K_VEL = np.sqrt(3000.0 * QE / MP) / np.sqrt(0.05 / 100.0)
+    """(t_F [ns], zeta, <v_z>/C_S0_FLASH) per PSC moment dump.
+
+    The clock and the velocity unit are read from the run's own log: the 511 keV leg runs
+    dt = 1.557 fs against the 60 keV leg's 4.544 fs, so a hardcoded DT_PSC would place its
+    dumps 2.92x too late (RESULTS 2026-08-27).
+    """
+    N_ = xc.psc_norm(datadir)
+    DT_PSC, K_VEL = N_["dt"], N_["K_vel"]
     out = []
     for step, zi, P in assemble(datadir, want=("NNi", "NVzi")):
         zi = zi[1:-1]
@@ -46,7 +51,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run_dir", nargs="?", default="runs/P4/P4_lez_kin_ic6_coldsolid")
-    ap.add_argument("--psc", default="/home/hhelal/psc-raytrace/run_ourflash/data")
+    ap.add_argument("--psc", default="/home/hhelal/psc-raytrace/run_ourflash_511keV/data",
+                    help="PSC leg. Defaults to the 511 keV run (real m_e c^2, collisions at\n"
+                         "1.00x physical); the paper's 60 keV leg is run_ourflash/data, which\n"
+                         "runs 2.92x slower and 72.5x over-collisional. The clock and velocity\n"
+                         "unit are read from whichever run is given.")
     ap.add_argument("--zlim", type=float, nargs=2, default=(-5.0, 25.0))
     ap.add_argument("--vlim", type=float, nargs=2, default=(-1.0, 6.0))
     ap.add_argument("--fps", type=int, default=6)
