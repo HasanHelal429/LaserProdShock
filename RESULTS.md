@@ -1,12 +1,129 @@
 # RESULTS.md — LaserProdShock lab notebook
 
 **One dated entry per substantive run or finding.** This is how context survives between
-sessions; read it first to learn current state. Newest entries at the bottom.
+sessions. Newest entries at the bottom.
+
+**Start at `CURRENT STATE` below, not at the entries.** At 79 entries the notebook carries
+many numbers a later entry overturned, and reading an entry in isolation is now the main way
+to get a wrong number out of this file. That block is the one part of the file maintained in
+place: it holds the live cross-code table, the numbers that appear with two live values, a
+retraction ledger, and the open items. Update it whenever you add an entry that supersedes
+something.
 
 Conventions: quote densities in `n_cr`, lengths in `d_e,ref` (say which), speeds in `c` or
 `v_A` (say which), times in `ω_ci0⁻¹` for shock runs and `ω_pe⁻¹`/ps for ablation runs.
 Report the gates (G1–G7, `TEST_PLAN.md` §6) for every run. **Retractions get their own
 dated entry** — do not silently edit an earlier one.
+
+# CURRENT STATE — read this before quoting any number below
+
+*Maintained header, rewritten in place; everything under it is append-only history.*
+**Last updated 2026-08-27.** 79 dated entries follow, and a good many of their numbers have
+been superseded. This section is the live state and the retraction ledger. If a number below
+this block contradicts one in it, this block wins.
+
+## The live cross-code comparison
+
+Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` = 823 ·
+`(m_i/m_i,real)^(1/3)` · `f_abs^(2/3)`; plume `T_e` is n-weighted over 0.05 < `n_e/n_cr` < 1.
+
+| leg | `f_abs` | plume `T_e` | `T_ss` | `T_e/T_ss` |
+|---|---|---|---|---|
+| FLASH | 0.870 ⚠ | 647 eV | 750 | 0.86 |
+| PSC `run_ourflash_511keV` | 0.475 (⟨f⟩ 0.583) | 508.8 eV @ 99.66 ps | 501 | **1.02** |
+| WarpX `P4_lez_kin_mr100` | 0.350 (⟨f⟩ 0.364) | 157.7 eV | 155 | **1.02** |
+
+⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
+PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.
+
+**The finding this rests on.** PSC reaches `m_i/m_e` = 100 by making the ELECTRON 18.4×
+heavier and keeps a REAL aluminium ion; WarpX makes the ION 18.2× lighter and keeps a real
+electron. Only the ion mass sets `C_S` and the Manheimer steady state, so the whole 3× plume
+gap is that one row. Measured against its own steady state no code is anomalous.
+
+**`µ^(1/3)` is confirmed in WarpX** — `m_p/m_e` 100 → 400 gives `T_e` ×1.551 against the
+predicted 1.587, 2.3 % apart on a 13.5 % noise floor. **PSC shows no `µ` factor and should
+not**: its ion is real Al at *every* `ReducedMassRatio`, so its "µ-sweep" is an electron-mass
+sweep. **The reduced-`c` null is doubly confirmed** (`T_e` 516.1 at 60 keV vs 508.8 at
+511 keV, 1.4 %; and the 511 keV leg is also 72.5× less collisional, so the null covers two
+variables at once).
+
+**The noise floor is 12–13.5 %, measured.** CUDA is not run-to-run reproducible. Any single-run
+`T_e` difference below ~15 % is noise — `mr100`-class plume `T_e` appears in this file as
+157.7 / 138.9 / 148.6 / 166.6 / 181.8 / 182 eV for the same physics.
+
+## Numbers that appear with two live values — check which basis before quoting
+
+| quantity | competing values | which to use |
+|---|---|---|
+| FLASH plume `T_e` | 839 eV (τ = 27) · **647 eV** (τ_own 5.39) | 647; 839 is a different time wearing the same label |
+| FLASH `T_e/T_ss` | 1.019 · 0.79 · **0.86** | 0.86 (the `f_abs`-adjusted basis) |
+| `T_ss` for a reduced leg | 312 eV (µ only) · **`823·µ^(1/3)·f_abs^(2/3)`** | the latter; 312 is the retired basis |
+| PSC `f_abs` | 0.764 ✗ · 0.47–0.56 · **0.475** `f_end` / 0.583 mean | 0.475 vs WarpX's 0.350; 0.764 is retracted |
+| WarpX `T_e/T_ss` | 0.505 · 0.58 · **1.02** | 1.02 |
+| hybrid `f_abs` | 0.364 integrated · 0.450 instantaneous | say which |
+| PSC laser lnΛ | 5.10 (point) · **6.27** (n-weighted, 336 cells) | 6.27 |
+
+## Retraction ledger — claims a later entry overturned
+
+Read as: *claim (line asserted → line overturned) → what is true now.*
+
+**Diagnostics and conventions**
+1. `f_abs(0)` is a run discriminator (438 → 530) → it carries 10.4 % 1σ on RNG seed alone. Quote `E_abs`.
+2. lnΛ = 2 / 5.0 in the P1 runs (1604 → 1728) → ~3.6× too low; physical is 6.74–7.30. Anything tuned against `f_abs` with a guessed lnΛ needs re-reading.
+3. WarpX↔PSC absorption agrees "to 0.46 %" (1539 → 1853) → exact; the residual is PSC's rounded literals.
+4. PSC's collisions use per-cell NRL (matrix → 6079) → per-cell NRL is the LASER operator; collisions use a global **lnΛ = 8.275** (`INIT_param.f:584`).
+5. `lnLmean` in the WarpX log (≈1.0) is the plasma's lnΛ → it is a whole-domain mean dominated by vacuum. The plume mean is 4.75.
+
+**Operator and numerics**
+6. 2D excess absorption is refractive self-channelling (917 → 890) → it is the transverse index clamp.
+7. `P1_vac_2d` / `_off` results, and the 2.17× planar speedup (862 → 1356) → **VOID**: both parents ran on the pre-clamp binary.
+8. O2 density threshold `n_th` = 3e-2 `n_cr` (§7.5.2 → 1163) → FALSIFIED, +6.13 % against a 0.48 % tolerance.
+9. The 27 % sharp-edge over-absorption is a march bug (1964 → 2021) → it was the temperature floor leaking through plain interpolation.
+10. H1: absorption shuts off at τ ~ 1, and the crater supports `T_e ∝ I^(1/2…2/3)` (2318 → 2333, 2482) → threshold out by 10×; measured `T_e ∝ I^0.18`; the crater agreement was two errors cancelling.
+
+**Cross-code**
+11. `T_e,SS` = 823 eV for every leg (2526 → 2983, 5952) → only at real ion mass, and the current basis also carries `f_abs^(2/3)`.
+12. "A1 passes" (2792 → 2855) → right answer, wrong reason: both legs carried an ion thermal reservoir 15.7× the laser energy.
+13. "The hybrid creates energy" (2867 → 2915) → retracted for the third time; it conserves to 4 %.
+14. "The kinetic leg is 30 % short and 36 % slow" (3042 → 3064) → normalisation artifact; the rarefaction coefficient agrees to 0.2 %.
+15. **"The FLASH↔kinetic benchmark passes"** (3085 → 4411) → that agreement is a coincidence of the transient. FLASH is 99.9 % converged there, WarpX 36–46 %; extrapolated it reads 1.59–2.00×. *Never issued as its own retraction — 3085 still reads as a pass.*
+16. "At a reduced mass ratio you can match the dynamics or the absorption, not both" (3251 → 3329) → false; the transfer is optical-depth preserving (`τ_abs ∝ µ⁰`).
+17. `flashic_ct` / `flashic_res` absolute numbers (3458 → 3746) → both carry a corona 5.19× too extended. The A/B between them stands; the absolute numbers must not be quoted.
+18. "ppc is 200× too low" (3832 → 3890) → the paper loads equally weighted particles, so its ppc scales with density. 4× ppc moves `RISE` by 0.1 %.
+19. "Missing electron heat conduction explains the `T_e` shape" (3696 → 3998, 4133) → it was the density floor.
+20. "The density floor is a strong lever on `T_e` magnitude" (3979 → 5268) → only on a long Gaussian corona; < 4 % on the FLASH-fitted exponential.
+21. "The root cause is `f_abs`" (4798 → 4897) → the floor bug is real and worth ⅓ of the gap, but at matched `f_abs` `T_e` does not move. The deposition operator is cleared.
+22. **"WarpX's kinetic electrons drain energy into ions in a way PSC's do not; the defect is the electron push"** (5139 → 5214) → false. Laser-off, PSC drains *faster* (48 % vs 26 %). Real ambipolar physics.
+23. "At comparable `f_abs` PSC's electron energy grows 5.5×" (5236 → 5305) → the two codes' `E_e0` baselines differ ~16× (solid at 20 eV vs 1.26 eV).
+24. "45 % of absorbed energy conducts into WarpX's under-dense solid" (5553 → 5597) → REFUTED; PSC's solid takes a larger share and its plume is still 3× hotter.
+25. "WarpX's target is 4.285× too thin AND its clock 18.36× too fast" (5664 → 5702 → 5832) → net: the **size** claim stands, the **clock** claim does not.
+26. "PSC is the outlier at 1.63×/1.95× its own `T_ss`" (5745, 5903 → 5948) → wrong `T_ss` basis; PSC's ion is real Al.
+27. "A residual 1.57× that mass ratio does not explain" (5773 → 5896) → dissolved by `f_abs^(2/3)` and each leg's true ion mass. No residual.
+28. PSC `f_abs` = 0.764 (5903 → 5992) → a cross-run mix, and the last finite value before a heap-corruption abort.
+29. "Cost ∝ s³ ≈ 7.9 h" for a real-mass leg (5857 → 2026-08-27) → **measured** `s^2.55`: mr25 58.35 s, mr100 345.1 s, mr400 2009 s.
+
+## Open items
+
+**Live, Phase 4**
+- FLASH's `f_abs` convention never re-derived (6118).
+- The three legs are not τ-matched: PSC 2.69 `τ_own`, WarpX 5.39, FLASH 26.96, and PSC's `T_e` is still rising — **509 eV is a lower bound** (6098).
+- The 511 keV `T_e` trajectory is non-monotonic (377 → 459 → 279 → 509 eV); the endpoint is on a recovery limb where `fabs` pinned at 1.000 (6102).
+- **The energy-partition inversion has never been explained** — only the inference from it was retracted. Electron share, τ_own 0.5 → 5.4: WarpX kinetic **−3.49 → −0.08**, WarpX hybrid 0.98 → 0.70, PSC 0.66 → 0.62 (5064, 5329).
+- PSC's `f_abs` diagnostic is documented valid only for sub-critical profiles and this target is overdense (4653) — yet PSC `f_abs` is in the matrix.
+- `reference.electron_mass_scale` unimplemented (5975). Note 2026-08-27: `LaserDeposition.cpp` also hardcodes `PhysConst::m_e` in 17 places, two of them silently fatal — see GOTCHAS "Cross-code comparison".
+- PSC's `T_i` normalisation unresolved: `Sxxi` is uncentered, reads 45× high (4993).
+- D3 Appendix C (electron thermal conductivity gate) never run (3183, 4601). D2b `conducting` closure never implemented (3040).
+- Quasi-steady ablation unreachable in the paper-faithful configuration at any duration (4315).
+
+**Dormant — Phases 0–3, campaign moved on**
+Ambient drain before `P2_mag` (343, 468) · H5 finite-spot coupling (1101) · H1′ exponent and the 1D intensity ladder (2344) · the refracting near-critical layer, "the weakest number in the operator" (2203) · `P1_vac_2d_off` never re-run post-clamp (1375) · the sharp-edge guard is not yet a CTest (2093).
+
+**Resolved but never marked closed** — do not re-litigate
+- "PSC shows no `µ^(1/3)` ⇒ run a PSC mass-ratio scan" (5798) → answered analytically at 5811 and 5937: PSC's ion is real Al at every RMR.
+- "A residual 1.57×" (5796) → see ledger 27.
+- "The FLASH↔kinetic benchmark passes" (3085) → see ledger 15.
+- "`T_e` shape cannot be quoted until D3-AppC runs" (3390) → resolved at 4133; D3-AppC is still open but for the *ablation rate*, a different question.
 
 ---
 
