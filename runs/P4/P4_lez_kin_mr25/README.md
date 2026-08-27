@@ -36,9 +36,9 @@ does not move).
 | `s = √(mr/2698)` | **0.5** |
 | target `thickness_de` | 22.5 (= 4.5 `d_i0`) |
 | corona `scale_length_de` | 3.4775 (= 0.6955 `d_i0`) |
-| domain `[lo, hi]_de` | [-25, 1225] (= 2500 `d_i0`/10) |
+| domain `[lo, hi]_de` | [-25, 1223] (= 2496 cells, trimmed from 2500 for `blocking_factor` 8) |
 | `max_step` | 27648 (= `tau_own` 5.39, so `∝ s²`) |
-| wall-clock (cost `∝ s³`) | **~45 s** |
+| wall-clock | estimated ~45 s, **measured 58.3 s** (TinyProfiler) |
 
 **Held fixed on purpose:** `theta_e_init`/`theta_i_init`/`theta_e_solid` (raw eV) and
 `drift_uz_de`. Scaling the initial temperature by `s²` would build the similarity answer

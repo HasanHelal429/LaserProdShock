@@ -66,7 +66,7 @@ plasma:
     corona_density_over_ncr: 1.0
     corona_offset_de: 2.3144
     shape: planar
-    theta_e_init: 7.4032e-4    # 100 eV -- the 0.1 ns ablation layer, NOT the 290 K cold
+    theta_e_init: 7.4032e-4    # 378.3 eV -- the 0.1 ns ablation layer, NOT the 290 K cold
                               # solid. PSC never sees the cold solid; it starts after it.
     theta_i_init: 2.2622e-4   # 115.6 eV -- FLASH's corona T_i, so T_e/T_i = 3.27 at t=0
     theta_e_solid: 3.914e-5   # 20 eV in the SOLID. NOT FLASH's 0.1377 eV: the cold solid is

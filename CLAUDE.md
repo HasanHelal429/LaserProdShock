@@ -64,11 +64,10 @@ python scripts/make_movies.py  runs/<phase>/<ID>                # movies (needs 
 python scripts/tune_shock.py   runs/<phase>/<ID>                # fit v_sh + front BY EYE -> shock_fit.yaml
 python scripts/make_figures.py runs/<phase>/<ID>                # Schaeffer criteria (reads shock_fit.yaml)
 ```
-Built: `launch.sh`, `run_progress_logger.py`, `make_inputs.py`, `run_checks.py`,
-`laser_report.py`, `spot_report.py`, `g3_spot.py`, `compare_runs.py`, `compare_frontside.py`,
-`plot_fields.py`, `plot_rays.py`, `phase_space.py`, `make_movies.py`,
-and `src/laserprod/{units,config,deck,io,plotting}`. Still to build: `tune_shock.py`,
+Everything above exists except the last two lines: **not built** are `tune_shock.py`,
 `make_figures.py`, `plot_ablation.py`, `sweep.py` and `laserprod.metrics` (Phase 1-3).
+Cross-code tools (`xcode_compare.py`, `xcode_matrix.py`, `paper_fig3.py`, `psc_phase_movie.py`)
+are documented in `scripts/README.md`.
 
 **The plotfile tools need the `physics` env** (yt is not in base anaconda):
 `/opt/anaconda3/envs/physics/bin/python scripts/plot_fields.py runs/<phase>/<ID>`. The
@@ -76,9 +75,11 @@ config/log-based tools (`make_inputs`, `run_checks`, `laser_report`, `compare_ru
 not, and work while a run is still going.
 
 ## Non-negotiables (full reasoning in `GOTCHAS.md`)
-`GOTCHAS.md` holds 63 hard-won conventions — **read it before** adding or launching a test,
+`GOTCHAS.md` holds 73 hard-won conventions in 9 sections — **read it before** adding or launching a test,
 changing `cfl`/`dz`/`ppc`/box size, benchmarking, switching CPU↔GPU, rebuilding WarpX,
-comparing runs or dimensionalities, or quoting absorption/piston/transverse numbers. The
+comparing runs or dimensionalities, or quoting absorption/piston/transverse numbers. **Any
+FLASH/PSC/WarpX comparison starts at its "Cross-code comparison" section** — PSC's two
+normalisation knobs and the `f_abs` convention have each already produced a wrong number. The
 handful below are here because getting them wrong is destructive or silently wrong:
 
 - **Launch with `scripts/launch.sh runs/<phase>/<ID>`, never by hand.** Decks set no

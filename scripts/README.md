@@ -33,10 +33,19 @@ python scripts/<script>.py <run_dir> [options]
 | `compare_runs.py` | Cross-run overlay — the controlled-comparison evidence | several run dirs | `media/<name>/compare.png` | **built** |
 | `xcode_compare.py` | **Three-way FLASH / kinetic / hybrid comparison** on the normalised axes, plus the A1-A8 table | FLASH delivery + two run dirs | `media/xcode/{profiles,history}.png` | **built** |
 | `talk_xcode.py` | The same series, two or three large panels for a slide. Imports `xcode_compare`, so it cannot drift from it | same | `media/xcode/talk_ablation.png` | **built** |
+| `xcode_matrix.py` | **The FLASH/PSC/WarpX parameter matrix** — 35 rows with per-row provenance, one `ROWS` table feeding csv + xlsx + an HTML view so they cannot diverge. PSC column is `run_ourflash_511keV` | none (self-contained) | `media/xcode/xcode_matrix.{csv,xlsx,html}` | **built** |
+| `paper_fig3.py` | Recreates Lezhnin Fig. 3 (n_e, T_e, T_i, v, P_abs) with a WarpX leg, optional `--psc` third leg | run dir + FLASH delivery | `media/.../paper_fig3.png` | **built** |
+| `psc_phase_movie.py` | WarpX ion phase space against PSC's bulk flow, frame per dump | run dir + PSC data dir | `media/<ID>/psc_phase.mp4` | **built** |
+| `xcode_movie.py` | The three-way profile comparison as a movie rather than fixed times | as `xcode_compare` | `media/xcode/xcode.mp4` | **built** |
 | `plot_ablation.py` | Vacuum ablation: plume profiles, `v_p`, `T_e(t)`, energy budget | `config.yaml`, plotfiles | `media/<ID>/ablation_*.png` | Phase 1 |
 | `tune_shock.py` | Fit `v_sh` + front **by eye** → `shock_fit.yaml` | `config.yaml`, plotfiles | `<run_dir>/shock_fit.yaml` | Phase 2 |
 | `make_figures.py` | Schaeffer criteria + `criteria.json` | `config.yaml`, plotfiles, `shock_fit.yaml` | `media/<ID>/*.png` | Phase 2 |
 | `sweep.py` / `plot_sweep.py` | Launch + reduce a parameter sweep to fitted exponents | `studies/<name>/` | `media/<name>/*.png` | Phase 3 |
+
+**PSC legs.** There are two PSC runs and they are *not* interchangeable: `~/psc-raytrace/run_ourflash`
+is the paper's 60 keV leg (72.5x over-collisional, crashed at 18%) and `~/psc-raytrace/run_ourflash_511keV`
+is the one to compare against. Never hardcode PSC's units — `xcode_compare.psc_norm(data_dir)` reads
+`K_temperature`, `K_time` and `dt` from the run's own log. See GOTCHAS "Cross-code comparison".
 
 Ports available for reference when building the Phase-2 tools:
 `../KinShock2020/scripts/{tune_shock,make_figures,make_movies}.py` and

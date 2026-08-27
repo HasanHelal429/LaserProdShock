@@ -38,7 +38,7 @@ does not move).
 | corona `scale_length_de` | 6.955 (= 0.6955 `d_i0`) |
 | domain `[lo, hi]_de` | [-50, 2450] (= 2500 `d_i0`/10) |
 | `max_step` | 110592 (= `tau_own` 5.39, so `∝ s²`) |
-| wall-clock (cost `∝ s³`) | **~6 min** |
+| wall-clock | estimated ~6 min, **measured 5.75 min** (TinyProfiler) |
 
 **Held fixed on purpose:** `theta_e_init`/`theta_i_init`/`theta_e_solid` (raw eV) and
 `drift_uz_de`. Scaling the initial temperature by `s²` would build the similarity answer
