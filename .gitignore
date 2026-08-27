@@ -65,3 +65,6 @@ studies/psc_absorption_xcheck.py
 # cost record. Both are provenance and belong in the repo.
 runs/**/run.log.*
 studies/collision_gate/scratch/
+
+# sidecar progress-logger PID files -- transient
+**/.logger.pid
