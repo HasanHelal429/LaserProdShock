@@ -68,7 +68,33 @@ this leg is identical in size, so **~6 min**.
 | G6 energy closure | | post-run |
 
 ## Result
-<pending>
+**Landed, and the prediction holds.** `<f_abs>` = **0.5629** against the 0.5833 target — 3.5 %
+low, inside the 5 % tolerance, so no second iteration was needed. Plume `T_e` = **197.4 eV**
+(17 cells, n-weighted 0.05–1.0 `n_cr`, `tau_own` 5.39). Wall 390.6 s on one RTX 4070.
+
+| leg | laser lnΛ | `<f_abs>` | plume `T_e` |
+|---|---|---|---|
+| `mr100` | nrl per-cell (4.75 in plume) | 0.3642 | 157.7 eV |
+| `cl_ctrl` | constant 4.75 | 0.4074 | 168.1 eV |
+| **`clmatch`** | **constant 11.2** | **0.5629** | **197.4 eV** |
+| `cl_psc` | constant 20.35 | 0.7455 | 255.1 eV |
+| PSC `run_ourflash_511keV` | NRL per-cell (6.27 in plume) | 0.5833 | 508.8 eV |
+
+**PSC / `clmatch` = 2.578 measured against 2.709 predicted** (`µ^(1/3)` = 2.645 times a 1.024
+residual `f_abs` correction) — **4.8 % apart on a 13.5 % noise floor.**
+
+The point of matching `f_abs` was to make the answer independent of the disputed
+`f_abs^(2/3)` term, and it did: the residual mismatch is 3.5 %, so that term contributes only
+2.4 % of the 2.709. **The ion-mass difference between WarpX and PSC is `µ^(1/3)` and nothing
+else** — there is no residual for a code difference to hide in.
+
+Within this mass ratio the `f_abs^(2/3)` correction also behaves: 0.3642 → 0.4074 predicts
+169.9 eV against 168.1 measured (1 %); 0.3642 → 0.5629 predicts 210.9 against 197.4 (6.4 %).
+It is *across* the µ-sweep that it fails (see RESULTS 2026-08-27), which is why this leg
+exists.
+
+## Retracted
+nothing
 
 ## Retracted
 nothing

@@ -6237,3 +6237,79 @@ Every PIC leg in the table above is `f_end` from LASERDEP. FLASH's 0.870 comes f
 `DELIVERY.md` and its convention was **not** checked against that. If it is a run-mean, FLASH's
 0.86 ratio is not on the same footing as the other two and would move. Cheap to settle; not
 settled here.
+
+---
+
+## 2026-08-27 (later) — **µ^(1/3) is the whole WarpX↔PSC difference.** Matched-`f_abs` test, 4.8 % on a 13.5 % floor
+
+**Environment.** `P4_lez_kin_clmatch`, one RTX 4070 (GPU 1), CUDA 1D build, 390.6 s
+TinyProfiler. PSC leg is `~/psc-raytrace/run_ourflash_511keV`, unchanged.
+
+### Why a new leg rather than another correction
+The cross-code tables reduce each leg by `T_ss = 823·µ^(1/3)·f_abs^(2/3)`. That reduction
+does **not** survive its own µ-sweep. Applied to mr25 / mr100 / mr400 it gives:
+
+| basis | mr25 | mr100 | mr400 | spread |
+|---|---|---|---|---|
+| `T_e/(µ^(1/3)·f_end^(2/3))` | 1529 | 838 | 495 | **3.1×** |
+| `T_e/(µ^(1/3)·⟨f_abs⟩^(2/3))` | 1455 | 816 | 633 | **2.3×** |
+| `T_e/µ^(1/3)` alone (no `f_abs`) | 0.645 | 0.505 | 0.494 | 1.3× |
+
+A valid reduction would give one constant. **`µ^(1/3)` alone fits the µ-sweep to 2.3 % over
+{100, 400}; adding `f_abs^(2/3)` breaks it** — the predicted mr400/mr100 ratio goes from
+1.587 (measured 1.551) to 1.997. So every cross-code number that rests on `f_abs^(2/3)` is
+soft, including the 1.02 / 1.02 / 0.86 band in the header. The fix is not a better correction:
+it is to **match `f_abs` experimentally and remove the term.**
+
+### The leg
+`P4_lez_kin_cl_ctrl` with `laser.coulomb_log` 4.75 → **11.2**, chosen by interpolating
+`τ = −ln(1−⟨f_abs⟩)/2` between `cl_ctrl` (4.75, 0.4074) and `cl_psc` (20.35, 0.7455) onto
+PSC's ⟨f_abs⟩ = 0.5833. `collisions.coulomb_log` stayed 6.3; mass ratio, IC, grid and
+duration untouched. Legitimate because `A ∝ lnΛ` enters the IB coefficient linearly and the
+ray path depends only on `n_e/n_cr`, so it is identical to scaling path length.
+
+| leg | laser lnΛ | `⟨f_abs⟩` | plume `T_e` |
+|---|---|---|---|
+| `mr100` | nrl per-cell | 0.3642 | 157.7 eV |
+| `cl_ctrl` | 4.75 | 0.4074 | 168.1 eV |
+| **`clmatch`** | **11.2** | **0.5629** | **197.4 eV** |
+| PSC 511 keV | NRL per-cell | 0.5833 | 508.8 eV |
+
+**⟨f_abs⟩ landed 3.5 % low — inside the 5 % tolerance, no second iteration.**
+
+### Result
+
+```
+PSC / clmatch  measured   = 508.8 / 197.4 = 2.578
+               predicted  = µ^(1/3) 2.645  x  (0.5833/0.5629)^(2/3) 1.024  = 2.709
+               agreement  = 4.8 %      (noise floor 13.5 %)
+```
+
+**The ion-mass difference between the two codes is `µ^(1/3)` and nothing else.** The residual
+`f_abs` mismatch contributes only 2.4 % of the 2.709, so this conclusion does **not** rest on
+the `f_abs^(2/3)` term the µ-sweep just discredited — which was the point of matching rather
+than correcting.
+
+Within one mass ratio `f_abs^(2/3)` does behave: 0.3642 → 0.4074 predicts 169.9 eV against
+168.1 measured (1 %), and 0.3642 → 0.5629 predicts 210.9 against 197.4 (6.4 %). It is
+**across µ** that it fails. That asymmetry is unexplained and is the one loose end here.
+
+### What this closes and what it does not
+**Closes:** "is there a code difference beyond the ion mass?" — no, not above 4.8 %. The
+proposed `reference.electron_mass_scale` work is therefore **not needed to make the codes
+agree**; it would only buy a leg whose `d_e/λ₀` and `λ_ei/L` match PSC's, and it now carries a
+much higher price than recorded (see the C++ note in GOTCHAS).
+**Does not close:** the `f_abs^(2/3)` inconsistency across µ, and the energy-partition
+inversion, which remains the oldest unexplained measurement in the file.
+
+### Two runs still going
+- `P4_lez_kin_mrreal` — WarpX at `mass_ratio` 49542, the real mass ratio. ETA ~2 h 51 m
+  measured (0.0051 s/step at 21424 cells), better than the 3.9–7.6 h bracket.
+- PSC at `ReducedMassRatio` = 25 — the electron-mass sweep at fixed real Al ion. Predicts
+  `T_e` unchanged at ~509 eV.
+
+### A PSC operating note paid for by a crash
+PSC aborts at its **first checkpoint** (3 minutes of wall time, `checkpoint_next =
+0.05*60*60`) if `data/chk` does not exist — `SERV_openby_p` cannot create it. A new PSC run
+directory needs `data/{chk,etracking,itracking}` pre-created, not just `data/`. The first
+`rmr25` attempt died at step 2572 this way; kept as `run_ourflash_rmr25.crashed_nochkdir`.
