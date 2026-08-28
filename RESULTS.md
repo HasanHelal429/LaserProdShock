@@ -32,14 +32,20 @@ Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` =
 | FLASH | 0.870 ⚠ | 647 eV | 750 | 0.86 |
 | PSC `run_ourflash_511keV` | 0.475 (⟨f⟩ 0.583) | 508.8 eV @ 99.66 ps | 501 | **1.02** |
 | WarpX `P4_lez_kin_mr100` | 0.350 (⟨f⟩ 0.364) | 157.7 eV | 155 | **1.02** |
-| ~~WarpX `P4_lez_kin_mrreal`~~ — **PROVISIONAL, IC drift wrong** | 0.793 (⟨f⟩ 0.623) | ~~464.3 eV~~ | 707 | 0.66 |
+| ~~WarpX `P4_lez_kin_mrreal`~~ — superseded, IC drift wrong | 0.793 (⟨f⟩ 0.623) | ~~464.3 eV~~ | — | — |
+| **WarpX `P4_lez_kin_mrreal_drift`** — real `m_i` AND `m_e`, no transform | 0.915 (⟨f⟩ **0.840**) | **440.2 eV** | 761 | 0.58 |
 
-⚠ **`mrreal`'s numbers are on hold.** Its IC corona drift was held fixed from `mr100`, but
-`drift_uz_de` is a velocity and needs `1/s` (`uzb`: `1/s²`) — held fixed it starts the corona
-4.29× too fast in the leg's own `C_S0` (measured `v/C_S0` 21.06 at 0.1 `n_cr` against FLASH's
-1.72). The plume came out `L_n` 4.05× FLASH's. `P4_lez_kin_mrreal_drift` repeats it corrected;
-until it lands, the raw-eV comparison (FLASH 647.0 · PSC 508.8 · WarpX 464.3) and the 11.6 %
-`µ^(1/3)` agreement are **provisional**. The cost measurement (`s^2.489`) is unaffected.
+**Raw eV, no normalisation, all on a real Al ion (2026-08-28):** FLASH 647.0 (`f_abs` 0.870) ·
+PSC 508.8 (0.583) · **WarpX `mrreal_drift` 440.2 (0.840)**. WarpX's absorption is within 3.4 %
+of FLASH's, so **WarpX↔FLASH is very nearly a matched-`f_abs` comparison: 0.69×**, with
+`zeta_cr` at 1.03× and `L_n` at 0.81×. That is the project's cleanest cross-code number.
+Against PSC the ratio is 0.865, but PSC absorbs 0.583 — **not matched, not agreement.**
+
+⚠ `P4_lez_kin_mrreal` (the first real-mass leg) is superseded: `drift_uz_de` was held fixed
+from `mr100`, but it is a velocity needing `1/s` (`uzb`: `1/s²`). Held fixed it started the
+corona 4.29× too fast and opened a density notch propagating at 2.28 `C_S0`. The error cost
+only 1.055× in `T_e` but 4.05× in `L_n`. **`mr25` and `mr400` carry it at 0.5× and 2.0× and
+have not been rerun.**
 
 ⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
 PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.
@@ -6486,3 +6492,73 @@ too fast in its own `C_S0` and `mr25`'s is 2× too slow.
 `tau` instead of silently repeating its last dump, and summarises at the last `tau` every leg
 reaches. That silent repetition is the mechanism behind the retracted "FLASH↔kinetic benchmark
 passes" (line 3085 vs 4411) — FLASH at `tau` 27 against WarpX at `tau` 5.
+
+---
+
+## 2026-08-28 — the corrected real-mass leg: **`µ^(1/3)` holds to 5.8 %, and WarpX runs 0.69× FLASH at matched absorption**
+
+**Environment.** `P4_lez_kin_mrreal_drift`, one RTX 4070, 15 830 s = 4 h 24 m,
+2030600/2030600, clean. Slower than the parent's 3 h 35 m only through machine load
+(17.2 vs 0.4), not physics.
+
+### The fix worked
+Only `drift_uz_de` moved: `[1.5271e-3, 1.5593e-4]` → `[3.5638e-4, 8.4922e-6]`, i.e. `uza ~ 1/s`
+and `uzb ~ 1/s²`. At `tau` = 8.0, as a ratio to FLASH:
+
+| | FLASH | **IC fixed** | IC bad | `mr100` |
+|---|---|---|---|---|
+| `zeta_cr` | 1.289 | **1.324 (1.03×)** | 0.538 (0.42×) | 0.253 (0.20×) |
+| `L_n` | 4.423 | **3.604 (0.81×)** | 17.895 (4.05×) | 4.485 (1.01×) |
+| `zeta_front` | 19.623 | **14.310 (0.73×)** | 55.231 (2.81×) | 16.083 (0.82×) |
+| `v_band_max` | 4.045 | **2.676 (0.66×)** | 10.144 (2.51×) | 2.832 (0.70×) |
+| `Te_mean_plume` | 646.3 | **445.7 (0.69×)** | 491.1 (0.76×) | 165.1 (0.26×) |
+
+The propagating notch is gone (recovery 1.0× at `tau_own` 1.35, against the parent's 25.6×) and
+the starting corona is 16.4× slower, matching the `s²` the `uzb` rescale carries.
+
+**The IC error was worth only 1.055× in `T_e`** (464.3 → 440.2) — the temperature was robust to
+it. What it wrecked was the geometry (`L_n` 4.05× → 0.81×) and the absorption (`⟨f_abs⟩` 0.6233
+→ 0.8402: a slower corona stays dense near the target and absorbs more).
+
+### `µ^(1/3)`, anchored at real mass
+
+| leg | `m_p/m_e` | `⟨f_abs⟩` | plume `T_e` | vs mr100 | `µ^(1/3)` |
+|---|---|---|---|---|---|
+| `mr25` | 25 | 0.2203 | 126.7 eV | 0.803 | 0.630 |
+| `mr100` | 100 | 0.3642 | 157.7 eV | 1.000 | 1.000 |
+| `mr400` | 400 | 0.5145 | 244.6 eV | 1.551 | 1.587 |
+| **`mrreal_drift`** | **1836** | **0.8402** | **440.2 eV** | **2.791** | **2.638** |
+
+Predicted 416.1, measured 440.2 — **5.8 % on a 13.5 % floor**, better than the defective leg's
+11.6 %. **The similarity scaling holds all the way to real mass.**
+
+### The cross-code comparison, in raw eV
+
+| code | plume `T_e` | `⟨f_abs⟩` |
+|---|---|---|
+| FLASH | 647.0 eV | 0.870 |
+| PSC `run_ourflash_511keV` | 508.8 eV | 0.5833 |
+| **WarpX `mrreal_drift`** | **440.2 eV** | **0.8402** |
+
+**WarpX's absorbed fraction is now within 3.4 % of FLASH's**, so WarpX↔FLASH is very nearly a
+matched-`f_abs` comparison needing no correction: **WarpX runs 0.69× FLASH's plume `T_e`**
+(0.705× after the small `f_abs^(2/3)` adjustment), with the critical surface at 1.03× and the
+scale length at 0.81×. That is the cleanest cross-code number the project has — real ion mass,
+real electron, matched absorption, no normalisation anywhere.
+
+Against PSC the raw-eV ratio is 0.865, but PSC absorbs 0.583 against WarpX's 0.840, so that
+pair is **not** matched and the 13.5 % must not be read as agreement.
+
+### Caveat carried forward
+Beyond ζ ≈ 8 WarpX's `T_e` climbs to 4–8 × `T_e,SS` where FLASH stays near 0.8. That is below
+the 0.05 `n_cr` band the scalar uses and is the known resolved-dynamic-range artifact
+(2026-08-18, the density-floor entry), not a new finding — but it means the far plume is not
+comparable and any statement about it needs the floor treatment first.
+
+### STILL OPEN
+- **`mr25` and `mr400` carry the same IC drift error**, at 0.5× and 2.0×. The µ-sweep's 2.3 %
+  agreement over {100, 400} was measured between legs whose starting coronas differ by 4× in
+  normalised flow. Two 1-minute and 33-minute reruns would settle it.
+- **G3/G6 on both real-mass legs.** No `_off` control exists at this mass ratio and duration;
+  grid heating scales with step count and these run 18.4× more steps than `mr100`. No
+  energy-closure statement from either leg until an `_off` twin runs (~4 h).
