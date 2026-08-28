@@ -6323,3 +6323,88 @@ PSC aborts at its **first checkpoint** (3 minutes of wall time, `checkpoint_next
 0.05*60*60`) if `data/chk` does not exist — `SERV_openby_p` cannot create it. A new PSC run
 directory needs `data/{chk,etracking,itracking}` pre-created, not just `data/`. The first
 `rmr25` attempt died at step 2572 this way; kept as `run_ourflash_rmr25.crashed_nochkdir`.
+
+---
+
+## 2026-08-27 (evening) — **WarpX at the real mass ratio**, and a prediction of mine that the PSC sweep refuted
+
+**Environment.** `P4_lez_kin_mrreal` on one RTX 4070 (GPU 1), CUDA 1D build, **12 910 s =
+3 h 35 m**, 2030600/2030600 steps, clean. PSC legs `run_ourflash_rmr25` (18 min) and
+`run_ourflash_rmr25_dz01` (1 h 15 m), 10 MPI ranks, both `okfile`.
+
+### Option 4 — the real mass ratio, and the only raw-eV comparison the project has
+
+`mass_ratio` = 49542: real aluminium against a real electron, **no similarity transform at
+all**. `dz`, `dt` and both numerical gates came out bit-identical to `mr100`, as predicted.
+
+| leg | `m_i/m_e` | `µ` | `⟨f_abs⟩` | plume `T_e` | vs mr100 | `µ^(1/3)` |
+|---|---|---|---|---|---|---|
+| `mr25` | 675 | 73.45 | 0.2203 | 126.7 eV | 0.803 | 0.630 |
+| `mr100` | 2698 | 18.36 | 0.3642 | 157.7 eV | 1.000 | 1.000 |
+| `mr400` | 10793 | 4.59 | 0.5145 | 244.6 eV | 1.551 | 1.587 |
+| **`mrreal`** | **49542** | **1.00** | 0.6233 | **464.3 eV** | **2.944** | **2.638** |
+
+`µ^(1/3)` from `mr100` predicts 416.0 eV; measured **464.3 eV is 11.6 % above, inside the
+13.5 % floor.** The similarity scaling holds across the full 18.4×, not just the {100, 400}
+window — the µ-sweep no longer extrapolates.
+
+**In raw eV, no normalisation, all three on a real Al ion:**
+
+| code | plume `T_e` | `⟨f_abs⟩` |
+|---|---|---|
+| FLASH | 647.0 eV | 0.870 |
+| PSC `run_ourflash_511keV` | 508.8 eV | 0.5833 |
+| **WarpX `mrreal`** | **464.3 eV** | 0.6233 |
+
+**WarpX and PSC agree to 8.7 % with no reduction of any kind** (12.7 % corrected to a common
+`f_abs`); both sit 21–28 % below FLASH.
+
+**Cost, measured:** exponent **`s^2.489`**, even more sub-cubic than the three-leg scan's
+`s^2.55` — the GPU is still not saturated at 21424 cells. Predicted 3.9–7.6 h, actual 3.59 h.
+**The real mass ratio is affordable**, which this project had assumed it was not.
+
+### Option 2 — PSC's `ReducedMassRatio` sweep. **My prediction was wrong.**
+
+I predicted PSC's plume `T_e` would be **RMR-invariant**, because `MMi1·K_mass` =
+`26.9815·hydr_mass_phys` — the ratio cancels and PSC's ion is real aluminium at every RMR, so
+there is no ion mass for `T_e` to follow. **It is not invariant.**
+
+| PSC leg | code `m_e` | physical `dz` | `ν_phys` | `⟨f_abs⟩` | plume `T_e` |
+|---|---|---|---|---|---|
+| RMR 100, DZ 0.2 | 18.36× real | 0.1452 µm | 1.325e7 s⁻¹ | 0.5833 | 508.8 eV |
+| RMR 25, DZ 0.2 | 73.45× real | 0.2904 µm | 3.314e6 s⁻¹ | 0.5620 | 399.8 eV |
+| **RMR 25, DZ 0.1** | 73.45× real | **0.1452 µm** | 3.314e6 s⁻¹ | 0.6206 | **392.6 eV** |
+
+- **Resolution is not the cause.** Halving the physical cell at RMR 25 moved `T_e` by
+  **1.8 %** (399.8 → 392.6 eV) — the control did its job and came back null.
+- At **fixed physical `dz`**, RMR 100 → 25 gives **0.772×**. Not 1.000 (my prediction) and not
+  the 0.630 that `µ^(1/3)` of `m_i/m_e` would give. Fitting `T_e ∝ m_e^(-p)` over the pair
+  gives **p = 0.187**.
+
+**Correction to something I asserted earlier today, in two places.** I wrote that a PSC RMR
+sweep holds collisionality fixed because `nudt0` came back bit-identical between the two legs.
+The *value* is identical, but `nudt0` is `ν·dt` in **code** units, so the physical rate is
+`nudt0/dt_phys` — and `dt_phys ∝ 1/RMR`. **RMR 100 is 4.0× more collisional per unit physical
+time than RMR 25.** A PSC RMR sweep therefore varies the electron mass *and* the collision
+rate together, and this pair cannot separate them.
+
+### What this means for the cross-code picture
+The Option 1 result stands untouched — it compared WarpX and PSC at fixed RMR = 100 and found
+`µ^(1/3)` accounts for the difference to 4.8 %. But **PSC's RMR = 100 leg is not a converged
+reference**: its own `T_e` moves 23 % over a 4× change in its electron mass. Extrapolating
+`m_e^(-0.187)` from 18.36× to a real electron would put PSC near 876 eV — *two points and a
+collisionality confound, an estimate and not a result*, but large enough that it matters.
+
+**So the 8.7 % WarpX↔PSC agreement in raw eV is between a fully real WarpX leg and a partly
+reduced PSC one, and should not be read as a converged cross-code validation.**
+
+### The run that would settle it
+A third PSC rung at **RMR = 400** (electron 4.59× real) at fixed physical `dz` — `DZ` = 0.4,
+5000 cells, `nmax` ≈ 128 000, **~5 h**. Three points would say whether `m_e^(-0.187)` is a
+power law worth extrapolating, and `RMR` = 1836 would *be* a real electron (but at ~138 h).
+
+### OPEN — G3/G6 on `mrreal`
+The existing `_off` control is at `mr100`'s mass ratio and duration; this leg runs 18.4× more
+steps and grid heating accumulates with step count, so that control does not bound it. The
+`T_e` result is a ratio measured the same way in every leg and does not depend on it, but **no
+energy-closure statement may be made from `mrreal` until an `_off` twin runs** — another 3.6 h.

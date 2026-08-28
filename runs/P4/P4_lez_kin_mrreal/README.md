@@ -62,23 +62,63 @@ an ideal 2.0, i.e. the GPU is underused below ~10k cells). At 21424 cells it sho
 so the estimate brackets: `s^2.55` gives 3.9 h, linear-per-step gives 5.5 h, ideal `s³` gives
 7.6 h. **Pilot-measured value below.**
 
+## Result
+**Completed 2030600/2030600 steps in 3 h 35 m** (12 910 s TinyProfiler, one RTX 4070, 0.0064
+s/step mean). Clean finish, no aborts, no `.old.` artifacts, 5 `diag1` dumps.
+
+**Plume `T_e` = 464.3 eV**, `⟨f_abs⟩` = 0.6233 (`f_end` 0.7930), 12 cells, `tau_own` = 5.390
+at t = 200.73 ps.
+
+### Against the µ-sweep it was launched to anchor
+
+| leg | `m_i/m_e` | `µ` | `⟨f_abs⟩` | plume `T_e` | vs mr100 | `µ^(1/3)` predicts |
+|---|---|---|---|---|---|---|
+| `mr25` | 675 | 73.45 | 0.2203 | 126.7 eV | 0.803 | 0.630 |
+| `mr100` | 2698 | 18.36 | 0.3642 | 157.7 eV | 1.000 | 1.000 |
+| `mr400` | 10793 | 4.59 | 0.5145 | 244.6 eV | 1.551 | 1.587 |
+| **`mrreal`** | **49542** | **1.00** | 0.6233 | **464.3 eV** | **2.944** | **2.638** |
+
+`µ^(1/3)` extrapolated from `mr100` predicts 416.0 eV; measured 464.3 eV is **11.6 % above,
+inside the 13.5 % noise floor.** The similarity scaling holds across the full 18.4× to real
+mass, not just the {100, 400} window the paper reports.
+
+### The thing only this leg can do — raw eV, no normalisation
+
+| code | ion | plume `T_e` | `⟨f_abs⟩` |
+|---|---|---|---|
+| FLASH | real Al | 647.0 eV | 0.870 |
+| PSC `run_ourflash_511keV` | real Al | 508.8 eV | 0.5833 |
+| **WarpX `mrreal`** | **real Al** | **464.3 eV** | 0.6233 |
+
+**WarpX and PSC agree to 8.7 % in raw eV with no reduction of any kind** (12.7 % after
+correcting to a common `f_abs`), and both sit 21–28 % below FLASH. This is the only leg in the
+project for which that comparison is meaningful.
+
+**Caveat, from the PSC RMR sweep run the same day:** PSC's own `T_e` is *not* independent of
+its `ReducedMassRatio` — it falls 0.772× when its electron goes from 18.4× to 73.4× real, at
+fixed physical `dz`. So PSC's 508.8 eV is itself a reduced-electron number and the 8.7 %
+agreement above is between a fully real WarpX leg and a partly reduced PSC one.
+
+### Cost
+Measured exponent `s^2.489` (12 910 s against `mr100`'s 345.1 s at `s` = 4.285) — even more
+sub-cubic than the `s^2.55` the three-leg scan gave, so the GPU is still not saturated at
+21424 cells. Predicted bracket was 3.9–7.6 h; actual **3.59 h**.
+
 ## Gates
 | Gate | Value | Pass? |
 |---|---|---|
-| G1 `omega_pe dt` at peak density | 0.783 (limit 2, budget 1.2) | PASS — identical to mr100 |
+| G1 `omega_pe dt` at peak density | 0.783 | PASS — identical to mr100, as predicted |
 | G2 `dz/lambda_D` (target / ambient) | 58.1 / n.a. | INFO — identical to mr100 |
-| G3 laser-off control | `P4_lez_kin_ic6_off` (mr100 basis) | see note |
+| G3 laser-off control | `P4_lez_kin_ic6_off` (mr100 basis) | **NOT VALID** — see below |
 | G4 `ray_cfl` check | 0.25 | PASS |
 | G5 ppc / `Tlocalfrac` | 500, mode local | PASS |
-| G6 energy closure | | post-run |
+| G6 energy closure | not evaluated | see below |
 
-G3 note: the existing `_off` control is at mr100's mass ratio and duration. Grid heating
-accumulates with step count, and this leg runs 18.4× more steps, so the mr100 control does
-**not** bound it. If G6 shows a non-trivial gap, an `_off` twin of this leg is required
-before any energy statement — budget the same wall time again.
-
-## Result
-<pending>
+**G3/G6 are the open item on this run.** The existing `_off` control is at mr100's mass ratio
+and duration; grid heating accumulates with step count and this leg runs 18.4× more steps, so
+that control does not bound it. Before any *energy* statement from this leg, an `_off` twin is
+required — another 3.6 h. The `T_e` result above does not depend on it (it is a ratio against
+other legs measured the same way), but an energy-closure claim would.
 
 ## Retracted
 nothing
