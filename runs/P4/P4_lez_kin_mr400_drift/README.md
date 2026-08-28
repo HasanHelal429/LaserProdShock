@@ -10,6 +10,22 @@ brings each leg toward `mr100`'s convention.
 **Falsified by.** A shift large enough to change the fitted exponent outside 1/3 ± the 13.5 %
 noise floor, which would mean the scan's headline was an artifact of the IC rather than physics.
 
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -100                                                  z = +4900
+
+  #  target flat top : 10 n_cr, 90 d_e thick, centred at -45 d_e
+  ~  coronal ramp   : exponential, L_n = 13.91 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 10000 cells, dz = 0.5 d_e, dt = 0.09885 fs, 442368 steps = 43.73 ps
+```
+
 ## Setup
 Parent: **`P4_lez_kin_mr400`**. One key moves, `plasma.target.drift_uz_de`, rescaled by
 `1/s` on `uza` and `1/s²` on `uzb` with `s` = 2.0:
@@ -61,9 +77,6 @@ their theories:
 inside the 13.5 % noise floor. **`µ^(1/3)` is now confirmed to 3.3 %**, and the optical-depth
 exponent sits 2 % from the `µ^(1/2)` that a raw-eV handoff predicts — so that failure is fully
 explained by the handoff convention, not by anything in the code.
-
-## Retracted
-nothing
 
 ## Retracted
 nothing

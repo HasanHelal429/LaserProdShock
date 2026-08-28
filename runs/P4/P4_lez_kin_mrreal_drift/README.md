@@ -10,6 +10,22 @@ inflated the plume extent (`L_n` 4.05× FLASH, `zeta_front` 2.81× FLASH, both a
 **Falsified by.** `T_e` unchanged from 464.3 eV, which would mean the drift is not what drove
 the parent's extended plume and something else is.
 
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -214                                                  z = +10498
+
+  #  target flat top : 10 n_cr, 192.826 d_e thick, centred at -96.4132 d_e
+  ~  coronal ramp   : exponential, L_n = 29.8024 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 21424 cells, dz = 0.5 d_e, dt = 0.09885 fs, 2030600 steps = 200.7 ps
+```
+
 ## Setup
 Parent: **`P4_lez_kin_mrreal`**. One key moves:
 
