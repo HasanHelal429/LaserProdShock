@@ -1,5 +1,13 @@
 # P4_lez_kin_ic6_long — `P4_lez_kin_ic6` run 4× longer, to τ_own 108
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Ran 4x longer; T_e still rising because the target ran out first. Conclusion is a live open item.**
+> 
+> Superseded by: **P4_lez_kin_thick**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** Does the kinetic leg reach quasi-steady ablation at all, and at what

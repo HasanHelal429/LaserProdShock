@@ -1,5 +1,13 @@
 # P4_lez_kin_bg — the kinetic leg with the same background as `P4_lez_hyb_bg3`
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Same Gaussian / 100 eV IC, plus a 1e-3 n_cr background 33940x denser than the chamber gas it stands for.**
+> 
+> Superseded by: **P4_lez_kin_ic6**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12
 **Question.** Does the 2.2–2.7× peak-density disagreement between the kinetic and hybrid
 legs survive when the two differ in **one** thing — the electron closure — instead of two?

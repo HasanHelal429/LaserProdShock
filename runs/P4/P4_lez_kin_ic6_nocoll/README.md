@@ -1,5 +1,13 @@
 # P4_lez_kin_ic6_nocoll — collisions OFF: the decisive bound on the collision hypothesis
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Collisions-off bound; the hypothesis was demoted to ~25 % of the gap.**
+> 
+> Superseded by: **closed by ledger item 21**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** Are collisions responsible *at all* for WarpX collapsing `T_i/T_e` from 0.308 to

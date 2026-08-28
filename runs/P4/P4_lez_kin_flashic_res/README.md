@@ -1,5 +1,13 @@
 # P4_lez_kin_flashic_res — the same leg with a SEMI-INFINITE RESERVOIR
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Same 5.19x corona defect; its own README already retracts the reservoir motivation.**
+> 
+> Superseded by: **P4_lez_kin_thick**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12; decision **D5** (`n_max` / target mass).
 
 **Question.** How much of the FLASH↔WarpX profile-shape gap is simply that **FLASH's

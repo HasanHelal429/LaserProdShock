@@ -1,5 +1,13 @@
 # P4_lez_kin_ic6_ppc2k
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Ran on the BROKEN temperature-floor configuration (f_abs 0.13-0.27), so it cannot settle the ppc question it was built for.**
+> 
+> Superseded by: **P4_lez_kin_cs_ppc4k**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** Is `Tlocalfrac` = 0 caused by particle STATISTICS rather than the

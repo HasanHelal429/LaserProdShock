@@ -1,0 +1,12 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_kin_mr25_drift
+# logging_started 2026-08-28T14:11:36  total_steps=27648  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-28T14:12:06 | 1075/27648 ( 3.9%) | 0h00m | 0.0279 s/step(wall) | 0.0267 s/step(warpx) | ETA ~0h12m | x1.04 | load 19.3 | laser 0.132 of peak, Eabs 1798 J
+2026-08-28T14:13:06 | 2891/27648 (10.5%) | 0h01m | 0.0330 s/step(wall) | 0.0307 s/step(warpx) | ETA ~0h13m | x1.08 | load 19.8 | laser 0.078 of peak, Eabs 4627 J
+2026-08-28T14:15:06 | 6289/27648 (22.7%) | 0h03m | 0.0353 s/step(wall) | 0.0332 s/step(warpx) | ETA ~0h12m | x1.06 | load 20.1 | laser 0.082 of peak, Eabs 1.049e+04 J
+2026-08-28T14:16:36 | 8855/27648 (32.0%) | 0h05m | 0.0351 s/step(wall) | 0.0337 s/step(warpx) | ETA ~0h10m | x1.04 | load 20.3 | laser 0.092 of peak, Eabs 1.352e+04 J
+2026-08-28T14:18:06 | 11271/27648 (40.8%) | 0h06m | 0.0373 s/step(wall) | 0.0345 s/step(warpx) | ETA ~0h10m | x1.08 | load 20.2 | laser 0.252 of peak, Eabs 1.809e+04 J
+2026-08-28T14:19:36 | 13903/27648 (50.3%) | 0h08m | 0.0342 s/step(wall) | 0.0344 s/step(warpx) | ETA ~0h07m | x0.99 | load 21.6 | laser 0.178 of peak, Eabs 2.327e+04 J
+2026-08-28T14:21:06 | 19821/27648 (71.7%) | 0h09m | 0.0152 s/step(wall) | 0.0287 s/step(warpx) | ETA ~0h01m | x0.53 | load 21.9 | laser 0.191 of peak, Eabs 3.751e+04 J
+2026-08-28T14:21:36 | 27648/27648 (100.0%) | 0h10m | 0.0038 s/step(wall) | 0.0212 s/step(warpx) | ETA ~0h00m | x0.18 | load 20.4 | laser 0.375 of peak, Eabs 5.597e+04 J
+DONE 2026-08-28T14:21:36 | 27648/27648 (100.0%) | total wall 0h10m | mean 0.0217 s/step(wall) | reached max_step

@@ -1,5 +1,13 @@
 # P4_lez_kin_mrreal — WarpX at the REAL mass ratio: the ground truth the µ-sweep extrapolates to
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **IC corona drift 4.29x too fast in its own C_S0 (`uza/C_S0` 2.349 against FLASH's 0.548): `drift_uz_de` was held fixed, but it is a velocity needing 1/s and its ramp 1/s^2. Opened a density notch propagating at 2.28 C_S0; L_n came out 4.05x FLASH's.**
+> 
+> Superseded by: **P4_lez_kin_mrreal_drift**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12
 **Question.** What does the reduced ion mass ratio actually cost? Run the same problem with
 real aluminium against a real electron and compare directly, with no similarity transform.

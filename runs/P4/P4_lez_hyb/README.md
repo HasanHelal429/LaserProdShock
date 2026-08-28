@@ -1,5 +1,13 @@
 # P4_lez_hyb — hybrid leg of the Phase-4 cross-code benchmark
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Ran `electron_energy_mode: advected`, documented unusable; aborted at 36.9 % on CFL 1.218.**
+> 
+> Superseded by: **P4_lez_hyb_clamp**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12, esp. §12.4
 **Question.** With kinetic electrons replaced by an Ohm's-law fluid and *nothing else*
 changed, does the answer survive — and if it does not, does the failure localise to the

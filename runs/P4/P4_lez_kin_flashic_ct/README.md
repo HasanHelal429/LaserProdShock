@@ -1,5 +1,13 @@
 # P4_lez_kin_flashic_ct — FLASH-IC kinetic leg at m_i/m_e = 100, corona temperature consistent
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Corona 5.19x too extended: `scale_length_de` 6.955 and `corona_offset_de` 2.3144 were never rescaled when mass_ratio went 2698 -> 100 (should be 1.339 / 0.4456). Retraction-ledger item 17. The A/B against `_res` stands; the absolute numbers must not be quoted.**
+> 
+> Superseded by: **P4_lez_kin_ic6**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12; decisions **D1** (initial condition) and **D5** (`n_max`).
 
 **Question.** `P4_lez_kin_flashic` absorbed only **`f_abs` = 0.358** against FLASH's 0.870

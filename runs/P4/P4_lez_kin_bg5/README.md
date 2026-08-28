@@ -1,5 +1,13 @@
 # P4_lez_kin_bg5 — the clean 2698 leg: FLASH-matched IC, background at the PIC floor
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Killed at 30.1 %; RESULTS records it was testing the wrong axis. Its declared laser-off control never existed.**
+> 
+> Superseded by: **the table at RESULTS.md:3970+**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** `P4_lez_kin_bg` is the best-agreeing leg (`f_abs` 0.769 vs FLASH's 0.870,

@@ -1,5 +1,13 @@
 # P4_lez_kin_ic6_nmin4 — match PSC's ELECTRON RESERVOIR, not just its heating
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Density-floor / reservoir hypothesis measured and refuted: < 4 % and in the wrong direction.**
+> 
+> Superseded by: **closed by ledger item 20**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** At comparable absorbed fraction (PSC 0.47–0.56, WarpX `pscheat` 0.42–0.46) PSC's

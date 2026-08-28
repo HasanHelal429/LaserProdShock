@@ -1,5 +1,13 @@
 # P4_lez_kin_flashic — kinetic leg, no background, initialised from the FLASH snapshot
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Reservoir-motivated 40 n_cr / 20 d_i0 target rather than the paper-faithful 10 / 4.5. NOT a carrier of the 5.19x corona bug -- its mass_ratio was never changed.**
+> 
+> Superseded by: **P4_lez_kin_ic6**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12; decisions **D1** (initial condition) and **D5** (`n_max`).
 
 **Question.** How much of `P4_lez_kin`'s departure from FLASH is its *initial corona*

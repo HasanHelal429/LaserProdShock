@@ -1,5 +1,13 @@
 # P4_lez_kin_ic6_coll1 — is the `T_e`/`T_i` over-equilibration a collision-supercycling artifact?
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Collision-cadence hypothesis refuted; its own README says it should not be carried forward.**
+> 
+> Superseded by: **P4_lez_kin_ic6_nocoll**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12.
 
 **Question.** WarpX collapses `T_i/T_e` from **0.308** (matching FLASH's 0.293) to **1.216**

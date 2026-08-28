@@ -1,5 +1,13 @@
 # P4_lez_hyb_bg3_open — hybrid with a 1e-3 n_cr background species
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **Boundary-condition twin of bg3 (`lo: open` as well as `hi`). Zero citations in RESULTS.md.**
+> 
+> Superseded by: **P4_lez_hyb_bg3**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12
 **Question.** Does a tenuous background species remove the low-density `u_e` divergence
 outright, instead of clamping or switching off transport to survive it?

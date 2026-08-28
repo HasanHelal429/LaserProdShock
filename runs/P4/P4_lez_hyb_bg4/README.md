@@ -1,5 +1,13 @@
 # P4_lez_hyb_bg4 — hybrid with a 1e-4 n_cr background species
 
+> ## [SUPERSEDED] — diagnostics deleted 2026-08-28
+> **1e-4 background leg. Its one number (the bg3->bg4 1.8x front shift) is recorded; the background axis was retired.**
+> 
+> Superseded by: **axis retired, no successor**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12
 **Question.** Does a tenuous background species remove the low-density `u_e` divergence
 outright, instead of clamping or switching off transport to survive it?

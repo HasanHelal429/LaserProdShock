@@ -1,5 +1,13 @@
 # P4_lez_kin — fully kinetic leg of the Phase-4 cross-code benchmark
 
+> ## [DEFECTIVE] — diagnostics deleted 2026-08-28
+> **Analytic Gaussian corona that fails the paper's own Fig-2 test (peak deposition zeta 4.13 vs FLASH 0.27), and `theta_e_init` 1.957e-4 = 100 eV, the retired IC convention. Its headline is retraction-ledger item 15.**
+> 
+> Superseded by: **P4_lez_kin_ic6**. `diags/` and `run.log` were removed to reclaim disk; the
+> config, deck, `warpx_used_inputs` and this README are kept as the provenance record.
+> Re-run from the config if the raw output is ever needed again.
+> See `runs/P4/SUPERSEDED.md` for the full ledger.
+
 **Phase.** 4, `TEST_PLAN.md` §12
 **Question.** Does the WarpX ray-tracing operator, driving a fully kinetic collisional
 plasma, reproduce a *published, independently computed* radiation-hydrodynamics ablation
