@@ -6768,3 +6768,78 @@ their real values, and *lowers* cost (`dz`, `dt` both grow 4.29×). It is the on
 laser repair. It changes `n_cr` by 18.4×, so the run is no longer the paper's 1.064 µm
 problem — which may be acceptable if the question is ablation physics rather than this
 benchmark. ~6 min to answer.
+
+---
+
+## 2026-08-28 (final) — **the wavelength repair is closed too.** All four laser knobs are now tested
+
+**Environment.** `P4_lez_kin_mr100_lam4x` and `_lam4x_i`, one RTX 4070 each, ~6 min, both
+clean. λ 1.064 → 4.5593 µm (`= µ^(−1/2)`); the second also drops `I` to 2.334e12 W/cm²
+(`= µ^(1/2)`) so that `T_ss ∝ λ^(4/3) I^(2/3)` returns to the real 823 eV.
+
+### The result
+
+| leg | λ | I (W/cm²) | `⟨f_abs⟩` | plume `T_e` | absorbed |
+|---|---|---|---|---|---|
+| `mr100` | 1.064 µm | 1e13 | 0.3642 | 157.7 eV | 3.64e12 |
+| `mr100_i4x` | 1.064 µm | 4.285e13 | 0.2404 | 322.7 eV | 1.03e13 |
+| **`mr100_lam4x`** | 4.559 µm | 1e13 | **0.0754** | **121.2 eV** | 7.54e11 |
+| **`mr100_lam4x_i`** | 4.559 µm | 2.334e12 | **0.1210** | **50.2 eV** | 2.82e11 |
+| `mrreal_drift` | 1.064 µm | 1e13 | 0.8402 | 440.2 eV | — |
+
+The combined leg restores `d_i0` to the real 7.256 µm **and** `T_ss` to the real 823 eV, and
+is the **worst** of the four probes: 12.9× less absorbed power than `mr100`, 8.8× cooler than
+the real-mass leg.
+
+### The measured λ exponents, and a discrimination worth keeping
+
+```
+d(ln f_abs)/d(ln lambda) = -1.082     static estimate -1.00   AGREES to 8%
+d(ln T_e )/d(ln lambda)  = -0.181     T_ss ~ lam^(4/3) = +1.333   -- T_e FELL
+```
+
+**The static optical-depth formula works for λ where it failed for µ** (0.017 predicted vs
+0.490 measured). That is the diagnosis, not a contradiction: changing λ rescales the whole
+problem uniformly — `dz`, `dt`, `d_i0`, `d_e`, `τ_own` all move together, the normalised
+dynamics are untouched, and only `n_cr ∝ λ^(−2)` moves. Changing µ instead alters the ion
+dynamics, which the static argument cannot see.
+
+**Physics: inverse bremsstrahlung favours SHORT wavelengths** — why ICF runs 351 nm, not
+1.06 µm. `n_cr ∝ λ^(−2)`, so longer λ means a thinner critical surface and a weaker absorber.
+**The λ scaling that restores `d_i0` is exactly the one that destroys absorption.**
+
+### A clean consistency check
+`lam4x_i` has a *higher* `f_abs` than `lam4x` (0.1210 vs 0.0754) because its intensity is
+4.285× lower. Predicted from the independently measured `d(ln f_abs)/d(ln I)` = −0.285:
+0.0754 × 4.285^0.285 = 0.115 against **0.1210 measured — 5 %**. The two exponents compose.
+
+### Could a SHORTER wavelength work? No.
+The deficit to close is `τ_abs/τ_abs,real` = `µ^0.490` = 0.2403, i.e. **4.16×**.
+`λ × µ^(1/2)` = 0.248 µm gains **4.83×** on absorption alone — but `T_ss ∝ λ^(4/3)` then falls
+6.96×, restoring it needs `I × λ^(−2)` = 18.4×, and `f_abs ∝ I^(−0.285)` gives back 0.436×.
+**Net 2.11× against 4.16× needed** — short by 2×, *and* `d_i0` shrinks to 0.395 µm, making the
+geometry error worse. It trades the geometry for half the absorption and does not close even
+that.
+
+### All four laser/handoff repairs, closed
+
+| repair | recovers | costs | verdict |
+|---|---|---|---|
+| similarity handoff (`T × µ^(1/3)`) | nothing | `f_abs` 0.364 → 0.274 | **refuted** — the plume forgets the handoff |
+| `coulomb_log × µ^(−1/2)` | `f_abs` exactly | lnΛ 20.35 vs a measured 4.75 | **works, but falsifies lnΛ** |
+| `intensity × µ^(−1/2)` | `T_e ∝ I^0.476`, partially | `f_abs ∝ I^(−0.285)` | **temperature knob, not a regime knob** |
+| `wavelength × µ^(−1/2)` | `d_i0` and `T_ss` exactly | `f_abs ∝ λ^(−1.08)` | **worst of the four** |
+
+**The conclusion the campaign has been converging on, now with four measured exponents behind
+it:** the absorbing **path** scales as `d_i0 ∝ µ^(1/2)` while `K` is pinned by physics the
+laser controls, and every knob that fixes one breaks the other. `f_abs` opposes `I` at −0.285,
+opposes `λ` at −1.082, and ignores the handoff temperature entirely. **Only more ion mass
+restores the absorption regime.** In 1D that costs 3.7 h and is simply the right thing to do.
+
+### Correction to my own analysis, same day
+I first checked "is the leg still driven?" by comparing each plume `T_e` against the IC corona
+temperature of 378.3 eV and reported all four as "cooled below the IC — essentially undriven".
+**That check is meaningless**: the plume band (0.05–1 `n_cr`, late) is the *expanded* plume,
+which has done work expanding and is cooler than the dense initial corona by construction.
+`mr100` is the validated baseline and is certainly driven. Withdrawn. I also wrote the
+optical-depth deficit as `4.285^0.490`; it is `µ^0.490` = 0.2403, i.e. 4.16×, corrected above.

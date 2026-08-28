@@ -81,7 +81,34 @@ accumulates with step count, and the step count is unchanged, so it remains a re
 bound — but an energy-closure claim from this leg would need its own `_off` twin.
 
 ## Result
-<pending>
+**`⟨f_abs⟩` collapsed 0.3642 → 0.0754 (0.207×), and `T_e` FELL 157.7 → 121.2 eV.**
+
+| | `⟨f_abs⟩` | plume `T_e` | absorbed |
+|---|---|---|---|
+| `mr100` (1.064 µm) | 0.3642 | 157.7 eV | 3.64e12 W/cm² |
+| **this leg** (4.559 µm) | **0.0754** | **121.2 eV** | 7.54e11 W/cm² |
+
+### The measured exponent, and a discrimination that matters
+
+```
+d(ln f_abs)/d(ln lambda) = -1.082      static estimate -1.00   AGREES to 8%
+d(ln T_e )/d(ln lambda)  = -0.181      T_ss ~ lam^(4/3) = +1.333   -- T_e FELL instead
+```
+
+**The static optical-depth formula works for λ (−1.08 vs −1) where it failed for µ (0.017 vs
+0.490).** That is not a contradiction, it is the diagnosis: changing λ rescales the *whole*
+problem uniformly — `dz`, `dt`, `d_i0`, `d_e` and `τ_own` all move together, so the normalised
+dynamics are untouched and only `n_cr ∝ λ^(−2)` moves. `K ∝ λ^(−2)`, `L ∝ λ`, `τ_abs ∝ λ^(−1)`.
+Changing µ instead alters the ion dynamics, which is what the static argument cannot see.
+
+`T_e` fell despite `T_ss ∝ λ^(4/3)` rising 6.96×, because the 4.8× loss of absorption more
+than cancelled it.
+
+### The physics
+**Inverse-bremsstrahlung absorption favours SHORT wavelengths** — the reason ICF runs 351 nm
+rather than 1.06 µm. `n_cr ∝ λ^(−2)`, so a longer wavelength means a less dense critical
+surface, fewer collisions, and a weaker absorber. **The λ scaling that restores `d_i0` is
+exactly the one that destroys absorption. The two are in opposition.**
 
 ## Retracted
 nothing

@@ -81,7 +81,29 @@ accumulates with step count, and the step count is unchanged, so it remains a re
 bound — but an energy-closure claim from this leg would need its own `_off` twin.
 
 ## Result
-<pending>
+**The worst of the four probes. `⟨f_abs⟩` = 0.1210, plume `T_e` = 50.2 eV.**
+
+| leg | λ | I (W/cm²) | `⟨f_abs⟩` | plume `T_e` | absorbed |
+|---|---|---|---|---|---|
+| `mr100` | 1.064 µm | 1e13 | 0.3642 | 157.7 eV | 3.64e12 |
+| `mr100_i4x` | 1.064 µm | 4.285e13 | 0.2404 | 322.7 eV | 1.03e13 |
+| `mr100_lam4x` | 4.559 µm | 1e13 | 0.0754 | 121.2 eV | 7.54e11 |
+| **this leg** | 4.559 µm | 2.334e12 | **0.1210** | **50.2 eV** | **2.82e11** |
+| `mrreal_drift` | 1.064 µm | 1e13 | 0.8402 | 440.2 eV | — |
+
+It absorbs **12.9× less power than `mr100`** and runs **8.8× cooler than the real-mass leg**,
+while the combination was designed to restore `d_i0` *and* `T_ss` to their real values. It
+does restore both — and the plume does not care, because the laser is barely coupling.
+
+The `⟨f_abs⟩` being *higher* than the λ-only leg's 0.0754 is the intensity exponent working as
+measured: dropping `I` by 4.285× raises `f_abs` by `4.285^0.285` = 1.53×, and 0.0754 × 1.53 =
+0.115 against 0.1210 measured — **5 % agreement**, a clean consistency check on
+`d(ln f_abs)/d(ln I)` = −0.285 from `P4_lez_kin_mr100_i4x`.
+
+### Verdict
+**The last laser repair is closed.** Restoring the geometry costs the absorption, and no
+intensity compensation buys it back — the two knobs pull the same quantity in opposite
+directions and neither is strong enough.
 
 ## Retracted
 nothing
