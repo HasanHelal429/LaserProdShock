@@ -104,6 +104,13 @@ Measured exponent `s^2.489` (12 910 s against `mr100`'s 345.1 s at `s` = 4.285) 
 sub-cubic than the `s^2.55` the three-leg scan gave, so the GPU is still not saturated at
 21424 cells. Predicted bracket was 3.9–7.6 h; actual **3.59 h**.
 
+## Figures
+`media/P4/P4_lez_kin_mrreal/mass_ratio_scan.png` — two panels from `scripts/mass_ratio_scan.py`:
+**(a)** the µ-sweep with all four legs and the `µ^(1/3)` guide through `mr100`, showing `mrreal`
+landing 11.6 % above the prediction; **(b)** the raw-eV comparison — FLASH 647.0, PSC 508.8,
+WarpX `mrreal` 464.3 — which only this leg makes possible, since every other WarpX leg has to
+be reduced first and the reduction is the thing under test.
+
 ## Gates
 | Gate | Value | Pass? |
 |---|---|---|
