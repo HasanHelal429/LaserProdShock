@@ -6843,3 +6843,68 @@ temperature of 378.3 eV and reported all four as "cooled below the IC — essent
 which has done work expanding and is cooler than the dense initial corona by construction.
 `mr100` is the validated baseline and is certainly driven. Withdrawn. I also wrote the
 optical-depth deficit as `4.285^0.490`; it is `µ^0.490` = 0.2403, i.e. 4.16×, corrected above.
+
+---
+
+## 2026-08-28 — **the absorption differences are the plasma, not the operator** — and one resolution caveat
+
+Asked directly: is the `f_abs` spread across these probes the plume, or the `LaserDeposition`
+module? Tested three ways at **step 1**, where the plasma is exactly the config IC and nothing
+has moved, so the ray march is isolated from every dynamical effect.
+
+### (1) Intensity — the operator is provably not involved
+
+| leg | `I₀` | `f_abs(0)` |
+|---|---|---|
+| `mr100` | 1.000e17 | 0.16305 |
+| `mr100_i4x` | 4.285e17 | **0.16268** — identical to 0.2 % |
+| `mr100_lam4x` | 1.000e17 | 0.05129 |
+| `mr100_lam4x_i` | 2.334e16 | **0.05128** — identical to 0.02 % |
+
+A linear ray march *cannot* produce an intensity-dependent absorbed fraction, and it does not.
+**The measured `f_abs ∝ I^(−0.285)` over a run is therefore 100 % plume evolution** — the
+operator contributes exactly zero to it.
+
+### (2) Wavelength — the operator matches IB theory to 2 %
+`τ(0)` 0.08900 → 0.02633 for λ 1.064 → 4.559 µm, ratio **0.2958**. Theory: `K ∝ λ^(−2) lnΛ`
+and `L ∝ λ`, so `τ ∝ λ^(−1)` × the lnΛ change (1.249, since `n_e ∝ λ^(−2)` at fixed `n_e/n_cr`)
+= 0.2914. **2 % agreement.** The λ response is correctly-implemented inverse bremsstrahlung.
+
+### (3) Mass ratio — the effect is present before the plasma moves
+
+| leg | µ | `f_abs(0)` | `τ(0)` | cells per `d_i0` |
+|---|---|---|---|---|
+| `mr25` | 0.0136 | 0.07032 | 0.03646 | 10.0 |
+| `mr100` | 0.0545 | 0.16305 | 0.08900 | 20.0 |
+| `mr400` | 0.2178 | 0.46131 | 0.30931 | 40.0 |
+| `mrreal` | 1.000 | 0.68214 | 0.57307 | 85.7 |
+
+`τ(0) ∝ µ^0.664`, against a run-averaged `µ^0.490`. **Most of the mass-ratio absorption effect
+is already in the initial condition**, from path length `L ∝ d_i0 ∝ µ^(1/2)` at an identical
+ζ-profile — not the operator, and not even the plume evolution.
+
+Together with the operator's prior validation — cross-checked against PSC's ray march to
+6.7e-16 on the coefficient and 0.000e+00 on lnΛ, and against analytic IB/WKB to 0.02–1.6 % —
+**the module is not the source of any of these differences.**
+
+### ⚠ But the sweep carries a resolution artifact, and it is not negligible
+`τ(0) ∝ µ^0.664` where pure geometry predicts `µ^0.500`. The sweep holds `dz` at 0.5 `d_e`
+while `d_i0/d_e ∝ µ^(1/2)`, so the legs span **8.6× in cells per `d_i0`** — the low-µ legs are
+the least resolved *in units of the structure being integrated*. Tested
+(`P4_lez_kin_mr25_dzhalf`, `dz` 0.5 → 0.25 `d_e`, step 1 only):
+
+```
+f_abs(0)  0.07032 -> 0.08493      tau(0) +21.7%
+exponent  mu^+0.664 -> mu^+0.623
+```
+
+**The coarse grid under-integrates `K`.** `mrreal` at 85.7 cells per `d_i0` is presumably
+converged, so the true exponent is shallower than measured — this pair bounds the shift at
+~0.04 and does not fully determine it. **So `µ^0.490` should be quoted as an upper bound on
+the magnitude, not a converged exponent.** The qualitative conclusion is untouched (absorption
+still falls steeply with µ, and only more ion mass restores it), but a published exponent
+needs a `dz` convergence leg at each rung.
+
+This is a property of how the sweep was *specified* — `dz_over_de` held fixed, per gate G7 —
+not of the operator, and it would affect any code integrating the same profiles on the same
+grid.
