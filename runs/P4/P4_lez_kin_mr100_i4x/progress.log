@@ -2,3 +2,13 @@
 # logging_started 2026-08-28T15:20:10  total_steps=110592  every=10%  poll=30s
 # wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
 2026-08-28T15:20:40 | 11383/110592 (10.3%) | 0h00m | 0.0026 s/step(wall) | 0.0026 s/step(warpx) | ETA ~0h04m | x1.03 | load 16.8 | laser 0.106 of peak, Eabs 9.534e+04 J
+2026-08-28T15:21:40 | 29071/110592 (26.3%) | 0h01m | 0.0034 s/step(wall) | 0.0031 s/step(warpx) | ETA ~0h04m | x1.11 | load 17.0 | laser 0.270 of peak, Eabs 2.294e+05 J
+2026-08-28T15:22:10 | 37667/110592 (34.1%) | 0h02m | 0.0035 s/step(wall) | 0.0032 s/step(warpx) | ETA ~0h04m | x1.11 | load 17.1 | laser 0.232 of peak, Eabs 3.031e+05 J
+2026-08-28T15:22:40 | 46183/110592 (41.8%) | 0h02m | 0.0035 s/step(wall) | 0.0032 s/step(warpx) | ETA ~0h03m | x1.10 | load 17.1 | laser 0.173 of peak, Eabs 3.797e+05 J
+2026-08-28T15:23:40 | 63407/110592 (57.3%) | 0h03m | 0.0035 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h02m | x1.06 | load 17.2 | laser 0.184 of peak, Eabs 5.65e+05 J
+2026-08-28T15:24:10 | 72080/110592 (65.2%) | 0h04m | 0.0035 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h02m | x1.05 | load 17.1 | laser 0.275 of peak, Eabs 6.436e+05 J
+2026-08-28T15:24:40 | 80807/110592 (73.1%) | 0h04m | 0.0034 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h01m | x1.04 | load 17.2 | laser 0.215 of peak, Eabs 7.284e+05 J
+2026-08-28T15:25:10 | 90190/110592 (81.6%) | 0h05m | 0.0032 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h01m | x0.97 | load 17.3 | laser 0.195 of peak, Eabs 8.43e+05 J
+2026-08-28T15:26:10 | 108499/110592 (98.1%) | 0h06m | 0.0033 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h00m | x1.00 | load 17.1 | laser 1.000 of peak, Eabs 1.093e+06 J
+2026-08-28T15:26:41 | 110592/110592 (100.0%) | 0h06m | 0.0144 s/step(wall) | 0.0033 s/step(warpx) | ETA ~0h00m | x4.36 | load 16.9 | laser 0.407 of peak, Eabs 1.126e+06 J
+DONE 2026-08-28T15:26:41 | 110592/110592 (100.0%) | total wall 0h06m | mean 0.0035 s/step(wall) | reached max_step

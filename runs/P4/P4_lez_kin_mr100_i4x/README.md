@@ -77,7 +77,50 @@ So the prediction here is a *measurement*, not a derivation:
 | G6 energy closure | | post-run |
 
 ## Result
-<pending>
+**366.9 s. Outcome 3: `⟨f_abs⟩` FELL. Intensity does not recover the regime.**
+
+| leg | `⟨f_abs⟩` | `f_end` | plume `T_e` |
+|---|---|---|---|
+| `mr100` (I = 1e13) | 0.3642 | 0.3495 | 157.7 eV |
+| **this leg** (I × 4.285) | **0.2404** | 0.4066 | **322.7 eV** |
+| `mrreal_drift` (real mass) | 0.8402 | 0.9148 | 440.2 eV |
+
+Predicted `T_e` ~416 eV; **measured 322.7** — 22.4 % short, outside the 13.5 % floor. And
+`⟨f_abs⟩` **fell 0.660×**, `d(ln f_abs)/d(ln I)` = **−0.285**.
+
+### But the shortfall is entirely the absorbed fraction, and Manheimer is exact
+Raising the incident intensity 4.285× raised the **absorbed** intensity only **2.828×**,
+because `f_abs` dropped. Feed that into Manheimer instead:
+
+```
+T_e ~ I_abs^(2/3):   2.828^(2/3) = 2.000x     MEASURED 322.7/157.7 = 2.046x     2.3% APART
+```
+
+**`T_e ∝ I_abs^(2/3)` holds to 2.3 %.** The entire 22.4 % miss against the naive prediction is
+the falling absorbed fraction — the scaling law is not in question, the coupling is.
+
+### Why `f_abs` falls: absorption is self-limiting
+`K ∝ Z lnΛ n² T^(−3/2)`, so the hotter plume this leg creates is a *worse* absorber. The
+plume heats, `K` drops faster than the lengthening path can compensate, and the coupling runs
+in the direction that opposes the knob. This is the documented self-limiting behaviour
+(`GOTCHAS.md`, "Absorption is self-limiting, and that is real physics"), here measured as a
+clean power law for the first time.
+
+### The answer to "can a laser scaling recover the regime"
+Composing the two measured exponents: `f_abs ∝ I^(−0.285)`, so `I_abs ∝ I^0.715` and
+**`T_e ∝ I^0.476`** — not `I^(2/3)`. To reach the real 823 eV target at `m_p/m_e` = 100 the
+intensity would have to rise **≈32×, to 3.2e14 W/cm²**, and `f_abs` would fall to ~0.135 —
+*further* from the real-mass leg's 0.840 than the 0.364 it started at. **You would buy the
+temperature by making the absorption worse.**
+
+(That extrapolates 7.5× beyond the measured pair, so treat ≈32× as an estimate. The direction
+and the mechanism are measured; the exact factor is not.)
+
+**So intensity is a temperature knob, not a regime knob** — and the two are anti-correlated,
+which rules out the "separable" reading this run was built to test. On the intensity-adjusted
+target this leg sits at `T_e/T_ss` = **0.392**, against `mr100`'s 0.506 and the real-mass
+leg's 0.535: raising the intensity moved it *away* from its own steady state.
 
 ## Retracted
+nothing## Retracted
 nothing

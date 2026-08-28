@@ -326,6 +326,15 @@ What still stands from the raw-eV choice: the handoff *is* FLASH's actual state,
 temperatures are comparable to FLASH in eV, and that remains the right reason to keep it. What
 does not stand is the idea that a different convention buys back the absorption.
 
+**And no laser scaling repairs it either** (`P4_lez_kin_mr100_i4x`, 2026-08-28). Raising the
+intensity by `µ^(−1/2)` to cancel the `µ^(1/3)` in `T_ss` gave `T_e` 157.7 → 322.7 eV against
+a predicted 416, because **`⟨f_abs⟩` fell 0.3642 → 0.2404**, `d(ln f_abs)/d(ln I)` = −0.285.
+Manheimer itself is exact — on the *absorbed* intensity, `2.828^(2/3)` = 2.000× against a
+measured 2.046×, **2.3 %** — so the miss is entirely the coupling. `K ∝ T^(−3/2)`, so the
+hotter plume is a worse absorber and the response opposes the knob. Composing,
+**`T_e ∝ I^0.476`**, and reaching 823 eV would need `I ≈ 32×` with `f_abs` down at ~0.135.
+**Intensity is a temperature knob, not a regime knob, and the two are anti-correlated.**
+
 ### 7.5 Collisionality — irreducible
 
 `λ_ei ∝ T²/(n lnΛ)` is **mass-independent**, while `L ∝ µ^(1/2)`. So

@@ -6695,3 +6695,76 @@ real problem and nothing in the setup can repair it, while real mass costs 3.7 h
 `mass_ratio` went 2698 → 100, but left every length alone — the mirror of the µ-sweep's error.
 Neither branch had ever been run cleanly before this. Their diagnostics were deleted on
 2026-08-28; their absolutes were already retracted for the 5.19× corona, so nothing was lost.
+
+---
+
+## 2026-08-28 (later) — **no laser scaling recovers the regime.** Absorption is self-limiting, measured as a power law
+
+**Environment.** `P4_lez_kin_mr100_i4x`, one RTX 4070, 366.9 s, 110592/110592, clean. One key
+moved from `mr100`: `laser.intensity` 1.0e17 → 4.285e17 W/m² (`= µ^(−1/2)`). Deck differs in
+exactly one line.
+
+### The question
+`T_ss ∝ µ^(1/3) I^(2/3)`, so `I ∝ µ^(−1/2)` cancels the mass reduction and should put a
+reduced leg on the real 823 eV target. Does restoring the *temperature* regime also restore
+the *absorption* regime?
+
+### The result — no, and they are anti-correlated
+
+| leg | `⟨f_abs⟩` | plume `T_e` |
+|---|---|---|
+| `mr100` (I = 1e13) | 0.3642 | 157.7 eV |
+| **`mr100_i4x`** (I × 4.285) | **0.2404** | **322.7 eV** |
+| `mrreal_drift` | 0.8402 | 440.2 eV |
+
+Predicted 416 eV, measured 322.7 — 22.4 % short. **`⟨f_abs⟩` fell 0.660×**, with
+`d(ln f_abs)/d(ln I)` = **−0.285**.
+
+### Manheimer is exact; the coupling is what bites
+The 4.285× rise in *incident* intensity produced only a **2.828×** rise in *absorbed*
+intensity. Against that:
+
+```
+T_e ~ I_abs^(2/3):  2.828^(2/3) = 2.000x    measured 2.046x    2.3% apart
+```
+
+**`T_e ∝ I_abs^(2/3)` holds to 2.3 %.** The whole 22.4 % miss is the falling absorbed
+fraction. The scaling law was never in doubt — the coupling between the knob and `f_abs` is.
+
+**Mechanism:** `K ∝ Z lnΛ n² T^(−3/2)`. The hotter plume the leg creates is a worse absorber,
+`K` drops faster than the lengthening path compensates, and the response opposes the knob.
+This is the self-limiting absorption already in `GOTCHAS.md`, now measured as a clean power
+law rather than observed qualitatively.
+
+### Composing the exponents — the answer to the question
+`f_abs ∝ I^(−0.285)` ⟹ `I_abs ∝ I^0.715` ⟹ **`T_e ∝ I^0.476`**, not `I^(2/3)`.
+
+Reaching 823 eV at `m_p/m_e` = 100 would need **I ≈ 32×, i.e. 3.2e14 W/cm²**, and `f_abs`
+would fall to ~0.135 — *further* from the real-mass leg's 0.840 than the 0.364 it started at.
+**You buy the temperature by making the absorption worse.** (That extrapolates 7.5× past the
+measured pair; the direction and mechanism are measured, the factor is an estimate.)
+
+On the intensity-adjusted target `mr100_i4x` sits at `T_e/T_ss` = **0.392**, against `mr100`'s
+0.506 and the real-mass leg's 0.535 — raising the intensity moved the leg *away* from its own
+steady state.
+
+### Where this leaves the three laser knobs
+| knob | recovers | costs | verdict |
+|---|---|---|---|
+| `laser.coulomb_log × µ^(−1/2)` | `f_abs` exactly (`K` is linear in lnΛ, so it is immune to the dynamics) | lnΛ becomes unphysical: 20.35 against a measured plume 4.75 | **tested** (`cl_psc`, `clmatch`). A controlled probe, not a production setting |
+| `laser.intensity × µ^(−1/2)` | temperature, partially — `T_e ∝ I^0.476` not `I^(2/3)` | `f_abs` **falls** 0.285 per decade of `I` | **tested here.** Temperature knob, not a regime knob |
+| `laser.wavelength × µ^(−1/2)` | `d_i0` and `d_e` to their real values, and the run gets *cheaper* | `n_cr ∝ λ^(−2)` falls 18.4×, so it is no longer the paper's problem | **untested**; needs `I × µ^(1/2)` alongside to hold `T_ss` |
+
+**Taken with the 2026-08-28 similarity-handoff refutation, three of the four available
+repairs are now closed:** the handoff convention does not restore absorption, intensity does
+not, and lnΛ only does so by falsifying the Coulomb logarithm. The absorbing **path** scales
+as `d_i0 ∝ µ^(1/2)` while the plume **temperature** that sets `K` is pinned by the laser — and
+now, additionally, any attempt to raise that temperature is opposed by `K ∝ T^(−3/2)`.
+**Only more ion mass fixes it.**
+
+### OPEN — the wavelength scaling
+`λ × µ^(−1/2)` = 4.559 µm with `I × µ^(1/2)` = 2.33e12 W/cm² holds both `d_i0` and `T_ss` at
+their real values, and *lowers* cost (`dz`, `dt` both grow 4.29×). It is the only untested
+laser repair. It changes `n_cr` by 18.4×, so the run is no longer the paper's 1.064 µm
+problem — which may be acceptable if the question is ablation physics rather than this
+benchmark. ~6 min to answer.
