@@ -1,0 +1,7 @@
+# WarpX progress — /home/hhelal/LaserProdShock/runs/P4/P4_lez_kin_mr100_sim
+# logging_started 2026-08-28T15:01:07  total_steps=110592  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-28T15:01:37 | 13171/110592 (11.9%) | 0h00m | 0.0023 s/step(wall) | 0.0022 s/step(warpx) | ETA ~0h03m | x1.03 | load 16.7 | laser 0.228 of peak, Eabs 5.006e+04 J
+2026-08-28T15:02:37 | 30170/110592 (27.3%) | 0h01m | 0.0035 s/step(wall) | 0.0029 s/step(warpx) | ETA ~0h04m | x1.20 | load 17.3 | laser 0.310 of peak, Eabs 9.32e+04 J
+2026-08-28T15:03:07 | 38379/110592 (34.7%) | 0h02m | 0.0037 s/step(wall) | 0.0031 s/step(warpx) | ETA ~0h04m | x1.18 | load 17.5 | laser 0.155 of peak, Eabs 1.099e+05 J
+2026-08-28T15:03:37 | 46591/110592 (42.1%) | 0h02m | 0.0037 s/step(wall) | 0.0032 s/step(warpx) | ETA ~0h03m | x1.15 | load 17.4 | laser 0.300 of peak, Eabs 1.271e+05 J
