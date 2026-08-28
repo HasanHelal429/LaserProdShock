@@ -128,4 +128,27 @@ required — another 3.6 h. The `T_e` result above does not depend on it (it is 
 other legs measured the same way), but an energy-closure claim would.
 
 ## Retracted
-nothing
+**The 464.3 eV above is PROVISIONAL — this leg's initial corona drift is wrong.**
+
+`plasma.target.drift_uz_de` was held fixed from `mr100`, following the mass-ratio recipe's
+"held fixed by design" list. That list has two families, `s¹` for `d_e`-quoted lengths and
+`s²` for times and step counts — but `drift_uz_de` is a **velocity in units of `c`** and
+belongs to neither. Held fixed while `C_S0` falls by `s` = 4.285, it leaves the starting
+corona `s` times too fast in normalised units:
+
+| at the handoff (`tau` 2.7) | FLASH | `mr100` | **`mrreal`** |
+|---|---|---|---|
+| `uza/C_S0` | 0.548 | 0.548 ✓ | **2.349** ✗ |
+| measured `v/C_S0` at 0.1 `n_cr` | 1.722 | 1.748 ✓ | **21.060** ✗ |
+
+`mr100` matches FLASH because `1.5271e-3` was chosen against *its* `C_S0`. This leg starts
+with a corona 4.29× too fast, which is the likely cause of its anomalous plume — `L_n` 4.05×
+FLASH's and `zeta_front` 2.81×, both out of line with `mr100` *and* FLASH.
+
+What survives: the run completed cleanly, the gates read as predicted, `d_e`/`dz`/`dt` are
+bit-identical to `mr100`, and the **cost** measurement (`s^2.489`, 3 h 35 m) is unaffected.
+What does not: **the 464.3 eV, the 11.6 % `µ^(1/3)` agreement, and the 8.7 % raw-eV agreement
+with PSC.** Superseded by `P4_lez_kin_mrreal_drift`, running.
+
+`mr25` and `mr400` carry the same error scaled by 0.5 and 2.0 and should be re-checked before
+their numbers are quoted again.

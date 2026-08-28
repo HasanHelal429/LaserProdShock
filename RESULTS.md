@@ -32,11 +32,14 @@ Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` =
 | FLASH | 0.870 ⚠ | 647 eV | 750 | 0.86 |
 | PSC `run_ourflash_511keV` | 0.475 (⟨f⟩ 0.583) | 508.8 eV @ 99.66 ps | 501 | **1.02** |
 | WarpX `P4_lez_kin_mr100` | 0.350 (⟨f⟩ 0.364) | 157.7 eV | 155 | **1.02** |
-| **WarpX `P4_lez_kin_mrreal`** — real `m_i` AND real `m_e`, no transform | 0.793 (⟨f⟩ 0.623) | **464.3 eV** | 707 | 0.66 |
+| ~~WarpX `P4_lez_kin_mrreal`~~ — **PROVISIONAL, IC drift wrong** | 0.793 (⟨f⟩ 0.623) | ~~464.3 eV~~ | 707 | 0.66 |
 
-**Raw eV, no normalisation, all on a real Al ion:** FLASH 647.0 · PSC 508.8 · WarpX `mrreal`
-464.3. WarpX/PSC = **0.913** (8.7 %), both 21–28 % below FLASH. `mrreal` is the only leg for
-which that comparison is meaningful.
+⚠ **`mrreal`'s numbers are on hold.** Its IC corona drift was held fixed from `mr100`, but
+`drift_uz_de` is a velocity and needs `1/s` (`uzb`: `1/s²`) — held fixed it starts the corona
+4.29× too fast in the leg's own `C_S0` (measured `v/C_S0` 21.06 at 0.1 `n_cr` against FLASH's
+1.72). The plume came out `L_n` 4.05× FLASH's. `P4_lez_kin_mrreal_drift` repeats it corrected;
+until it lands, the raw-eV comparison (FLASH 647.0 · PSC 508.8 · WarpX 464.3) and the 11.6 %
+`µ^(1/3)` agreement are **provisional**. The cost measurement (`s^2.489`) is unaffected.
 
 ⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
 PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.

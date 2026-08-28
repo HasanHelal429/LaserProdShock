@@ -412,7 +412,9 @@ FLASH_RAD = ("/home/hhelal/shared/simulations/FLASH_LaserAblationRad-Ploegstra_2
 SP_KIN = {"electron": ["targ_electrons", "amb_electrons"],
           "ion": ["targ_ions", "amb_ions"]}
 SP_HYB = {"ion": ["targ_ions", "amb_ions"]}
-TAUS = (2.7, 6.7, 13.5, 20.3, 27.0)
+TAUS = [2.7, 6.7, 13.5, 20.3, 27.0]   # FLASH's clock; override with --taus.
+# These run well past the end of a short leg. A WarpX leg at mass_ratio 2698 reaches
+# tau_own 5.39, i.e. FLASH tau 8.09, so only the first two rows are real for it.
 
 # Kept as a three-key dict, and kept exactly, because scripts/talk_xcode.py reads it.
 COLS = {"FLASH": "#1f4e9c", "kinetic": "#c1441a", "hybrid": "#2a8a5f"}
@@ -485,7 +487,14 @@ def load_leg(label, path, colour):
 
 
 def leg_state(leg, tau):
-    """(zeta, ne, Te, v) for one leg at the nearest tau, with the hybrid T_e interpolated."""
+    """(zeta, ne, Te, v) for one leg at the nearest tau, with the hybrid T_e interpolated.
+
+    Also returns ``tau_want`` and ``stale``. A leg that ended before the requested tau has
+    its LAST dump returned by ``pick`` with no complaint, so every row past the end of a
+    short leg silently repeats it -- which is how "the FLASH-kinetic benchmark passes" got
+    into RESULTS at line 3085 comparing FLASH at tau 27 against WarpX at tau 5 (retracted,
+    line 4411). ``stale`` marks those rows so the table can flag them instead.
+    """
     s = pick(leg["S"], tau)
     if s is None:
         return None
@@ -493,7 +502,8 @@ def leg_state(leg, tau):
     if leg["hybrid"]:
         hf = pick(leg["F"], tau, "Te")
         Te = np.interp(s["zeta"], hf["zeta"], hf["Te"]) if hf else None
-    return dict(zeta=s["zeta"], ne=s["ne"], Te=Te, v=s.get("v"), tau=s["tau"])
+    return dict(zeta=s["zeta"], ne=s["ne"], Te=Te, v=s.get("v"), tau=s["tau"],
+                tau_want=tau, stale=abs(s["tau"] - tau) > 0.25)
 
 
 # The WarpX legs' clocks do NOT start where FLASH's does. Every Phase-4 initial condition
@@ -541,15 +551,26 @@ def table(data, legs):
         for tau in TAUS:
             if tau not in sc[n]:
                 continue
+            d = data[tau].get(n) or {}
+            mark = "  <-- STALE: leg ended at tau %.2f" % (d.get("tau", np.nan) + TAU_HANDOFF) \
+                   if d.get("stale") else ""
             print(f"{tau:6.1f} " + " ".join(f"{sc[n][tau].get(k, np.nan):14.3f}"
-                                           for k in keys))
+                                           for k in keys) + mark)
     print("\n" + "=" * 116)
-    print("FINAL STATE (tau = 27), each WarpX leg as a ratio to FLASH")
+    # Compare at the LAST tau every leg actually reaches, not at the end of the grid --
+    # otherwise a short leg's last dump is silently set against FLASH hundreds of ps later.
+    live = [t for t in TAUS
+            if all(not (data[t].get(n) or {}).get("stale", False) for n in names[1:])]
+    tcmp = max(live) if live else TAUS[0]
+    if tcmp != max(TAUS):
+        print(f"NOTE: comparing at tau = {tcmp} -- the last tau EVERY leg reaches. "
+              f"The grid runs to {max(TAUS)}, where the short legs are stale.")
+    print(f"STATE AT tau = {tcmp}, each WarpX leg as a ratio to FLASH")
     for k in keys:
-        f = sc["FLASH"][27.0].get(k, np.nan)
+        f = sc["FLASH"][tcmp].get(k, np.nan)
         line = f"  {k:16s} FLASH {f:10.3f}"
         for n in names[1:]:
-            v = sc[n].get(27.0, {}).get(k, np.nan)
+            v = sc[n].get(tcmp, {}).get(k, np.nan)
             line += f" | {n} {v:9.3f} ({v/f:5.2f}x)" if f else f" | {n} {v:9.3f}"
         print(line)
     print(f"\n  T_e (plume, density-weighted) against EACH LEG'S OWN Manheimer value")
@@ -563,7 +584,7 @@ def table(data, legs):
         fabs[leg["label"]] = q["f_mean"] if q else np.nan
     for n in names:
         ref = TE_REF if n == "FLASH" else ss_of.get(n, TSS_REDUCED)
-        T = sc[n].get(27.0, {}).get("Te_mean_plume", np.nan)
+        T = sc[n].get(tcmp, {}).get("Te_mean_plume", np.nan)
         supported = ref * (fabs[n] / 0.870) ** (2.0 / 3.0)
         print(f"    {n:22s} f_abs {fabs[n]:5.3f}  T_e {T:7.1f} eV  "
               f"/ own SS {ref:6.1f} = {T/ref:5.3f}  "
@@ -716,6 +737,10 @@ def main():
                          "from the run's own config. Default: "
                          + "; ".join(f"{a}={b}" for a, b in LEGS_DEFAULT))
     ap.add_argument("--outdir", default="media/xcode")
+    ap.add_argument("--taus", type=float, nargs="+", default=None, metavar="TAU",
+                    help="FLASH-clock taus to compare at (default 2.7 6.7 13.5 20.3 27.0). "
+                         "Rows past the end of a leg are marked STALE, not silently filled "
+                         "with its last dump -- keep them inside every leg's window.")
     ap.add_argument("--tau-offset", dest="tau_offset", type=float, default=TAU_HANDOFF,
                     help="shift the WarpX legs by this much in tau before comparing. Every "
                          "Phase-4 IC stands for FLASH's t = 0.1 ns = tau 2.696, so the "
@@ -724,6 +749,8 @@ def main():
                          "measured on.")
     a = ap.parse_args()
 
+    if a.taus:
+        TAUS[:] = list(a.taus)
     spec = [tuple(q.split("=", 1)) for q in a.leg] if a.leg else list(LEGS_DEFAULT)
     legs = [load_leg(lab, path, PALETTE[i % len(PALETTE)])
             for i, (lab, path) in enumerate(spec)]

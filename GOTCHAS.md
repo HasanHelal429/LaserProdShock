@@ -524,6 +524,14 @@ Added 2026-08-27. Every one of these has already produced a wrong number in `RES
   (`checkpoint_next = 0.05*60*60`, `INIT_param.f:386`) and `SERV_openby_p` opens
   `data/chk/...` without creating the directory, so the run aborts there — far enough in to
   look like a physics failure and to have written five moment dumps first.
+- **The mass-ratio recipe has a THIRD family the run READMEs do not list: velocities, which
+  scale as `1/s`.** `plasma.target.drift_uz_de` is a velocity in units of `c` and its ramp is
+  *per `d_e`*, so `uza ~ 1/s` and `uzb ~ 1/s²`. It sits under "held fixed by design" in the
+  `mr25/mr100/mr400` READMEs, and holding it fixed while `C_S0` falls by `s` starts the corona
+  `s` times too fast in normalised units. `P4_lez_kin_mrreal` was built that way and began with
+  `v/C_S0` = 21.06 at 0.1 `n_cr` against FLASH's 1.72 — its plume `L_n` came out 4.05× FLASH's.
+  **Check `uza/C_S0` against FLASH's 0.548 on any new mass-ratio leg**; `mr100` only looks right
+  because the constant was chosen at *its* `C_S0`.
 - **The `s` rescaling of a mass-ratio leg is 100 % MANUAL.** Nothing in `units.py`/`deck.py`
   applies it. Two families: **s¹** on `d_e`-quoted lengths (`thickness_de`, `center_de`,
   `scale_length_de`, `corona_offset_de`, `axis.lo_de`, `hi_de`, `max_grid_size`) and **s²** on
