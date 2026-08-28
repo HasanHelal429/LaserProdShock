@@ -156,7 +156,8 @@ Three things about this list are load-bearing.
 **The temperatures transfer in RAW eV, not in similarity units.** `theta_e_init` = 378.3 eV is
 FLASH's actual ablation-layer temperature. Lengths and times transfer in **similarity** units
 (`d_e`, `d_i0`, `τ_own`). That mixture is a deliberate choice — it keeps the IC physically the
-state FLASH computed — and it is the single origin of the absorption discrepancy in §7.4.
+state FLASH computed — and it is the right one: §7.4 shows that scaling the temperature
+instead makes the absorption *worse*, so nothing is being given up here.
 
 **The cold solid is not transferred.** FLASH's 290 K = 0.025 eV solid is Debye-unresolvable on
 a uniform grid, so the WarpX solid starts at 1.26 eV. A known departure, not a fit.
@@ -295,11 +296,35 @@ The reason the initial condition wins over the steady state is that these runs r
 5.39 `τ_own` and never reach quasi-steady ablation, so absorption is a transient set by the
 handoff temperature rather than by each leg's own equilibrium.
 
-**This is the fork.** You may hand off the real state in raw eV — comparable to FLASH in eV,
-absorption wrong by `µ^(1/2)` — or transfer everything in similarity units including
-`T ∝ µ^(1/3)` — absorption preserved, raw-eV comparison meaningless. **Mixing them is what
-produces the `µ^0.454`.** Note also that no post-hoc `f_abs^(2/3)` correction repairs it:
-applied across the sweep it makes the scatter worse, not better.
+**There is no handoff convention that fixes this — tested and refuted 2026-08-28.**
+
+The obvious repair is to scale the handoff temperature by `µ^(1/3)` as well, restoring the
+cancellation. `P4_lez_kin_mr100_sim` is `mr100` with exactly that change and nothing else
+(378.3 → 143.4 eV, 115.6 → 43.8 eV; the deck differs in two constants). Predicted `⟨f_abs⟩`
+0.856, landing on the real-mass leg's 0.840. **Measured 0.2735** — 3.1× off and *lower* than
+the raw-eV parent. Scaling the handoff temperature makes absorption **worse**.
+
+The static `∫K dz` argument fails because it holds the path fixed while scaling `T`, and two
+larger effects are not in it:
+
+1. **The plume forgets the handoff temperature.** A 2.638× colder IC gave a plume only 1.16×
+   cooler (157.7 → 135.5 eV): `d(ln T_plume)/d(ln T_IC)` = **0.156**. The plume temperature is
+   set by the *laser*. `K` in the absorbing region barely moves whatever the handoff says.
+2. **A colder start builds its corona more slowly.** `C_S ∝ √T`, so the expansion that
+   *creates* the absorbing path is 1.62× slower. The two `f_abs` conventions move opposite
+   ways — time-integrated down 0.751×, final instantaneous up 1.256× — which is the signature
+   of a leg that starts thin and is still catching up at cutoff.
+
+Smaller, same direction: `K ∝ lnΛ`, and the NRL lnΛ at 0.3 `n_cr` falls 5.77 → 4.32 over that
+temperature change.
+
+**So `µ^0.490` is not a bookkeeping artifact.** It is intrinsic to reducing the ion mass at
+fixed laser and fixed real electron: the absorbing **path** scales as `d_i0 ∝ µ^(1/2)`, while
+the plume **temperature** that sets `K` does not scale at all. **Only more ion mass fixes it.**
+
+What still stands from the raw-eV choice: the handoff *is* FLASH's actual state, so
+temperatures are comparable to FLASH in eV, and that remains the right reason to keep it. What
+does not stand is the idea that a different convention buys back the absorption.
 
 ### 7.5 Collisionality — irreducible
 
@@ -342,7 +367,9 @@ PSC's 0.583 is not matched to either, so its 0.79× is not a like-for-like figur
 4. Normalise velocities by `C_S` at the leg's **measured** `T_e`.
 5. Quote `⟨f_abs⟩` beside every temperature, and say which convention (time-integrated, not
    the final instantaneous value the older tables use).
-6. Expect `f_abs` to scale as `µ^(1/2)` on a raw-eV handoff — it is not a code difference.
+6. Expect `f_abs` to scale as `µ^(1/2)`, whatever the handoff convention — it is not a code
+   difference, and it is not fixable by rescaling the initial condition (§7.4). Only more ion
+   mass fixes it.
 7. Keep `n_cell` divisible by `blocking_factor` 8 and reset `max_grid_size` to match.
 8. Check gates G1 and G2 are unchanged from `mr100`; if they moved, something in the electron
    sector was touched that should not have been.

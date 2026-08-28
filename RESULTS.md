@@ -71,9 +71,14 @@ corrected IC drift).** The sweep reads mr25/mr100/mr400/mrreal = **113.9 / 157.7
 `T_e/T_ss(own µ)` = 0.580 / 0.506 / 0.547 / 0.535, a 1.15× spread inside the 13.5 % floor.
 Nothing extrapolates any more.
 
-**Optical depth is NOT preserved, and the handoff convention fully explains it.** Fitted
-**`µ^0.490`** against the `µ^(1/2)` a raw-eV handoff predicts — 2 % — with 4.6 % scatter.
-`⟨f_abs⟩` ran 0.205 → 0.364 → 0.624 → 0.840. See `HANDOFF.md` §7.4.
+**Optical depth is NOT preserved: `µ^0.490`, 4.6 % scatter, `⟨f_abs⟩` 0.205 → 0.364 → 0.624
+→ 0.840.** ⚠ **The handoff convention does NOT explain it — tested and refuted 2026-08-28.**
+`P4_lez_kin_mr100_sim` scaled the handoff temperature by `µ^(1/3)` (378.3 → 143.4 eV) and
+nothing else; predicted `⟨f_abs⟩` 0.856, **measured 0.2735** — lower, not higher. The plume
+forgets the handoff (`d(ln T_plume)/d(ln T_IC)` = 0.156; the *laser* sets it) and a colder
+start builds its corona more slowly. **`µ^0.490` is intrinsic to reducing the ion mass: the
+absorbing path scales as `µ^(1/2)`, the plume temperature that sets `K` does not scale at all.
+Only more ion mass fixes it.** See `HANDOFF.md` §7.4.
 
 ⚠ **PSC's `T_e` is NOT `ReducedMassRatio`-invariant — an earlier claim here, refuted
 2026-08-27.** PSC's *ion* is real Al at every RMR (the ratio cancels in `MMi1·K_mass`), so its
@@ -6626,3 +6631,67 @@ domain (`∝ mu^(1/2)`) and a shorter duration (`∝ mu`).
 `cfl`, `ppc` alone. **Check `uza/C_S0` against 0.548, and `zeta_cr` and `L_n` against FLASH —
 the temperature is not a sensitive tell**: the defective leg's `T_e` was off 5 % while its
 `L_n` was off 4×.
+
+---
+
+## 2026-08-28 (late) — **the similarity handoff does not rescue absorption.** A prediction, and its refutation
+
+**Environment.** `P4_lez_kin_mr100_sim`, one RTX 4070, 379 s, 110592/110592, clean.
+
+### The test
+`HANDOFF.md` §7.4 claimed the `µ^0.490` optical-depth failure was caused by pinning the handoff
+temperature in raw eV while the lengths transfer in similarity units, and that scaling `T` by
+`µ^(1/3)` would restore the `∫K dz` cancellation. `mr100_sim` is `mr100` with **only** the two
+corona temperatures scaled — 378.3 → 143.4 eV and 115.6 → 43.8 eV, `T_e/T_i` = 3.27 preserved.
+The generated deck differs from the parent in **exactly two `my_constants`**.
+
+Prediction, recorded in the run README before launch: `⟨f_abs⟩` **0.364 → 0.856**, landing on
+the real-mass leg's 0.840, since `K ∝ T^(−3/2)` rises 4.285× at unchanged path.
+
+### The result
+
+| leg | corona IC | `⟨f_abs⟩` | `f_end` | plume `T_e` | `T_e/T_ss` |
+|---|---|---|---|---|---|
+| `mr100` (raw eV) | 378.3 eV | 0.3642 | 0.3495 | 157.7 eV | 0.506 |
+| **`mr100_sim`** | **143.4 eV** | **0.2735** | 0.4389 | 135.5 eV | 0.434 |
+| `mrreal_drift` | 378.3 eV | 0.8402 | 0.9148 | 440.2 eV | 0.535 |
+
+**Predicted 0.856, measured 0.2735** — 3.1× off, and *lower* than the parent rather than
+higher. **Scaling the handoff temperature makes absorption worse.**
+
+### Why the argument failed
+It held the path fixed while scaling `T`. Two larger effects are not in `∫K dz` at fixed `L`:
+
+1. **The plume forgets the handoff temperature.** A 2.638× colder IC gave a plume only 1.16×
+   cooler (157.7 → 135.5 eV): `d(ln T_plume)/d(ln T_IC)` = **0.156**. The plume temperature is
+   set by the **laser**, so `K` in the absorbing region barely moves whatever the handoff says.
+2. **A colder start builds its corona more slowly.** `C_S ∝ √T`, so the expansion that
+   *creates* the absorbing path is 1.62× slower. The signature is the two `f_abs` conventions
+   moving opposite ways — time-integrated **down** 0.751×, final instantaneous **up** 1.256× —
+   a leg that starts thin and is still catching up at cutoff.
+
+Smaller and in the same direction: `K ∝ lnΛ`, and the NRL lnΛ at 0.3 `n_cr` falls 5.77 → 4.32
+across that temperature change.
+
+### What is retracted, and what stands
+**RETRACTED:** `HANDOFF.md` §7.4's "fork" — the claim that a similarity-unit handoff preserves
+the optical depth, and that the choice is between a comparable IC and preserved absorption.
+There is no such branch. Rewritten in place.
+
+**STANDS:** the measured `τ_abs ∝ µ^0.490` (4.6 % scatter), `T_e ∝ µ^0.322`, and the raw-eV
+handoff as the right choice — it keeps the IC physically FLASH's state, and this run shows the
+alternative costs absorption rather than buying it.
+
+**NEW, and stronger than what it replaces:** `µ^0.490` is **intrinsic** to reducing the ion
+mass at fixed laser and fixed real electron. The absorbing **path** scales as
+`d_i0 ∝ µ^(1/2)`; the plume **temperature** that sets `K` does not scale at all, because the
+laser sets it. **No initial condition fixes this. Only more ion mass does.**
+
+That sharpens the 1D verdict in the ledger: at `m_p/m_e` = 100 a leg absorbs ~4× less than the
+real problem and nothing in the setup can repair it, while real mass costs 3.7 h.
+
+### A note on the closest prior attempt
+`flashic_ct` / `flashic_res` scaled the corona temperature by `µ^(1/3)` and `uza` by `1/s` when
+`mass_ratio` went 2698 → 100, but left every length alone — the mirror of the µ-sweep's error.
+Neither branch had ever been run cleanly before this. Their diagnostics were deleted on
+2026-08-28; their absolutes were already retracted for the 5.19× corona, so nothing was lost.

@@ -80,7 +80,43 @@ smaller Debye length at fixed density, so `dz/λ_D` goes 58.1 → ~94 in the tar
 INFO-level measurement on this project's uniform grid, but worth quoting beside the result.
 
 ## Result
-<pending — not launched>
+**379 s. The prediction was wrong, decisively and in the wrong direction.**
+
+| leg | corona IC | `⟨f_abs⟩` | `f_end` | plume `T_e` | `T_e/T_ss` |
+|---|---|---|---|---|---|
+| `mr100` (raw eV) | 378.3 eV | 0.3642 | 0.3495 | 157.7 eV | 0.506 |
+| **this run** (similarity) | **143.4 eV** | **0.2735** | 0.4389 | 135.5 eV | 0.434 |
+| `mrreal_drift` (real mass) | 378.3 eV | 0.8402 | 0.9148 | 440.2 eV | 0.535 |
+
+Predicted `⟨f_abs⟩` 0.856, landing on the real-mass leg's 0.840. **Measured 0.2735** — 3.1×
+off, and *lower* than the raw-eV parent rather than higher. Scaling the handoff temperature
+does not restore the optical depth; it makes absorption worse.
+
+### Why the static argument failed
+It held the path fixed while scaling `T`. Two things that are not in `∫K dz` at fixed `L`:
+
+1. **The plume forgets the handoff temperature.** A 2.638× colder IC produced a plume only
+   1.16× cooler (157.7 → 135.5 eV), i.e. `d(ln T_plume)/d(ln T_IC)` = **0.156**. The plume
+   temperature is set by the *laser*, not by the initial condition — so `K` in the absorbing
+   region barely moves no matter what the handoff says.
+2. **A colder start builds its corona more slowly.** `C_S ∝ √T`, so the expansion that
+   *creates* the absorbing path is 1.62× slower. The tell is in the two `f_abs` conventions
+   moving opposite ways: time-integrated **down** 0.751×, final instantaneous **up** 1.256×.
+   The colder leg spends more of a short run with a thin corona and is only catching up at
+   cutoff.
+
+Third, smaller: `K ∝ lnΛ`, and the NRL lnΛ at 0.3 `n_cr` falls 5.77 → 4.32 when `T` drops
+378.3 → 143.4 eV, another 0.75× against the intended gain.
+
+### What this means for the campaign
+**There is no handoff convention that preserves the optical depth.** The `µ^0.490` scaling is
+not a fixable bookkeeping artifact — it is intrinsic to reducing the ion mass at fixed laser
+and fixed real electron: the absorbing **path** scales as `d_i0 ∝ µ^(1/2)` while the plume
+**temperature**, which sets `K`, does not scale at all because the laser sets it. Only more
+ion mass fixes it.
+
+This supersedes `HANDOFF.md` §7.4's "fork", which offered a similarity branch that does not
+exist.
 
 ## Retracted
 nothing
