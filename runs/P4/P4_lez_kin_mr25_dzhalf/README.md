@@ -12,6 +12,22 @@ closer to 0.500.
 **Falsified by.** Nothing — this is a null test on the worst-resolved leg, and either answer
 bounds the artifact.
 
+## Geometry
+```
+1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
+
+                                                               <== laser
+      ##~                                                               
+      ^                                                                ^
+      reflecting                                                    open
+      z = -25                                                  z = +1223
+
+  #  target flat top : 10 n_cr, 22.5 d_e thick, centred at -11.25 d_e
+  ~  coronal ramp   : exponential, L_n = 3.4775 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 4992 cells, dz = 0.25 d_e, dt = 0.04943 fs, 27648 steps = 1.367 ps
+```
+
 ## Setup
 Parent: **`P4_lez_kin_mr25_drift`**. `dz_over_de` 0.5 → **0.25** (cells 2496 → 4992), with
 `max_grid_size` doubled to match so the one-box GPU rule still holds. Nothing else moves.
