@@ -6430,3 +6430,59 @@ The existing `_off` control is at `mr100`'s mass ratio and duration; this leg ru
 steps and grid heating accumulates with step count, so that control does not bound it. The
 `T_e` result is a ratio measured the same way in every leg and does not depend on it, but **no
 energy-closure statement may be made from `mrreal` until an `_off` twin runs** — another 3.6 h.
+
+---
+
+## 2026-08-27 (late) — the `mrreal` defect, caught in the profile comparison: a propagating notch
+
+**Environment.** Analysis only, on `P4_lez_kin_mrreal` and `P4_lez_kin_mr100` plotfiles.
+`P4_lez_kin_mrreal_drift` (the corrected repeat) launched, ETA 2 h 37 m.
+
+### How it was caught
+The FLASH-vs-WarpX profile comparison looked right at `t = 0` and wrong afterwards. The
+give-away was not the temperature — 0.76× FLASH is plausible — but **`L_n` at 4.05× FLASH's
+while `mr100` sits at 1.01×**. Nothing about going to real mass should quadruple the density
+scale length.
+
+### The notch
+Local minimum in `n_e` over 0.3 < ζ < 14, and its recovery factor:
+
+| `tau_own` | `mrreal` notch | recovery | `mr100` |
+|---|---|---|---|
+| 0.00 | — | 1.0× | 1.0× |
+| 1.35 | ζ 1.73 | **25.6×** | 4.0× (outer edge) |
+| 2.70 | ζ 4.50 | **23.9×** | 1.0× |
+| 4.04 | ζ 7.66 | **5.7×** | 1.0× |
+| 5.39 | ζ 10.91 | **22.6×** | 1.2× |
+
+`ζ = 2.281·tau − 1.486`, residuals ±0.17. **A straight line — it propagates, so it is a wave,
+not noise, and `mr100` has none of it.**
+
+### The cause, and why `t = 0` looked fine
+`drift_uz_de` was held fixed from `mr100`. It is a **velocity in units of `c`** and its ramp is
+per `d_e`, so it needs `1/s` and `1/s²`; the mass-ratio recipe's held-fixed list has only `s¹`
+lengths and `s²` times and does not cover it. In the leg's own `C_S0`:
+
+| ζ | `mrreal` launched at | FLASH's corona |
+|---|---|---|
+| 2 | **22.9** `C_S0` | 0.66 |
+| 5 | **53.7** `C_S0` | 0.88 |
+| 10 | **105.1** `C_S0` | 1.11 |
+
+35–95× too fast and worsening outward, because `uzb`'s error compounds with ζ. **The `t = 0`
+density matches FLASH exactly** — it *is* the FLASH state, and a velocity error does not appear
+in the density. It appears one dump later, when that corona tears away ballistically and the
+ablation refills behind it. The notch is the gap.
+
+### Consequence
+`mrreal`'s **464.3 eV, its 11.6 % `µ^(1/3)` agreement and its 8.7 % raw-eV agreement with PSC
+are withdrawn pending `mrreal_drift`.** Its cost measurement (`s^2.489`, 3 h 35 m) does not
+depend on the IC and stands. **`mr25` and `mr400` carry the same error at 0.5× and 2.0×** — the
+`µ`-sweep's 2.3 % agreement over {100, 400} should be re-checked, since `mr400`'s drift is 2×
+too fast in its own `C_S0` and `mr25`'s is 2× too slow.
+
+### Tooling note
+`xcode_compare` now takes `--taus`, marks a row **STALE** when a leg ended before the requested
+`tau` instead of silently repeating its last dump, and summarises at the last `tau` every leg
+reaches. That silent repetition is the mechanism behind the retracted "FLASH↔kinetic benchmark
+passes" (line 3085 vs 4411) — FLASH at `tau` 27 against WarpX at `tau` 5.

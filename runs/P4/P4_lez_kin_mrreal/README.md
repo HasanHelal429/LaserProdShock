@@ -145,6 +145,33 @@ corona `s` times too fast in normalised units:
 with a corona 4.29× too fast, which is the likely cause of its anomalous plume — `L_n` 4.05×
 FLASH's and `zeta_front` 2.81×, both out of line with `mr100` *and* FLASH.
 
+**The smoking gun: a propagating density notch.** The `t = 0` profile matches FLASH because
+it *is* the FLASH state — the drift is a velocity and does not show in the density. It shows
+one dump later. Local minimum in `n_e` over 0.3 < ζ < 14, and how far it recovers after:
+
+| `tau_own` | notch at ζ | recovery | `mr100` at the same `tau_own` |
+|---|---|---|---|
+| 0.00 | — | 1.0× (monotonic) | 1.0× |
+| 1.35 | 1.73 | **25.6×** | 4.0× at ζ 12.6 (outer edge only) |
+| 2.70 | 4.50 | **23.9×** | 1.0× |
+| 4.04 | 7.66 | **5.7×** | 1.0× |
+| 5.39 | 10.91 | **22.6×** | 1.2× |
+
+The notch **propagates**: `ζ = 2.281·tau − 1.486`, residuals ±0.17 — a straight line, so a
+wave, not noise. **`mr100` shows nothing of the kind.**
+
+The cause is visible in the IC velocity. `uza + uzb·z/d_e` in the leg's own `C_S0`:
+
+| ζ | `mrreal` launches at | FLASH's corona |
+|---|---|---|
+| 2 | **22.9** `C_S0` | 0.66 |
+| 5 | **53.7** `C_S0` | 0.88 |
+| 10 | **105.1** `C_S0` | 1.11 |
+
+35–95× too fast, and *worsening outward* because `uzb`'s error compounds with ζ. That corona
+tears away ballistically, the ablation refills behind it, and the gap between them is the
+notch. It is also why `L_n` came out 4.05× FLASH's and `zeta_front` 2.81×.
+
 What survives: the run completed cleanly, the gates read as predicted, `d_e`/`dz`/`dt` are
 bit-identical to `mr100`, and the **cost** measurement (`s^2.489`, 3 h 35 m) is unaffected.
 What does not: **the 464.3 eV, the 11.6 % `µ^(1/3)` agreement, and the 8.7 % raw-eV agreement
