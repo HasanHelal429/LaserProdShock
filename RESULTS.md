@@ -32,6 +32,11 @@ Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` =
 | FLASH | 0.870 ⚠ | 647 eV | 750 | 0.86 |
 | PSC `run_ourflash_511keV` | 0.475 (⟨f⟩ 0.583) | 508.8 eV @ 99.66 ps | 501 | **1.02** |
 | WarpX `P4_lez_kin_mr100` | 0.350 (⟨f⟩ 0.364) | 157.7 eV | 155 | **1.02** |
+| **WarpX `P4_lez_kin_mrreal`** — real `m_i` AND real `m_e`, no transform | 0.793 (⟨f⟩ 0.623) | **464.3 eV** | 707 | 0.66 |
+
+**Raw eV, no normalisation, all on a real Al ion:** FLASH 647.0 · PSC 508.8 · WarpX `mrreal`
+464.3. WarpX/PSC = **0.913** (8.7 %), both 21–28 % below FLASH. `mrreal` is the only leg for
+which that comparison is meaningful.
 
 ⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
 PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.
@@ -51,10 +56,24 @@ heavier and keeps a REAL aluminium ion; WarpX makes the ION 18.2× lighter and k
 electron. Only the ion mass sets `C_S` and the Manheimer steady state, so the whole 3× plume
 gap is that one row. Measured against its own steady state no code is anomalous.
 
-**`µ^(1/3)` is confirmed in WarpX** — `m_p/m_e` 100 → 400 gives `T_e` ×1.551 against the
-predicted 1.587, 2.3 % apart on a 13.5 % noise floor. **PSC shows no `µ` factor and should
-not**: its ion is real Al at *every* `ReducedMassRatio`, so its "µ-sweep" is an electron-mass
-sweep. **The reduced-`c` null is doubly confirmed** (`T_e` 516.1 at 60 keV vs 508.8 at
+**`µ^(1/3)` is confirmed in WarpX all the way to real mass (2026-08-27).** The sweep now
+reads mr25/mr100/mr400/**mrreal** = 126.7 / 157.7 / 244.6 / **464.3 eV**; `µ^(1/3)` from
+mr100 predicts 416.0 for the real-mass leg against 464.3 measured, **11.6 % on a 13.5 %
+floor**. Nothing extrapolates any more.
+
+⚠ **PSC's `T_e` is NOT `ReducedMassRatio`-invariant — an earlier claim here, refuted
+2026-08-27.** PSC's *ion* is real Al at every RMR (the ratio cancels in `MMi1·K_mass`), so its
+RMR knob is an **electron-mass** knob — but `T_e` still moves: **508.8 → 392.6 eV, 0.772×**,
+going RMR 100 → 25 at *fixed physical* `dz`, fitting `T_e ∝ m_e^(-0.187)`. A resolution
+control came back null (1.8 %). Note also that an RMR sweep does **not** hold collisionality
+fixed: `nudt0` is `ν·dt` in *code* units and `dt_phys ∝ 1/RMR`, so RMR 100 is **4.0× more
+collisional per unit physical time** than RMR 25 — electron mass and collisionality move
+together and this pair cannot separate them.
+
+**Consequence: PSC's RMR = 100 leg is not a converged reference.** Extrapolating
+`m_e^(-0.187)` to a real electron would put it near 876 eV (two points and a confound — an
+estimate, not a result). So the raw-eV agreement below is between a fully real WarpX leg and a
+partly reduced PSC one. **The reduced-`c` null is doubly confirmed** (`T_e` 516.1 at 60 keV vs 508.8 at
 511 keV, 1.4 %; and the 511 keV leg is also 72.5× less collisional, so the null covers two
 variables at once).
 
@@ -130,7 +149,7 @@ Read as: *claim (line asserted → line overturned) → what is true now.*
 Ambient drain before `P2_mag` (343, 468) · H5 finite-spot coupling (1101) · H1′ exponent and the 1D intensity ladder (2344) · the refracting near-critical layer, "the weakest number in the operator" (2203) · `P1_vac_2d_off` never re-run post-clamp (1375) · the sharp-edge guard is not yet a CTest (2093).
 
 **Resolved but never marked closed** — do not re-litigate
-- "PSC shows no `µ^(1/3)` ⇒ run a PSC mass-ratio scan" (5798) → answered analytically at 5811 and 5937: PSC's ion is real Al at every RMR.
+- ~~"PSC shows no `µ^(1/3)` ⇒ run a PSC mass-ratio scan" (5798) → answered analytically~~ — **this was wrong and the scan was worth running.** PSC's ion being real Al at every RMR is true and means its RMR knob is an electron-mass knob, but `T_e` moves anyway (0.772× over 4×). See 2026-08-27 (evening).
 - "A residual 1.57×" (5796) → see ledger 27.
 - "The FLASH↔kinetic benchmark passes" (3085) → see ledger 15.
 - "`T_e` shape cannot be quoted until D3-AppC runs" (3390) → resolved at 4133; D3-AppC is still open but for the *ablation rate*, a different question.

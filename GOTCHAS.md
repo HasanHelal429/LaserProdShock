@@ -484,8 +484,15 @@ Added 2026-08-27. Every one of these has already produced a wrong number in `RES
   dumps **8.52× too cold on a clock 2.92× too slow, silently and with no error.**
 - **PSC's ion is REAL aluminium at every `ReducedMassRatio`** — `MMi1·K_mass` =
   `26.9815·hydr_mass_phys`, the ratio cancels (`:212`, `:164`). So a PSC "µ-sweep" is an
-  **electron**-mass sweep at fixed real ion, and PSC's plume `T_e` is *expected* to be
-  RMR-invariant. That is why PSC "shows no `µ^(1/3)`" — not a code difference, a different knob.
+  **electron**-mass sweep at fixed real ion — so PSC shows no `µ^(1/3)` because there is no ion
+  mass moving, not because it disagrees with WarpX. **But its `T_e` is NOT RMR-invariant**
+  (measured 2026-08-27): 508.8 → 392.6 eV, `0.772×`, over RMR 100 → 25 at fixed physical `dz`,
+  i.e. `T_e ∝ m_e^(-0.187)`. A resolution control came back null at 1.8 %. **PSC's RMR = 100
+  leg is therefore not a converged reference for a real electron.**
+- **A PSC RMR sweep does NOT hold collisionality fixed, even though `nudt0` prints the same
+  number.** `nudt0` is `ν·dt` in **code** units, so the physical rate is `nudt0/dt_phys`, and
+  `dt_phys ∝ 1/RMR`. RMR 100 is **4.0× more collisional per unit physical time** than RMR 25
+  (1.325e7 vs 3.314e6 s⁻¹). Electron mass and collisionality move together on that knob.
 - **PSC's COLLISION lnΛ is a global 8.275, not the per-cell NRL.** The per-cell NRL formula
   (`get_lnlambda`, `PIC_part_heating.F90:882`) belongs to the **laser** operator only;
   `INIT_param.f:584` sets `lnlambda = 23 − ln(√n_cr·Z_eff/T^1.5)` once at `n_cr` and 3000 eV,
