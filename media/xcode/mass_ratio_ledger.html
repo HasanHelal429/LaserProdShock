@@ -1,0 +1,284 @@
+<title>Reduced Mass Ratio Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#F5F7F9; --surface:#FFFFFF; --sunk:#EBEFF3;
+  --ink:#12181D; --ink-2:#3D4C57; --ink-3:#77878F;
+  --rule:#DBE2E8; --rule-2:#C0CBD4;
+  --accent:#1F5F8B; --accent-soft:#E4EDF4;
+  --keep:#1B7A55; --keep-bg:#E3F2EA;
+  --bend:#8A6100; --bend-bg:#F8EFDA;
+  --break:#A83A26; --break-bg:#FAE7E2;
+  --shadow:0 1px 2px rgba(18,24,29,.05),0 10px 28px -14px rgba(18,24,29,.2);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0B1013; --surface:#141C21; --sunk:#101619;
+  --ink:#E6ECF0; --ink-2:#A6B6C0; --ink-3:#71838D;
+  --rule:#222E35; --rule-2:#2F3E47;
+  --accent:#5BA7D6; --accent-soft:#122B3A;
+  --keep:#63C99B; --keep-bg:#0F2A1F;
+  --bend:#DCB264; --bend-bg:#2A2114;
+  --break:#F08C74; --break-bg:#2E1913;
+  --shadow:0 1px 2px rgba(0,0,0,.45),0 10px 28px -14px rgba(0,0,0,.65);
+}}
+:root[data-theme="dark"]{
+  --ground:#0B1013; --surface:#141C21; --sunk:#101619;
+  --ink:#E6ECF0; --ink-2:#A6B6C0; --ink-3:#71838D;
+  --rule:#222E35; --rule-2:#2F3E47;
+  --accent:#5BA7D6; --accent-soft:#122B3A;
+  --keep:#63C99B; --keep-bg:#0F2A1F;
+  --bend:#DCB264; --bend-bg:#2A2114;
+  --break:#F08C74; --break-bg:#2E1913;
+  --shadow:0 1px 2px rgba(0,0,0,.45),0 10px 28px -14px rgba(0,0,0,.65);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;font-size:15px;
+  line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:44px 22px 92px;display:flex;flex-direction:column;gap:40px}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin:0 0 12px}
+h1{font-family:Spectral,Georgia,serif;font-weight:600;font-size:clamp(29px,4.4vw,43px);
+  line-height:1.12;margin:0 0 16px;text-wrap:balance;letter-spacing:-.012em}
+h2{font-family:Spectral,Georgia,serif;font-weight:600;font-size:23px;margin:0 0 6px;
+  letter-spacing:-.005em;text-wrap:balance}
+.lede{font-family:Spectral,Georgia,serif;font-size:clamp(16px,2vw,19px);line-height:1.62;
+  color:var(--ink-2);max-width:64ch;margin:0}
+.lede em{color:var(--ink);font-style:italic}
+section{display:flex;flex-direction:column;gap:16px}
+.sub{color:var(--ink-2);max-width:70ch;margin:0}
+
+/* verdict */
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.v{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:20px 22px;
+  box-shadow:var(--shadow);display:flex;flex-direction:column;gap:9px;border-top:3px solid var(--accent)}
+.v .dim{font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.v .call{font-family:Spectral,Georgia,serif;font-size:22px;font-weight:600;line-height:1.25}
+.v.no{border-top-color:var(--break)} .v.no .call{color:var(--break)}
+.v.yes{border-top-color:var(--bend)} .v.yes .call{color:var(--bend)}
+.v p{margin:0;font-size:13.5px;color:var(--ink-2)}
+
+/* ledger */
+.ledger{display:flex;flex-direction:column;gap:10px}
+.row{background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  display:grid;grid-template-columns:118px 1fr;gap:0;overflow:hidden}
+.row .exp{background:var(--sunk);padding:15px 12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;border-right:1px solid var(--rule)}
+.row .exp b{font-family:"IBM Plex Mono",monospace;font-size:19px;font-weight:600;
+  font-variant-numeric:tabular-nums;line-height:1}
+.row .exp span{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.row .body{padding:14px 18px;display:flex;flex-direction:column;gap:5px}
+.row .name{font-weight:600;font-size:14.5px}
+.row .name .tag{display:inline-block;font-family:"IBM Plex Sans",sans-serif;font-size:10px;
+  font-weight:600;letter-spacing:.08em;padding:2px 8px;border-radius:2px;margin-left:9px;
+  border:1px solid currentColor;vertical-align:1px}
+.row .why{margin:0;font-size:13px;color:var(--ink-2)}
+.k .exp b{color:var(--keep)} .k .tag{color:var(--keep);background:var(--keep-bg)}
+.b .exp b{color:var(--bend)} .b .tag{color:var(--bend);background:var(--bend-bg)}
+.x .exp b{color:var(--break)} .x .tag{color:var(--break);background:var(--break-bg)}
+
+/* the fork */
+.fork{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}
+.opt{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:19px 21px;
+  display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.opt h3{margin:0;font-size:15px;font-weight:600}
+.opt .gain,.opt .loss{font-size:13px;margin:0;padding-left:19px;position:relative;color:var(--ink-2)}
+.opt .gain::before{content:"keeps";position:absolute;left:0;top:0;font-family:"IBM Plex Mono",monospace;
+  font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--keep);font-weight:600}
+.opt .loss::before{content:"costs";position:absolute;left:0;top:0;font-family:"IBM Plex Mono",monospace;
+  font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--break);font-weight:600}
+.opt .gain,.opt .loss{padding-left:0;padding-top:15px}
+.opt .verdict{margin:2px 0 0;font-size:12.5px;color:var(--ink-3);border-top:1px solid var(--rule);padding-top:10px}
+
+/* tables */
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:3px;
+  box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px}
+thead th{background:var(--sunk);color:var(--ink-2);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;font-weight:600;text-align:left;padding:11px 14px;
+  border-bottom:1px solid var(--rule-2);white-space:nowrap}
+tbody th,tbody td{padding:10px 14px;border-bottom:1px solid var(--rule);text-align:left;
+  vertical-align:top}
+tbody th{font-weight:500}
+tbody td{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-variant-numeric:tabular-nums}
+tbody tr:last-child th,tbody tr:last-child td{border-bottom:none}
+tr.hi th,tr.hi td{background:var(--accent-soft)}
+tr.hi td{font-weight:600}
+.note{font-size:12.5px;color:var(--ink-3);margin:0;max-width:74ch}
+
+/* recipe */
+.recipe{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:3px;padding:20px 24px;display:flex;flex-direction:column;gap:13px}
+.recipe ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:9px}
+.recipe li{font-size:13.5px;color:var(--ink-2)}
+.recipe li b{color:var(--ink)}
+.callout{background:var(--break-bg);border:1px solid var(--break);border-left-width:3px;
+  border-radius:3px;padding:17px 20px}
+.callout p{margin:0;font-size:13.5px;color:var(--ink)}
+.callout b{color:var(--break)}
+.foot{border-top:1px solid var(--rule);padding-top:18px;color:var(--ink-3);font-size:12.5px;
+  display:flex;flex-direction:column;gap:5px}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">LaserProdShock &middot; Phase 4 &middot; methods</p>
+  <h1>What survives a reduced ion mass ratio</h1>
+  <p class="lede">Measured across a 73&times; range in ion mass &mdash; <em>m<sub>p</sub>/m<sub>e</sub></em> = 25, 100, 400 and real &mdash; on one laser-ablation problem in WarpX. Every exponent below is fitted to four runs, not assumed from the algebra.</p>
+</header>
+
+<section>
+  <div class="verdicts">
+    <div class="v no">
+      <div class="dim">in 1D</div>
+      <div class="call">Don&rsquo;t reduce.</div>
+      <p>Real mass is <b>3.7&nbsp;h</b> on one RTX&nbsp;4070 &mdash; 39&times; the <code>m_p/m_e</code>&nbsp;=&nbsp;100 leg. The reduction saves under four hours and costs you the absorbed fraction.</p>
+    </div>
+    <div class="v yes">
+      <div class="dim">in 2D</div>
+      <div class="call">You have no choice.</div>
+      <p>Cost goes as <code>&mu;&sup2;</code> instead of <code>&mu;<sup>1.5</sup></code>, so the same run at real mass is <b>~1300&nbsp;h</b>. The question becomes <em>which convention</em>, not whether.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The ledger</h2>
+  <p class="sub">&mu; = <em>m</em><sub>i,leg</sub> / <em>m</em><sub>i,real</sub>. Exponents are least-squares fits in log&nbsp;&mu; over the four legs; scatter is the residual spread.</p>
+
+  <div class="ledger">
+
+    <div class="row k">
+      <div class="exp"><b>&mu;<sup>0</sup></b><span>exact</span></div>
+      <div class="body">
+        <div class="name">Every numerical parameter<span class="tag">preserved</span></div>
+        <p class="why"><code>dz</code> = 8.467e&minus;08&nbsp;m, <code>dt</code> = 9.885e&minus;17&nbsp;s, <code>&omega;_pe&middot;dt</code> = 0.783, <code>dz/&lambda;_D</code> = 58.1 &mdash; <b>bit-identical in all four legs.</b> They are set by the <em>electron</em>, which no leg touches. Reducing the ion mass buys nothing in resolution; the entire saving is fewer cells &times; fewer steps.</p>
+      </div>
+    </div>
+
+    <div class="row k">
+      <div class="exp"><b>&mu;<sup>0</sup></b><span>8% scatter</span></div>
+      <div class="body">
+        <div class="name">T<sub>e</sub> against its own steady state<span class="tag">preserved</span></div>
+        <p class="why"><code>T_e / (823&middot;&mu;^(1/3))</code> = 0.645 / 0.506 / 0.494 / 0.535 across the sweep. Flat to 8&nbsp;% once you drop the most extreme leg. <b>This is the quantity to compare, never raw eV.</b></p>
+      </div>
+    </div>
+
+    <div class="row b">
+      <div class="exp"><b>&mu;<sup>0.293</sup></b><span>theory ⅓</span></div>
+      <div class="body">
+        <div class="name">Plume T<sub>e</sub> in raw eV<span class="tag">rescales</span></div>
+        <p class="why">126.7 / 157.7 / 244.6 / 440.2&nbsp;eV. Manheimer&rsquo;s steady state carries <code>&mu;^(1/3)</code>, and the measured 0.293 sits 12&nbsp;% from it over a 73&times; mass range. Extrapolating the reduced legs to real mass predicts 416&nbsp;eV against 440 measured &mdash; <b>5.8&nbsp;%, inside the 13.5&nbsp;% noise floor.</b></p>
+      </div>
+    </div>
+
+    <div class="row x">
+      <div class="exp"><b>&mu;<sup>0.454</sup></b><span>theory 0</span></div>
+      <div class="body">
+        <div class="name">Optical depth, and therefore absorption<span class="tag">broken</span></div>
+        <p class="why">The similarity transform is supposed to leave <code>&int;K dz</code> invariant: <code>K &prop; T^(&minus;3/2)</code> falls as <code>&mu;^(&minus;1/2)</code> exactly as the path <code>L &prop; d_i0</code> grows as <code>&mu;^(1/2)</code>. It does not, because that cancellation needs <em>T</em> scaled by <code>&mu;^(1/3)</code> too. Pin the handoff in raw eV instead and <code>K</code> stops moving, leaving <code>&tau;_abs &prop; &mu;^(1/2)</code>. Measured 0.454. <b>f<sub>abs</sub> ran 0.220 &rarr; 0.840 across the sweep.</b></p>
+      </div>
+    </div>
+
+    <div class="row x">
+      <div class="exp"><b>&mu;<sup>1/6</sup></b><span>analytic</span></div>
+      <div class="body">
+        <div class="name">Collisionality relative to scale<span class="tag">irreducible</span></div>
+        <p class="why"><code>&lambda;_ei &prop; T&sup2;/(n&thinsp;ln&Lambda;)</code> is <em>mass-independent</em>, while <code>L &prop; &mu;^(1/2)</code>. So <code>&lambda;_ei/L &prop; &mu;^(1/6)</code> &mdash; at <code>m_p/m_e</code>&nbsp;=&nbsp;100 the plasma is <b>1.62&times; more collisional relative to its own scale</b> than the real one. No handoff convention fixes this; only more mass does.</p>
+      </div>
+    </div>
+
+    <div class="row x">
+      <div class="exp"><b>&mu;<sup>&minus;1/2</sup></b><span>a trap</span></div>
+      <div class="body">
+        <div class="name">Every velocity in the initial condition<span class="tag">easy to miss</span></div>
+        <p class="why">Holding <code>v/C_S0</code> fixed means the <em>physical</em> velocity scales as <code>&mu;^(&minus;1/2)</code>. The run READMEs list <code>drift_uz_de</code> under &ldquo;held fixed by design&rdquo; and it is neither an <code>s&sup1;</code> length nor an <code>s&sup2;</code> time. Held fixed, the real-mass leg started its corona <b>4.29&times; too fast</b> and opened a density notch propagating at 2.28&nbsp;<code>C_S0</code>.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <h2>The fork you cannot avoid</h2>
+  <p class="sub">Both branches are defensible. They answer different questions, and mixing them is what produced the &mu;<sup>0.454</sup> above.</p>
+  <div class="fork">
+    <div class="opt">
+      <h3>Hand off the real state, in raw eV</h3>
+      <p class="gain">The initial condition <em>is</em> the rad-hydro state. Temperatures are directly comparable to FLASH in eV, which is what a cross-code benchmark needs.</p>
+      <p class="loss">Optical depth goes as <code>&mu;^(1/2)</code>. At <code>m_p/m_e</code>&nbsp;=&nbsp;100 the leg absorbs <b>4.3&times; less</b> than the real problem, and no post-hoc <code>f_abs^(2/3)</code> correction repairs it &mdash; applied across the sweep that correction makes the scatter worse, not better.</p>
+      <p class="verdict">What this project did. Right for benchmarking, wrong for physics at low &mu;.</p>
+    </div>
+    <div class="opt">
+      <h3>Transfer everything in similarity units</h3>
+      <p class="gain">Scale the handoff temperature by <code>&mu;^(1/3)</code> as well, and <code>&int;K dz</code> is genuinely invariant. Absorption, <code>T_e/T_ss</code> and the flow all transfer.</p>
+      <p class="loss">The initial condition is no longer the state any other code computed, so raw-eV comparison to FLASH becomes meaningless. You are simulating the reduced-mass <em>analogue</em> of the problem, not the problem.</p>
+      <p class="verdict">Right when the reduced run must stand on its own &mdash; a 2D campaign, a parameter sweep.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><b>The one thing you cannot do is mix them.</b> Normalised lengths and times with a raw-eV temperature is exactly the combination that suppresses <code>&kappa;</code> by <code>&mu;^(&minus;1/2)</code> and under-drives the run. If the temperature is not on the same footing as the lengths, the transform is not a transform.</p>
+  </div>
+</section>
+
+<section>
+  <h2>How far you can reduce, and what it saves</h2>
+  <div class="tw">
+    <table>
+      <thead>
+        <tr><th>m<sub>p</sub>/m<sub>e</sub></th><th>&mu;</th><th>&tau;<sub>abs</sub> error<br><span style="font-weight:400;text-transform:none;letter-spacing:0">raw-eV handoff</span></th><th>&lambda;<sub>ei</sub>/L error<br><span style="font-weight:400;text-transform:none;letter-spacing:0">either handoff</span></th><th>1D cost</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>25</th><td>0.014</td><td>7.6&times;</td><td>2.05&times;</td><td>0.17&times;</td></tr>
+        <tr><th>100</th><td>0.054</td><td>4.3&times;</td><td>1.62&times;</td><td>1&times; &middot; 5.8 min</td></tr>
+        <tr><th>400</th><td>0.218</td><td>2.1&times;</td><td>1.29&times;</td><td>5.7&times; &middot; 33 min</td></tr>
+        <tr><th>1229</th><td>0.669</td><td>1.20&times;</td><td>1.07&times;</td><td>23&times; &middot; 2.2 h</td></tr>
+        <tr class="hi"><th>1836 (real)</th><td>1.000</td><td>1.00&times;</td><td>1.00&times;</td><td>39&times; &middot; 3.7 h</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Cost measured, not modelled: 58.4&nbsp;s / 345&nbsp;s / 2009&nbsp;s / 12&nbsp;910&nbsp;s on one RTX&nbsp;4070, fitting <code>&mu;^1.258</code> against an ideal <code>&mu;^1.5</code> &mdash; the GPU is underused below ~10k cells, so treat 1.258 as a floor. In 2D the transverse extent scales too and the exponent becomes <code>&mu;&sup2;</code>.</p>
+</section>
+
+<section>
+  <h2>If you do reduce, the recipe</h2>
+  <div class="recipe">
+    <ol>
+      <li><b>s&sup1; on every length quoted in <code>d_e</code></b> &mdash; target thickness, centre, corona scale length and offset, domain bounds, <code>max_grid_size</code>. <code>s = &radic;(mr/2698)</code>.</li>
+      <li><b>s&sup2; on times and step counts</b> &mdash; <code>mass_ratio</code>, <code>max_step</code>, the laser profile interval and all four diagnostic intervals.</li>
+      <li><b>1/s on velocities, 1/s&sup2; on velocity <em>ramps</em></b> quoted per <code>d_e</code>. This family is missing from the run READMEs and is the one that bit us.</li>
+      <li><b>&mu;<sup>1/3</sup> on the handoff temperature</b> &mdash; only if you took the similarity branch above. Skipping it is what breaks the optical depth.</li>
+      <li><b>Leave <code>dz</code>, <code>dt</code>, <code>cfl</code>, <code>ppc</code> and <code>&lambda;_D</code> alone.</b> They belong to the electron and are already right.</li>
+      <li><b>Check three things before believing the run:</b> <code>uza/C_S0</code> against the rad-hydro corona&rsquo;s 0.548, and <code>&zeta;_cr</code> and <code>L_n</code> against it too. The temperature is <em>not</em> a sensitive tell &mdash; the bad leg&rsquo;s <code>T_e</code> was off by 5&nbsp;% while its <code>L_n</code> was off by 4&times;.</li>
+      <li><b>Keep the domain divisible by <code>blocking_factor</code> 8</b> and reset <code>max_grid_size</code> to match, or a 1D GPU run loses 7.9&times;.</li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>What the corrected real-mass leg says about the codes</h2>
+  <div class="tw">
+    <table>
+      <thead><tr><th>code</th><th>ion</th><th>plume T<sub>e</sub></th><th>&lang;f<sub>abs</sub>&rang;</th><th>vs FLASH</th></tr></thead>
+      <tbody>
+        <tr><th>FLASH (rad-hydro)</th><td>real Al</td><td>647.0 eV</td><td>0.870</td><td>&mdash;</td></tr>
+        <tr><th>PSC</th><td>real Al</td><td>508.8 eV</td><td>0.583</td><td>0.79&times;</td></tr>
+        <tr class="hi"><th>WarpX, real mass</th><td>real Al</td><td>440.2 eV</td><td>0.840</td><td>0.69&times;</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">WarpX&rsquo;s absorbed fraction lands within 3.4&nbsp;% of FLASH&rsquo;s, so that pair is very nearly a matched-<code>f_abs</code> comparison needing no correction &mdash; with the critical surface at 1.03&times; and the density scale length at 0.81&times;. PSC&rsquo;s 0.583 is <em>not</em> matched to either, so its 0.79&times; is not a like-for-like number.</p>
+</section>
+
+<footer class="foot">
+  <div>Four WarpX legs, <code>P4_lez_kin_mr{25,100,400}</code> and <code>P4_lez_kin_mrreal_drift</code>, all at <code>&tau;_own</code> = 5.39, plume band 0.05 &lt; <code>n_e/n_cr</code> &lt; 1, n-weighted, each on its own &zeta;.</div>
+  <div>Noise floor 13.5&nbsp;%, measured from a same-config repeat &mdash; CUDA is not run-to-run reproducible. Treat any single-leg difference below ~15&nbsp;% as noise.</div>
+  <div>Full derivations and the retraction history in <code>RESULTS.md</code>; the operating rules in <code>GOTCHAS.md</code>, &ldquo;Cross-code comparison&rdquo;.</div>
+</footer>
+
+</div>

@@ -6562,3 +6562,62 @@ comparable and any statement about it needs the floor treatment first.
 - **G3/G6 on both real-mass legs.** No `_off` control exists at this mass ratio and duration;
   grid heating scales with step count and these run 18.4× more steps than `mr100`. No
   energy-closure statement from either leg until an `_off` twin runs (~4 h).
+
+---
+
+## 2026-08-28 (synthesis) — what the reduced mass ratio preserves, rescales and breaks
+
+**Environment.** No new run. Fits over the four completed legs `P4_lez_kin_mr{25,100,400}` and
+`P4_lez_kin_mrreal_drift`, all at `tau_own` 5.39, `mu` spanning 73×.
+
+**Shareable version:** `media/xcode/mass_ratio_ledger.html` (tracked; hand-written, not
+regenerable by a script).
+
+### Measured exponents in `mu` = `m_i,leg / m_i,real`
+
+| quantity | measured | theory | scatter |
+|---|---|---|---|
+| `dz`, `dt`, `omega_pe*dt`, `dz/lambda_D` | **`mu^0` exactly** | `mu^0` | bit-identical |
+| `T_e / (823 mu^(1/3))` | **`mu^0`** (0.645/0.506/0.494/0.535) | `mu^0` | 8 % |
+| plume `T_e` raw eV | **`mu^0.293`** | `mu^(1/3)` | 8.3 % |
+| optical depth `-ln(1-f)/2` | **`mu^0.454`** | **`mu^0`** | 8.7 % |
+| `lambda_ei/L` | `mu^(1/6)` (analytic) | — | — |
+| IC velocities | `mu^(-1/2)` (analytic) | — | — |
+| wall time, 1D | **`mu^1.258`** | `mu^1.5` | GPU underused |
+
+### The finding that matters
+**Optical depth is NOT preserved, and the reason is the handoff convention.** The similarity
+cancellation `K ∝ T^(-3/2) ∝ mu^(-1/2)` against `L ∝ mu^(1/2)` requires `T` scaled by
+`mu^(1/3)`. Pin the handoff in **raw eV** — which this project does, so the IC is FLASH's
+actual state — and `K` stops moving, leaving `tau_abs ∝ mu^(1/2)`. Measured 0.454, to 9 %.
+`f_abs` ran **0.220 → 0.840** across the sweep. At `m_p/m_e` = 100 the leg absorbs **4.3× less**
+than the real problem.
+
+It is the IC and not the steady state that wins because these runs reach 5.39 `tau_own` and
+never reach quasi-steady ablation (2026-08-18) — absorption is a transient set by the handoff.
+
+**The fork:** hand off the real state in raw eV (comparable to FLASH in eV, absorption wrong by
+`mu^(1/2)`) **or** transfer everything in similarity units including `T ∝ mu^(1/3)` (absorption
+preserved, raw-eV comparison meaningless). **Mixing them is what produces the `mu^0.454`.**
+
+### The cost argument, and why it splits by dimensionality
+`d_e`, `dz` and `dt` are set by the **electron**, which no leg changes — measured bit-identical
+across all four. So reducing `m_i` buys nothing in resolution; the whole saving is a smaller
+domain (`∝ mu^(1/2)`) and a shorter duration (`∝ mu`).
+
+- **1D: real mass is 39× `mr100` = 3.7 h.** The reduction saves under four hours and costs the
+  absorbed fraction. **Don't reduce.**
+- **2D: the transverse extent scales too, giving `mu^2` ≈ 340×**, so the same run is ~1300 h.
+  **The reduction is unavoidable and the question is which convention.**
+
+### Practical tolerances (raw-eV handoff)
+`tau_abs` within 20 % needs `m_p/m_e` > 1229 (2.2 h in 1D); within 10 %, > 1488.
+`lambda_ei/L` within 20 % needs > 615, within 10 % > 1036 — and no convention fixes that one.
+
+### The recipe, corrected
+`s¹` on `d_e`-quoted lengths · `s²` on times and step counts · **`1/s` on velocities and
+`1/s²` on velocity ramps quoted per `d_e`** (the family missing from the run READMEs) ·
+`mu^(1/3)` on the handoff temperature *only* on the similarity branch · leave `dz`, `dt`,
+`cfl`, `ppc` alone. **Check `uza/C_S0` against 0.548, and `zeta_cr` and `L_n` against FLASH —
+the temperature is not a sensitive tell**: the defective leg's `T_e` was off 5 % while its
+`L_n` was off 4×.
