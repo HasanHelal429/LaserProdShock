@@ -65,10 +65,15 @@ heavier and keeps a REAL aluminium ion; WarpX makes the ION 18.2× lighter and k
 electron. Only the ion mass sets `C_S` and the Manheimer steady state, so the whole 3× plume
 gap is that one row. Measured against its own steady state no code is anomalous.
 
-**`µ^(1/3)` is confirmed in WarpX all the way to real mass (2026-08-27).** The sweep now
-reads mr25/mr100/mr400/**mrreal** = 126.7 / 157.7 / 244.6 / **464.3 eV**; `µ^(1/3)` from
-mr100 predicts 416.0 for the real-mass leg against 464.3 measured, **11.6 % on a 13.5 %
-floor**. Nothing extrapolates any more.
+**`µ^(1/3)` is confirmed to 3.3 % across a 73× mass range (2026-08-28, all four legs on the
+corrected IC drift).** The sweep reads mr25/mr100/mr400/mrreal = **113.9 / 157.7 / 271.0 /
+440.2 eV**, fitting **`µ^0.322`** against the predicted 0.333, scatter **4.5 %**.
+`T_e/T_ss(own µ)` = 0.580 / 0.506 / 0.547 / 0.535, a 1.15× spread inside the 13.5 % floor.
+Nothing extrapolates any more.
+
+**Optical depth is NOT preserved, and the handoff convention fully explains it.** Fitted
+**`µ^0.490`** against the `µ^(1/2)` a raw-eV handoff predicts — 2 % — with 4.6 % scatter.
+`⟨f_abs⟩` ran 0.205 → 0.364 → 0.624 → 0.840. See `HANDOFF.md` §7.4.
 
 ⚠ **PSC's `T_e` is NOT `ReducedMassRatio`-invariant — an earlier claim here, refuted
 2026-08-27.** PSC's *ion* is real Al at every RMR (the ratio cancels in `MMi1·K_mass`), so its

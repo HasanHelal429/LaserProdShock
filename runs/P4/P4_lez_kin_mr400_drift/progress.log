@@ -6,3 +6,10 @@
 2026-08-28T14:19:38 | 92791/442368 (21.0%) | 0h08m | 0.0055 s/step(wall) | 0.0052 s/step(warpx) | ETA ~0h32m | x1.07 | load 21.6 | laser 0.422 of peak, Eabs 4.508e+05 J
 2026-08-28T14:23:39 | 136620/442368 (30.9%) | 0h12m | 0.0055 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h28m | x1.05 | load 17.7 | laser 0.487 of peak, Eabs 6.77e+05 J
 2026-08-28T14:27:41 | 180900/442368 (40.9%) | 0h16m | 0.0055 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h23m | x1.03 | load 17.4 | laser 0.612 of peak, Eabs 9.276e+05 J
+2026-08-28T14:31:43 | 225580/442368 (51.0%) | 0h20m | 0.0054 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h19m | x1.02 | load 17.1 | laser 0.660 of peak, Eabs 1.213e+06 J
+2026-08-28T14:35:16 | 266121/442368 (60.2%) | 0h23m | 0.0052 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h15m | x0.99 | load 17.5 | laser 0.654 of peak, Eabs 1.482e+06 J
+2026-08-28T14:39:19 | 314400/442368 (71.1%) | 0h27m | 0.0050 s/step(wall) | 0.0053 s/step(warpx) | ETA ~0h10m | x0.96 | load 17.2 | laser 0.785 of peak, Eabs 1.811e+06 J
+2026-08-28T14:42:52 | 358190/442368 (81.0%) | 0h31m | 0.0049 s/step(wall) | 0.0052 s/step(warpx) | ETA ~0h06m | x0.93 | load 17.2 | laser 0.730 of peak, Eabs 2.118e+06 J
+2026-08-28T14:46:26 | 403522/442368 (91.2%) | 0h34m | 0.0047 s/step(wall) | 0.0052 s/step(warpx) | ETA ~0h03m | x0.91 | load 17.1 | laser 0.744 of peak, Eabs 2.439e+06 J
+2026-08-28T14:49:29 | 442368/442368 (100.0%) | 0h37m | 0.0047 s/step(wall) | 0.0051 s/step(warpx) | ETA ~0h00m | x0.92 | load 17.3 | laser 0.744 of peak, Eabs 2.73e+06 J
+DONE 2026-08-28T14:49:29 | 442368/442368 (100.0%) | total wall 0h37m | mean 0.0051 s/step(wall) | reached max_step

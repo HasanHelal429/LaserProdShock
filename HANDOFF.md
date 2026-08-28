@@ -192,6 +192,11 @@ accident — `1.5271e-3` was chosen against *its* `C_S0`.
 | `mr400` | 1.096 (2× too fast) | 0.548 |
 | `mrreal` | 2.349 (4.29× too fast) | 0.548 |
 
+All four legs have now been re-run on the corrected drift, and both fitted exponents moved
+*toward* their theories while the scatter nearly halved — `T_e` `µ^0.293 → µ^0.322` (theory
+0.333) and optical depth `µ^0.454 → µ^0.490` (theory 0.500), scatter 8.3 % → 4.5 %. The drift
+error was adding real scatter to the sweep, and removing it sharpens both results.
+
 The temperature is **not** a sensitive tell for this bug: the broken real-mass leg's `T_e` was
 off by 5 % while its density scale length was off by **4×**. Check the geometry — `ζ_cr` and
 `L_n` against FLASH — not the temperature.
@@ -218,12 +223,12 @@ Measured across the sweep, all at `τ_own` = 5.39:
 |---|---|---|---|
 | `mr25_drift` | 0.0136 | 113.9 eV | 0.580 |
 | `mr100` | 0.0545 | 157.7 eV | 0.506 |
-| `mr400` | 0.218 | 244.6 eV | 0.494 |
+| `mr400_drift` | 0.218 | 271.0 eV | 0.547 |
 | `mrreal_drift` | 1.000 | **440.2 eV** | 0.535 |
 | FLASH | 1.000 | 647.0 eV | 0.786 |
 
-Fitted, `T_e ∝ µ^0.293` against the predicted `µ^(1/3)` — 12 % over a 73× mass range, inside
-the 13.5 % noise floor. **So compare `T_e/T_ss(own µ)`, never raw eV.** The remaining
+Fitted over all four corrected legs, `T_e ∝ µ^0.322` against the predicted `µ^(1/3)` = 0.333 —
+**3.3 % over a 73× mass range**, with 4.5 % scatter. **So compare `T_e/T_ss(own µ)`, never raw eV.** The remaining
 WarpX↔FLASH gap, 0.69×, is a real code difference and is discussed in §8.
 
 ### 7.2 The ablation sound speed — and the trap in it
@@ -280,10 +285,10 @@ tau_abs = int K dz ,   K ~ n^2 Z lnLambda T^(-3/2) ,   L ~ d_i0 ~ mu^(1/2)
 The handoff (§5) pins `T` in **raw eV**. So `K` does not move, `L` does, and
 
 ```
-tau_abs  ~  mu^(1/2)          measured: mu^0.454, 9% scatter
+tau_abs  ~  mu^(1/2)          measured: mu^0.490, 4.6% scatter  -- 2% from the prediction
 ```
 
-Measured `⟨f_abs⟩` across the sweep: **0.205 → 0.364 → 0.515 → 0.840**. At `m_p/m_e` = 100 the
+Measured `⟨f_abs⟩` across the sweep: **0.205 → 0.364 → 0.624 → 0.840**. At `m_p/m_e` = 100 the
 leg absorbs roughly **4.3× less** than the real problem.
 
 The reason the initial condition wins over the steady state is that these runs reach only
