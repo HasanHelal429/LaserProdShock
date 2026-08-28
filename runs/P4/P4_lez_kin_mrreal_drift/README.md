@@ -46,7 +46,24 @@ Identical to the parent: 21424 cells × 500 ppc × 2030600 steps, **~3 h 35 m** 
 | G6 energy closure | | post-run |
 
 ## Result
-<pending>
+**Interim, at 20 % — the notch is gone.** Checked at the first post-IC dump, the earliest one
+that can show it:
+
+| | `tau_own` | max `v/C_S0` over ζ 0.3–6 | notch recovery |
+|---|---|---|---|
+| `mrreal` (parent) | 0.00 | **63.51** | — |
+| `mrreal` | 1.35 | 4.30 | **25.6×** ✗ |
+| **this leg** | 0.00 | **3.88** | — |
+| **this leg** | 1.35 | 2.95 | **1.0× — clean** ✓ |
+
+The starting corona is 16.4× slower, against `s²` = 18.4 — `uzb` was the dominant term and it
+carried the `1/s²`, so that is the expected factor. The profile at `tau_own` 1.35 is monotonic
+where the parent's had already opened a 25.6× notch at ζ 1.73.
+
+Full result pending; the run is at 20 % with ETA ~4 h (the machine picked up other load, so
+this is slower than the parent's 3 h 35 m at the same step count).
+
+<pending: plume T_e, f_abs, the raw-eV comparison>
 
 ## Retracted
 nothing
