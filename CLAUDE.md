@@ -11,6 +11,10 @@ ambient plasma (unmagnetized, magnetized) → sweeps of laser power and geometry
 - `TEST_PLAN.md` — **the plan**: phases, runs, gates, scaling hypotheses. Start here.
 - `OVERVIEW.md` — the model (eikonal rays, inverse bremsstrahlung, the deposition kernel)
   and the shock physics being driven. The physics reference.
+- `HANDOFF.md` — **how the FLASH→WarpX benchmark is set up**: the FLASH scenario, what
+  transfers at the 0.1 ns handoff, the three scaling families a mass-ratio change needs,
+  and why the two codes report different temperatures and sound speeds. Read before
+  touching `reference.mass_ratio` or quoting a cross-code number.
 - `RESULTS.md` — **the running lab notebook.** Dated entry per run/finding. Read it first
   to learn current state.
 - `runs/README.md`, `scripts/README.md`, `studies/README.md` — conventions and tool docs.
