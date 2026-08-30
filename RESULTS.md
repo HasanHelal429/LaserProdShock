@@ -7250,3 +7250,61 @@ was applied. Only six inert `my_constants` helpers went unused.
 key", and it has both false negatives (this one) and no positive proof of use. The
 authoritative check is the unused-input list, available seconds after launch, which is why
 `--verify` is mandated then and not at the end.
+
+---
+
+## 2026-08-30 (later) — **the ray march does not converge on this target. `ray_cfl = 0.05` is retracted as the production value the same day it was set**
+
+The fifth rung ran (`57753369`, COMPLETED exit 0, 12:53, `--verify` OK). It does not close
+the gate — it reopens it wider.
+
+| `ray_cfl` | `E_abs` (J/absent dim) | Δ vs next coarser | `f_abs` peak |
+|---|---|---|---|
+| 0.50 | 8.871e4 | — | 1.0000 |
+| 0.25 (default) | 9.560e4 | +7.77 % | 1.0000 |
+| 0.10 | 1.017e5 | +6.38 % | 0.6529 |
+| 0.05 | 1.029e5 | +1.18 % | 0.7516 |
+| **0.025** | **1.050e5** | **+2.04 %** | 0.7188 |
+
+**The increment goes back up at the finest step: +7.77 / +6.38 / +1.18 / +2.04 %.** A
+converging sequence does not do that. The 1.18 % at 0.05 was a coincidentally narrow step in
+a non-monotonic sequence, not an approach to an asymptote — and this morning's entry, which
+set 0.05 as the production value on the strength of it, was wrong to. `E_abs` has risen
+**+18.4 %** from 0.50 to 0.025 and is **still rising** at the finest march tested; nothing in
+the data bounds where it stops. `f_abs` peak oscillates rather than settling (1.000, 1.000,
+0.653, 0.752, 0.719).
+
+**The default `ray_cfl = 0.25` is 9.0 % below the finest rung.**
+
+**What still holds.** The deposition *peak* is stable — cell 1066–1068 across all five rungs,
+within ±1 cell at every dump — so A5 holds and the operator is putting the energy in the
+right *place*. The failure is confined to *how much*. Gates G1/G5 pass on every rung,
+`Tlocalfrac` = 1.000 and `Vskip` = 0.000 throughout, so this is not a temperature-floor or
+an empty-cell-skipping artifact. `--verify` OK on all five: every rung simulated its config.
+
+**Consequence.** No P5 absorption number is trustworthy at any march tested, and the phase's
+headline observable *is* absorption. Running the spine now would produce a 12–20 h result
+whose central number carries an unquantified resolution floor. The spine and the ladder
+targets were left queued but not started (nothing had begun; no GPU time spent).
+
+The **laser-off controls are unaffected** — `intensity = 0`, no ray is traced, `ray_cfl` is
+inert in them — so they remain valid and are the one part of the campaign that can proceed
+while this is open.
+
+### What this most likely is, and what would test it
+
+The suspect is the documented **exit-boundary overshoot**: a ray takes a partial extra
+arc-length step past the far boundary and *creates* energy in the final cell (+24.9 % at the
+default, RESULTS 2026-07-28). That defect scales with step count, so halving `ray_cfl`
+doubles the number of opportunities — a mechanism that would make `E_abs` climb without
+limit as the march refines, which is what is observed. It has never bitten before because
+`studies/exit_overshoot` ran a 1.5 `n_cr` slab with **no interior critical surface**, so no
+ray turned inside the plasma; every P5 leg is 10 `n_cr` and the 2026-08-29 audit puts 41 % of
+the IC's optical depth within `0.9 < n̂ < 1`.
+
+Distinguishing test, cheap: re-run two rungs with the exit-overshoot path instrumented, or
+compare `∫P_abs dz` restricted to cells away from the far boundary against the total. If the
+divergence lives in the last cell, it is the overshoot and it is a code fix, not a
+resolution limit.
+
+**D4 is not closed. It is now the phase's blocking item**, ahead of the spine.

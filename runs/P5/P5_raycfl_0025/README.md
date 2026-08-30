@@ -75,7 +75,44 @@ else, so any difference between rungs is the march and not the setup.
 
 ## Result
 
-*(pending — submitted 2026-08-30 as target `raycfl2`)*
+**Ran 2026-08-30, job 57753369, COMPLETED exit 0 in 12:53, `--verify` OK.
+`E_abs` = 1.050e5 J per absent dim — `+2.04 %` on the 0.05 rung.**
+
+**The ladder does not converge.** The step-to-step change does not shrink:
+
+| `ray_cfl` | `E_abs` | Δ vs next coarser | `f_abs` peak |
+|---|---|---|---|
+| 0.50 | 8.871e4 | — | 1.0000 |
+| 0.25 (default) | 9.560e4 | +7.77 % | 1.0000 |
+| 0.10 | 1.017e5 | +6.38 % | 0.6529 |
+| 0.05 | 1.029e5 | +1.18 % | 0.7516 |
+| **0.025** | **1.050e5** | **+2.04 %** | 0.7188 |
+
+The increment sequence is +7.77 / +6.38 / **+1.18** / **+2.04 %** — it goes *up* at the
+finest step. The 1.18 % at 0.05 was therefore **not** an approach to an asymptote but a
+coincidentally narrow step in a non-monotonic sequence, which is exactly the failure mode
+D4 warned about and precisely why this ladder was specified to be read as a set rather than
+as a pair. `E_abs` has risen **+18.4 %** in total from 0.50 to 0.025 and is still rising at
+the finest march tested. `f_abs` peak oscillates rather than settling: 1.000, 1.000, 0.653,
+0.752, 0.719.
+
+**No march tested is demonstrably converged**, and the default 0.25 is **9.0 % below** the
+finest rung.
+
+The deposition peak remains stable — cell 1066–1068 across all five rungs, within ±1 cell at
+every dump — so acceptance criterion A5 still holds. The failure is confined to the energy
+integral, i.e. to *how much* is absorbed, not *where*.
+
+## Retracted
+
+**The plan to produce at `ray_cfl = 0.05` (set 2026-08-30) is retracted the same day.** It
+rested on the 0.05 rung's 1.18 % residual reading as near-convergence; the 0.025 rung shows
+it was not. Any P5 absorption number is resolution-limited until this is understood, and the
+size of the limit is unbounded by the data in hand — `E_abs` has not turned over.
+
+The four-rung result that "0.10 → 0.05 moves 1.18 %, marginally over threshold" is not
+retracted, but it must not be read as "nearly converged". It is one step of a sequence that
+does not settle.
 
 ## Retracted
 
