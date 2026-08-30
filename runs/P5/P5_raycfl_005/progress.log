@@ -1,0 +1,15 @@
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P5/P5_raycfl_005
+# logging_started 2026-08-29T22:16:32  total_steps=20300  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-29T22:17:02 | 1096/20300 ( 5.4%) | 0h00m | 0.0274 s/step(wall) | 0.0237 s/step(warpx) | ETA ~0h08m | x1.16 | load 1.1 | laser 0.935 of peak, Eabs 5165 J
+2026-08-29T22:17:32 | 2370/20300 (11.7%) | 0h01m | 0.0236 s/step(wall) | 0.0236 s/step(warpx) | ETA ~0h07m | x1.00 | load 1.3 | laser 0.926 of peak, Eabs 1.114e+04 J
+2026-08-29T22:18:32 | 4860/20300 (23.9%) | 0h02m | 0.0241 s/step(wall) | 0.0238 s/step(warpx) | ETA ~0h06m | x1.01 | load 1.2 | laser 0.999 of peak, Eabs 2.316e+04 J
+2026-08-29T22:19:02 | 6135/20300 (30.2%) | 0h02m | 0.0235 s/step(wall) | 0.0238 s/step(warpx) | ETA ~0h05m | x0.99 | load 1.2 | laser 0.990 of peak, Eabs 2.947e+04 J
+2026-08-29T22:20:02 | 8620/20300 (42.5%) | 0h03m | 0.0242 s/step(wall) | 0.0239 s/step(warpx) | ETA ~0h04m | x1.01 | load 1.3 | laser 0.963 of peak, Eabs 4.187e+04 J
+2026-08-29T22:21:02 | 11160/20300 (55.0%) | 0h04m | 0.0236 s/step(wall) | 0.0238 s/step(warpx) | ETA ~0h03m | x0.99 | load 1.4 | laser 0.886 of peak, Eabs 5.51e+04 J
+2026-08-29T22:21:32 | 12361/20300 (60.9%) | 0h05m | 0.0250 s/step(wall) | 0.0239 s/step(warpx) | ETA ~0h03m | x1.04 | load 1.4 | laser 0.804 of peak, Eabs 6.133e+04 J
+2026-08-29T22:22:32 | 14880/20300 (73.3%) | 0h06m | 0.0238 s/step(wall) | 0.0239 s/step(warpx) | ETA ~0h02m | x1.00 | load 1.2 | laser 0.723 of peak, Eabs 7.416e+04 J
+2026-08-29T22:23:32 | 17320/20300 (85.3%) | 0h07m | 0.0246 s/step(wall) | 0.0240 s/step(warpx) | ETA ~0h01m | x1.02 | load 1.4 | laser 0.686 of peak, Eabs 8.706e+04 J
+2026-08-29T22:24:02 | 18560/20300 (91.4%) | 0h07m | 0.0242 s/step(wall) | 0.0240 s/step(warpx) | ETA ~0h00m | x1.01 | load 1.4 | laser 0.694 of peak, Eabs 9.368e+04 J
+2026-08-29T22:25:02 | 20300/20300 (100.0%) | 0h08m | 0.0345 s/step(wall) | 0.0241 s/step(warpx) | ETA ~0h00m | x1.43 | load 1.5 | laser 0.727 of peak, Eabs 1.029e+05 J
+DONE 2026-08-29T22:25:02 | 20300/20300 (100.0%) | total wall 0h08m | mean 0.0251 s/step(wall) | reached max_step
