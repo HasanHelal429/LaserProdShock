@@ -51,14 +51,27 @@ echo "--- provenance: $WARPX_COMMIT ($(git rev-parse --short HEAD))"
 # key P5 depends on is grepped for here, at build time, so a missing one is found before
 # a 20-hour run rather than after it.
 echo "--- input keys this build implements:"
+# Extract ONCE: this binary is ~0.5 GB and the old loop ran `strings` twice per key.
+#
+# Two traps, both of which made this check useless the first time it ran on Perlmutter:
+#  1. `strings ... | grep -q` under `set -o pipefail` reports FAILURE even on a match --
+#     grep -q exits at the first hit, strings dies of SIGPIPE, and the pipeline returns
+#     141. Every key came back MISSING. Grep a saved file instead of a pipe.
+#  2. `grep -x` cannot match here. The constant pool packs literals back-to-back with no
+#     NUL between them (`..._distribution_t` runs straight into `VelocityProperti`), so a
+#     whole-line match never succeeds. Substring is the only sound test.
+_KEYDUMP="$(mktemp "${TMPDIR:-/tmp}/warpx_keys.XXXXXX")"
+trap 'rm -f "$_KEYDUMP"' EXIT
+strings "$BIN" > "$_KEYDUMP" 2>/dev/null || true
 for key in laser_deposition ray_cfl temperature_mode coulomb_log_mode \
            min_macroparticles_per_cell maxwellian_u_std_distribution_type \
            maxwellian_u_mean_distribution_type parse_density_function; do
-    if strings "$BIN" 2>/dev/null | grep -qx "$key" || \
-       strings "$BIN" 2>/dev/null | grep -q "$key"; then
+    if grep -qF -- "$key" "$_KEYDUMP"; then
         echo "      OK      $key"
     else
-        echo "      MISSING $key   <-- a deck using this would be silently ignored"
+        echo "      UNPROVEN $key   <-- not found as a contiguous literal."
+        echo "               NOT proof of absence: check the source, then confirm with"
+        echo "               make_inputs.py --verify seconds after launch."
     fi
 done
 echo

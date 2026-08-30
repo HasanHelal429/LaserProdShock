@@ -100,8 +100,16 @@ done
 
 # A file rather than an exported variable: sbatch --export is comma-separated and mangles
 # anything containing spaces.
-RUNLIST="$(mktemp "${TMPDIR:-/tmp}/lp5_runlist.XXXXXX")"
+#
+# It MUST live on $PSCRATCH, not $TMPDIR. On Perlmutter /tmp is a per-node tmpfs, so a
+# runlist written here on a login node is invisible to the compute node that runs the
+# array task: job.sbatch would sed an absent file, get an empty SPEC and exit 2 on every
+# task -- after the full queue wait. KinShock2020 got this right and the port lost it.
+# Timestamped rather than mktemp'd so a submission's run list is also its provenance.
+mkdir -p "$LP_PM/.runlists"
+RUNLIST="$LP_PM/.runlists/${WHAT}-$(date +%Y%m%dT%H%M%S).txt"
 printf '%s\n' "${RUNS[@]}" > "$RUNLIST"
+echo "run list -> $RUNLIST"
 WORKROOT="${WORKROOT:-${PSCRATCH:-$HOME}/laserprod_work}"
 
 CMD=(sbatch -A "$NERSC_ACCOUNT" -q "$QOS" -t "$TIME"

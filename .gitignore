@@ -68,3 +68,5 @@ studies/collision_gate/scratch/
 
 # sidecar progress-logger PID files -- transient
 **/.logger.pid
+perlmutter/.runlists/
+perlmutter/site.conf
