@@ -70,3 +70,10 @@ studies/collision_gate/scratch/
 **/.logger.pid
 perlmutter/.runlists/
 perlmutter/site.conf
+
+# Slurm array stdout/stderr, written to the submission cwd by job.sbatch's
+# -o/-e. KinShock2020 ignores these; the port dropped it. The real run output is
+# runs/<ID>/run.log -- these carry only the module-reload notice and run_warpx's
+# exit line.
+slurm-*.out
+slurm-*.err
