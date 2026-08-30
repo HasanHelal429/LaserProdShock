@@ -358,11 +358,21 @@ With the real-mass leg (`P4_lez_kin_mrreal_drift`, µ = 1, real electron, no tra
 | PSC | real Al | 508.8 eV | 0.583 |
 | **WarpX, real mass** | real Al | **440.2 eV** | **0.840** |
 
-WarpX's absorbed fraction lands within 3.4 % of FLASH's, so that pair is very nearly a
+> ⚠⚠ **RETRACTED 2026-08-29 — read `RESULTS.md` (2026-08-29) before using this section.**
+> FLASH's 0.870 is a **whole-run** figure (0 → 1 ns) and no PIC leg simulates the
+> 0 → 0.1 ns ramp. On `mrreal_drift`'s own window FLASH absorbs **0.6827**, so WarpX
+> **over-absorbs by 1.23×** — the pair was never matched. Corrected through
+> `f_abs^(2/3)`, WarpX is **383.4 eV** and the ratio is **0.59×**, not 0.69×. And roughly
+> half the excess is FLASH's grid: it has **no cells** in `0.9 < n/n_cr < 1`, worth
+> **1.69×** in optical depth, against **1.80×** from our fitted corona.
+> Use `scripts/flash_absorption.py` and `scripts/ic_optical_depth.py`. **Never quote
+> `DELIVERY.md`'s 0.870 against a PIC leg.** The `zeta_cr` 1.03× and `L_n` 0.81× stand.
+
+~~WarpX's absorbed fraction lands within 3.4 % of FLASH's, so that pair is very nearly a
 matched-`f_abs` comparison needing no correction: **WarpX runs 0.69× FLASH's plume `T_e`**,
 with the critical surface at 1.03× and the density scale length at 0.81×. That is the
 project's cleanest cross-code number — real ion, real electron, matched absorption, no
-normalisation anywhere.
+normalisation anywhere.~~
 
 PSC's 0.583 is not matched to either, so its 0.79× is not a like-for-like figure.
 

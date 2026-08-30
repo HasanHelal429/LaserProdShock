@@ -1849,3 +1849,60 @@ which is a result worth having.
    of its FLASH↔PSC heat-flux discrepancy. Our per-cell treatment is *better*, so we should
    expect to differ from PSC here and agree with FLASH better. Do not "fix" this by forcing
    a global value without recording both.
+
+---
+
+## 13. Phase 5 — the FLASH benchmark on corrected terms (`runs/P5/`)
+
+**Full framing, findings and decision register: `runs/P5/README.md`.** This section is the
+plan-level summary only.
+
+### 13.1 What Phase 5 changes
+
+Phase 4 delivered the scaling physics (`µ^(1/3)` on `T_e` to 3.3 %, `µ^0.490` on optical
+depth, both across a 73× mass range) and one cross-code number. Phase 5 does not add
+physics. It fixes three things about how the comparison is *made*:
+
+1. **PSC is demoted.** It is another PIC code, not the benchmark — a conduit for PIC physics.
+   Phase 4 disqualified it as a reference three ways (its RMR knob is an electron-mass knob
+   and `T_e ∝ m_e^(−0.187)`; its `f_abs` diagnostic is documented only for sub-critical
+   profiles while this target is overdense; it is τ-matched to nothing). **FLASH is the
+   benchmark** and every acceptance criterion is against it.
+2. **The observable becomes a trajectory.** A ratio-versus-τ curve on the five quantities
+   FLASH can adjudicate, not a single-time ratio. Ledger 15 killed one "benchmark passes" for
+   being a single-time claim on an unconverged transient; the 0.69× was the same claim.
+3. **The anchor gets audited too.** A benchmark is only as good as its reference, and the
+   pre-launch audit (§13.2) found FLASH unconverged exactly where the laser couples.
+
+### 13.2 The pre-launch audit — two findings, no simulation
+
+Recorded in full in `RESULTS.md` (2026-08-29); ledger items 30 and 31.
+
+* **The matched-`f_abs` claim is retracted.** `DELIVERY.md`'s 87.04 % is a whole-run figure
+  and no PIC leg runs the 0 → 0.1 ns ramp. Window-matched, FLASH absorbs 0.6827 against
+  WarpX's 0.8402: **WarpX over-absorbs by 1.23×**, and the corrected ratio is **0.59×**.
+  Tool: `scripts/flash_absorption.py`.
+* **Half that excess is FLASH's grid.** `τ_W/τ_F` = 3.04 = **1.69× (FLASH has no cells in
+  `0.9 < n̂ < 1`, where the IB kernel diverges) × 1.80× (our fitted corona is the more
+  absorbing shape)**. The operator remains cleared. Tool: `scripts/ic_optical_depth.py`.
+
+### 13.3 The runs
+
+| ID | what it is | cost |
+|---|---|---|
+| `P5_full` | real mass, whole 1 ns pulse, thickened target, FLASH's dump cadence | ~19.8 h |
+| `P5_full_off` | its G3 laser-off control, same duration | concurrent, GPU 1 |
+| `P5_seed` | seed replicate over `τ_own` 0–5.39 — the band a trajectory claim needs | ~4.4 h |
+| `P5_full_n20` | density cap 10 → 20 `n_cr` at real mass — now a critical-surface-gradient test | ~19.8 h |
+
+Plus two collaborator reruns that cost **seconds** each and outrank all of the above on value
+per cost: **F1** `lrefine_max` 5 and 6 (does FLASH's absorption rise when it resolves the
+critical layer?) and **F2** `diff_eleFlCoef` 0.03 and 0.12 (is FLASH's own flux-limiter
+calibration inside our error bar on `L_n`?).
+
+### 13.4 Acceptance
+
+Phase 5 succeeds if it can say with a band which of three is true: the ratio curve is **flat**
+(a real code difference, quotable); it **rises** (the 0.69× was a stopwatch artifact); or it
+**moves when FLASH's resolution or flux limiter moves** (the anchor was inside our error bar).
+The third is the one nobody has looked for, and §13.2 says it is live.

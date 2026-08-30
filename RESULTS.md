@@ -18,7 +18,7 @@ dated entry** — do not silently edit an earlier one.
 # CURRENT STATE — read this before quoting any number below
 
 *Maintained header, rewritten in place; everything under it is append-only history.*
-**Last updated 2026-08-27.** 79 dated entries follow, and a good many of their numbers have
+**Last updated 2026-08-29.** 80 dated entries follow, and a good many of their numbers have
 been superseded. This section is the live state and the retraction ledger. If a number below
 this block contradicts one in it, this block wins.
 
@@ -29,17 +29,29 @@ Convention: `f_abs` is `f_end`, the final instantaneous LASERDEP value; `T_ss` =
 
 | leg | `f_abs` | plume `T_e` | `T_ss` | `T_e/T_ss` |
 |---|---|---|---|---|
-| FLASH | 0.870 ⚠ | 647 eV | 750 | 0.86 |
+| FLASH | 0.870 ⚠⚠ whole-run; **0.683** on the PIC window | 647 eV | 750 | 0.86 |
 | PSC `run_ourflash_511keV` | 0.475 (⟨f⟩ 0.583) | 508.8 eV @ 99.66 ps | 501 | **1.02** |
 | WarpX `P4_lez_kin_mr100` | 0.350 (⟨f⟩ 0.364) | 157.7 eV | 155 | **1.02** |
 | ~~WarpX `P4_lez_kin_mrreal`~~ — superseded, IC drift wrong | 0.793 (⟨f⟩ 0.623) | ~~464.3 eV~~ | — | — |
 | **WarpX `P4_lez_kin_mrreal_drift`** — real `m_i` AND `m_e`, no transform | 0.915 (⟨f⟩ **0.840**) | **440.2 eV** | 761 | 0.58 |
 
-**Raw eV, no normalisation, all on a real Al ion (2026-08-28):** FLASH 647.0 (`f_abs` 0.870) ·
-PSC 508.8 (0.583) · **WarpX `mrreal_drift` 440.2 (0.840)**. WarpX's absorption is within 3.4 %
-of FLASH's, so **WarpX↔FLASH is very nearly a matched-`f_abs` comparison: 0.69×**, with
-`zeta_cr` at 1.03× and `L_n` at 0.81×. That is the project's cleanest cross-code number.
-Against PSC the ratio is 0.865, but PSC absorbs 0.583 — **not matched, not agreement.**
+**Raw eV, no normalisation, all on a real Al ion:** FLASH 647.0 · PSC 508.8 · **WarpX
+`mrreal_drift` 440.2**. `zeta_cr` is at 1.03× and `L_n` at 0.81×, and those two stand.
+
+⚠⚠ **RETRACTED 2026-08-29: the pair was never matched on absorption, and the ratio is 0.59×,
+not 0.69×.** FLASH's 0.870 is a WHOLE-RUN figure (0 → 1 ns) and no PIC leg simulates the
+0 → 0.1 ns ramp. On `mrreal_drift`'s own window FLASH absorbs **0.6827** against WarpX's
+0.8402 — **WarpX over-absorbs by 1.23×.** Correcting through Manheimer's `f_abs^(2/3)` gives
+WarpX **383.4 eV**, so **WarpX/FLASH = 0.59×**, and it is a corrected number, not a matched
+one. Use `scripts/flash_absorption.py`; never quote `DELIVERY.md`'s 0.870 against a PIC leg.
+Against PSC the raw ratio is 0.865, but PSC absorbs 0.583 — **not matched, not agreement.**
+
+⚠⚠ **And roughly half that excess is FLASH's grid, not ours (2026-08-29).** Integrating the
+same IB kernel along both handoff profiles gives `tau_W/tau_F` = 3.04 = **1.69× (FLASH's
+0.781 µm grid has NO cells in 0.9 < n/n_cr < 1, where the kernel diverges) × 1.80× (the
+fitted exponential IC is genuinely the more absorbing shape)**. The deposition operator
+remains cleared. `scripts/ic_optical_depth.py`. **The anchor needs checking before the
+0.59× means anything** — see `runs/P5/README.md` F1.
 
 ⚠ `P4_lez_kin_mrreal` (the first real-mass leg) is superseded: `drift_uz_de` was held fixed
 from `mr100`, but it is a velocity needing `1/s` (`uzb`: `1/s²`). Held fixed it started the
@@ -47,8 +59,9 @@ corona 4.29× too fast and opened a density notch propagating at 2.28 `C_S0`. Th
 only 1.055× in `T_e` but 4.05× in `L_n`. **`mr25` and `mr400` carry it at 0.5× and 2.0× and
 have not been rerun.**
 
-⚠ FLASH's 0.870 comes from `DELIVERY.md` and its convention was never checked against the
-PIC legs'. If it is a run-mean, FLASH's 0.86 is not on the same footing.
+✅ **CLOSED 2026-08-29.** FLASH's 0.870 is a run-mean over 0 → 1 ns, and it is NOT on the
+same footing as a PIC leg's `⟨f_abs⟩`. Window-matched values: 0.4156 (ramp) · **0.6823**
+(0.1–0.3 ns) · 0.8960 (0.1–1.0 ns). `scripts/flash_absorption.py`.
 
 **µ^(1/3) is the whole WarpX↔PSC difference — measured, not inferred (2026-08-27).** With
 `f_abs` matched experimentally rather than corrected for (`P4_lez_kin_clmatch`, laser lnΛ
@@ -150,11 +163,15 @@ Read as: *claim (line asserted → line overturned) → what is true now.*
 27. "A residual 1.57× that mass ratio does not explain" (5773 → 5896) → dissolved by `f_abs^(2/3)` and each leg's true ion mass. No residual.
 28. PSC `f_abs` = 0.764 (5903 → 5992) → a cross-run mix, and the last finite value before a heap-corruption abort.
 29. "Cost ∝ s³ ≈ 7.9 h" for a real-mass leg (5857 → 2026-08-27) → **measured** `s^2.55`: mr25 58.35 s, mr100 345.1 s, mr400 2009 s.
+30. **"WarpX↔FLASH is a matched-`f_abs` comparison, 0.69×"** (`HANDOFF.md` §8, CURRENT STATE, `mrreal_drift` README → 2026-08-29) → the two `f_abs` were integrated over **different windows**. Window-matched, WarpX over-absorbs by **1.23×** and the corrected ratio is **0.59×**.
+31. Implicitly, that FLASH's absorption is a converged reference (throughout → 2026-08-29) → FLASH's grid has **no cells** in `0.9 < n/n_cr < 1` and misses **1.69×** of its own optical depth. The anchor is unconverged where the laser couples.
 
 ## Open items
 
 **Live, Phase 4**
-- FLASH's `f_abs` convention never re-derived (6118).
+- ~~FLASH's `f_abs` convention never re-derived (6118)~~ — **CLOSED 2026-08-29**, and it retracted the headline. See ledger 30.
+- **NEW: is FLASH converged at the critical surface?** `dx_min` 0.781 µm, no cells in `0.9 < n̂ < 1`. Needs `lrefine_max` 5/6 reruns — 38 s each on the collaborator's side (`runs/P5/README.md` F1).
+- **NEW: the fitted IC is 1.80× too absorbing** at matched resolution. Decision D5 in `runs/P5/README.md`: characterise it, or give `deck.py` a piecewise `density_function`.
 - The three legs are not τ-matched: PSC 2.69 `τ_own`, WarpX 5.39, FLASH 26.96, and PSC's `T_e` is still rising — **509 eV is a lower bound** (6098).
 - The 511 keV `T_e` trajectory is non-monotonic (377 → 459 → 279 → 509 eV); the endpoint is on a recovery limb where `fabs` pinned at 1.000 (6102).
 - **The energy-partition inversion has never been explained** — only the inference from it was retracted. Electron share, τ_own 0.5 → 5.4: WarpX kinetic **−3.49 → −0.08**, WarpX hybrid 0.98 → 0.70, PSC 0.66 → 0.62 (5064, 5329).
@@ -6908,3 +6925,117 @@ needs a `dz` convergence leg at each rung.
 This is a property of how the sweep was *specified* — `dz_over_de` held fixed, per gate G7 —
 not of the operator, and it would affect any code integrating the same profiles on the same
 grid.
+
+---
+
+## 2026-08-29 — Phase 5 pre-launch audit: the matched-`f_abs` claim is retracted, and half the residual is FLASH's grid
+
+Two findings, both from analysis alone — no simulation was run. Together they change what
+Phase 5 should measure, so they are recorded before anything launches.
+
+### Finding 1 — RETRACTION: WarpX and FLASH were never matched on absorption
+
+**Claim overturned:** *"WarpX's absorbed fraction lands within 3.4 % of FLASH's, so that pair
+is very nearly a matched-`f_abs` comparison needing no correction: WarpX runs 0.69× FLASH's
+plume `T_e`."* (`HANDOFF.md` §8, `RESULTS.md` CURRENT STATE, `P4_lez_kin_mrreal_drift`
+README.) This was the project's headline cross-code number.
+
+The open item *"FLASH's `f_abs` convention never re-derived (6118)"* is now closed, and it was
+the load-bearing one. `DELIVERY.md`'s **87.04 %** is a **whole-run** figure — cumulative
+`Energy in` against `Energy out` over 0 → 1 ns. It reproduces exactly
+(`scripts/flash_absorption.py`, new). But **no PIC leg simulates 0 → 0.1 ns.** They are handed
+FLASH's state at the end of the ramp and integrate absorption from there, and
+`xcode_compare.absorbed()` reports `⟨f_abs⟩ = E_abs/(I0·t)` over the leg's **own** window.
+Comparing those two is comparing different integrals, and FLASH's absorption is climbing
+steeply throughout, so it does not average out:
+
+| window | FLASH `⟨f_abs⟩` | FLASH `f_inst` at the end |
+|---|---|---|
+| 0.0 → 0.1 ns — the ramp, which no PIC leg runs | 0.4156 | 0.5295 |
+| **0.1 → 0.3 ns — `mrreal_drift`'s window** | **0.6823** | 0.8062 |
+| 0.1 → 1.0 ns — `P5_full`'s window | 0.8960 | 0.9979 |
+| 0.0 → 1.0 ns — the `DELIVERY.md` basis | 0.8704 | 0.9979 |
+
+`P4_lez_kin_mrreal_drift` measures `⟨f_abs⟩` = **0.8402** over 0.1 → 0.3007 ns. Against
+FLASH's **0.6827** on the identical window:
+
+```
+ratio WarpX/FLASH, time-integrated  =  1.2307      (not 0.966)
+```
+
+**WarpX over-absorbs by 1.23×.** Manheimer is exact on the *absorbed* intensity to 2.3 %
+(2026-08-28), so correcting onto FLASH's absorption multiplies WarpX's `T_e` by
+`(0.6827/0.8402)^(2/3)` = 0.8708: **440.2 → 383.4 eV against FLASH's 647.0**.
+
+**The cross-code number is 0.59×, not 0.69×,** and it is a *corrected* number rather than a
+matched one. The instantaneous convention says the same thing in the same direction —
+WarpX `f_end` 0.9148 against FLASH 0.8048, 1.14×.
+
+Reproduce: `python3 scripts/flash_absorption.py --against runs/P4/P4_lez_kin_mrreal_drift`.
+The tool refuses to run this comparison for a reduced-mass leg, since its seconds are not
+FLASH's seconds and its absorption is broken as `µ^0.490` regardless (`HANDOFF.md` §7.4).
+
+### Finding 2 — half the excess absorption is FLASH's grid, not WarpX's error
+
+Absorption differs from the **first step**, on what is nominally the same plasma: at the
+0.1 ns handoff FLASH's instantaneous fraction is 0.5295 and WarpX's `f_abs(0)` is 0.6821.
+The operator is not a candidate — validated against analytic IB/WKB to 0.02–1.6 % and
+reproducing PSC's kernel to 6.7e-16. An operator that is right on the profile it is given
+can still absorb the wrong amount if the **profile** is wrong.
+
+`scripts/ic_optical_depth.py` (new) integrates the *same* IB kernel
+(`K ~ n̂²(1−n̂)^(−1/2) Z lnΛ T^(−3/2)`, prefactor calibrated on FLASH so only shape is tested)
+along a normally-incident ray to the turning point and back, for FLASH's actual 0.1 ns
+profile and for the fitted IC rebuilt from `config.yaml`:
+
+```
+tau, one way, arbitrary units
+  FLASH on its OWN grid (dx_min 0.781 um)        2.2429e-08
+  FLASH profile resampled to dz = 0.0847 um      3.7944e-08     1.69x its own grid
+  WarpX fitted IC                                6.8230e-08
+
+  WarpX / FLASH-own-grid   = 3.042    what the two codes actually integrate
+  WarpX / FLASH-resampled  = 1.798    pure profile-SHAPE difference
+```
+
+So the 3.04× factors cleanly into **1.69× FLASH grid × 1.80× IC shape**:
+
+* **FLASH has no cells at all in `0.9 < n/n_cr < 1`.** Its AMR `dx_min` is 0.781 µm and the
+  profile jumps from below 0.9 to above 1.0 in one cell. The near-critical layer, where the
+  IB kernel diverges as `(1−n̂)^(−1/2)`, is **structurally absent** from FLASH's absorption.
+  The fitted IC puts **41 % of its entire optical depth** in exactly that band, over 0.517 µm,
+  because WarpX resolves it at 0.0847 µm — 9× finer.
+* **The fitted exponential is genuinely the more absorbing shape** even at matched
+  resolution. `rms(ln n)` = 0.107 on the fit and IB goes as `n²`. Its `n_cr → 0.5 n_cr`
+  transition spans 3.51 µm against FLASH's 2.34 µm.
+
+Band decomposition, one way:
+
+| `n̂` band | FLASH `τ` share, span | WarpX `τ` share, span |
+|---|---|---|
+| 0.9 – 1.0 | **0 %, no cells** | **41.0 %**, 0.517 µm |
+| 0.5 – 0.9 | 22.8 %, 0.781 µm (one cell) | 43.9 %, 2.966 µm |
+| 0.1 – 0.5 | 46.2 %, 9.375 µm | 12.3 %, 8.108 µm |
+| < 0.1 | 1.2 % | 0.5 % |
+
+**Reading it.** Roughly half the absorption discrepancy is physics FLASH is *missing* at
+0.781 µm, and half is fidelity our initial condition is *lacking*. Neither is a defect of the
+deposition operator. This is the first result in the project that says **the anchor itself
+needs checking**, and it makes a FLASH rerun at higher `lrefine_max` — 38 s of the
+collaborator's compute — the highest value-per-cost item in Phase 5.
+
+**Caveats, stated so they are not lost.** The kernel here is a WKB IB estimate, not the
+operator's eikonal march; at 1D normal incidence refraction is minimal but not zero. The
+`(1−n̂)^(−1/2)` integrand is grid-sensitive by construction, which is the point of the
+resampling control but also its main uncertainty. `f_abs(0)` carries 10.4 % 1σ on RNG seed
+alone (ledger 1), so the 0.5295 → 0.6821 attribution is an attribution, not a closure; the
+time-integrated 1.23× is the number on firm ground.
+
+### What this does to the plan
+
+Phase 5 is written up in `runs/P5/README.md` and `TEST_PLAN.md` §13. Four decks are generated
+and gate-checked (`P5_full`, `P5_full_off`, `P5_seed`, `P5_full_n20`); nothing is launched.
+The `P5_full_n20` cap test is upgraded from a reservoir question to a **critical-surface
+gradient** question with a predicted direction, and two FLASH reruns (`lrefine_max` 5/6;
+`diff_eleFlCoef` 0.03/0.12) are now ahead of every WarpX run on value per cost.
+
