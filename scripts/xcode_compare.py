@@ -405,10 +405,18 @@ def scalars(zeta, ne, Te=None, v=None):
 
 TSS_REDUCED = TE_REF / RESCALE ** (1.0 / 3.0)      # 312 eV -- see main()'s note
 
-FLASH_DIR = ("/home/hhelal/shared/simulations/FLASH_LaserAblation-Ploegstra_2026-08/"
-             "Ablation_prod_08-17")
-FLASH_RAD = ("/home/hhelal/shared/simulations/FLASH_LaserAblationRad-Ploegstra_2026-08/"
-             "Ablation_prod_rad_08-17")
+# The FLASH delivery. Overridable by $LP_FLASH_DIR / $LP_FLASH_RAD so the analysis runs
+# unchanged wherever the data has been copied -- Perlmutter needs only the 51 plotfiles
+# plus lez1d_LaserEnergyProfile.dat, which is 7.6 MB, and editing this line on a second
+# machine is how two clones start disagreeing about what they measured.
+FLASH_DIR = os.environ.get(
+    "LP_FLASH_DIR",
+    "/home/hhelal/shared/simulations/FLASH_LaserAblation-Ploegstra_2026-08/"
+    "Ablation_prod_08-17")
+FLASH_RAD = os.environ.get(
+    "LP_FLASH_RAD",
+    "/home/hhelal/shared/simulations/FLASH_LaserAblationRad-Ploegstra_2026-08/"
+    "Ablation_prod_rad_08-17")
 SP_KIN = {"electron": ["targ_electrons", "amb_electrons"],
           "ion": ["targ_ions", "amb_ions"]}
 SP_HYB = {"ion": ["targ_ions", "amb_ions"]}

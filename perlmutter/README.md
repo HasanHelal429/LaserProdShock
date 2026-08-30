@@ -17,21 +17,13 @@ Single-GPU is not a compromise: every P5 config sets `numerics.max_grid_size = n
 i.e. **one box**, and one box cannot be split across ranks. It is also the *fastest* 1D
 configuration — 7.9× over the default decomposition (project memory). More GPUs would idle.
 
-## ⚠ Before anything: push `warpx-cda`
+## `warpx-cda` provenance — resolved 2026-08-29
 
-On 2026-08-29 the chablis clone sat **7 commits ahead of `origin/feature/hybrid-laser`**.
-All seven touch `HybridPICModel` and docs — **none touch `LaserDeposition` or
-`Initialization`** — so a Perlmutter clone at `origin` builds a binary that is correct for
-every P5 leg, all of which are full PIC. `site.conf.example` therefore pins
-`WARPX_COMMIT=fcb48c9fe`, which is on origin today.
-
-**Push them anyway.** Two clones that disagree is how binary provenance rots, and it costs
-nothing:
-
-```bash
-cd ~/warpx-cda && git push origin feature/hybrid-laser
-# then bump WARPX_COMMIT in perlmutter/site.conf to the new HEAD
-```
+The chablis clone had sat 7 commits ahead of `origin/feature/hybrid-laser` (all
+`HybridPICModel` and docs; none touching `LaserDeposition` or `Initialization`). They are
+**pushed**: `fcb48c9fe..534f3b170`. The two clones now agree, and `site.conf.example` pins
+`WARPX_COMMIT=534f3b170`, so a fresh Perlmutter clone builds exactly the code P4 was
+measured on.
 
 ## One-time setup
 
@@ -53,7 +45,7 @@ git clone <this repo's remote> LaserProdShock
 # 4. site config
 cd $PSCRATCH/LaserProdShock
 cp perlmutter/site.conf.example perlmutter/site.conf
-vi perlmutter/site.conf                    # NERSC_ACCOUNT, paths, WARPX_COMMIT
+vi perlmutter/site.conf                    # NERSC_ACCOUNT and paths; WARPX_COMMIT is already right
 ```
 
 ⚠ Lustre striping: WarpX plotfiles are many small files, and P5 writes **45 per long leg**
@@ -72,8 +64,23 @@ rather than a live read. So:
   copied over (36 MB, `lez1d_hdf5_plt_cnt_*` and `lez1d_LaserEnergyProfile.dat`) or those
   steps done on chablis.
 
-Copying is easier and it is 36 MB. Do it once and edit `FLASH_DIR` in
-`scripts/xcode_compare.py`, or symlink it into place.
+Copying is easier and the minimal set is **7.6 MB**, not the delivery's 36. From chablis:
+
+```bash
+D=~/shared/simulations/FLASH_LaserAblation-Ploegstra_2026-08/Ablation_prod_08-17
+rsync -av $D/lez1d_hdf5_plt_cnt_* $D/lez1d_LaserEnergyProfile.dat \
+      perlmutter.nersc.gov:$PSCRATCH/flash_lez1d/
+```
+
+Then on Perlmutter, **no source edit** — the path is an env var:
+
+```bash
+export LP_FLASH_DIR=$PSCRATCH/flash_lez1d
+```
+
+`xcode_compare.py`, `flash_absorption.py`, `ic_optical_depth.py`, `flash_ic_fit.py` and
+`xcode_trajectory.py` all read it. Editing a hardcoded path on a second machine is how two
+clones start disagreeing about what they measured.
 
 ## Build
 

@@ -15,11 +15,11 @@ WARPX_SRC=${PSCRATCH:-${SCRATCH:-$HOME}}/warpx-cda
 # serves all of them.
 WARPX_BUILD=$WARPX_SRC/build_pm_1d
 
-# Pinned COMMIT, not a branch: the binary's provenance has to be a SHA. The chablis clone
-# sat 7 commits ahead of origin on 2026-08-29 -- all of them HybridPICModel and docs,
-# none touching LaserDeposition or Initialization -- so origin is sufficient for the
-# kinetic legs. Bump this once those are pushed and the two clones agree.
-WARPX_COMMIT=fcb48c9fe
+# Pinned COMMIT, not a branch: the binary's provenance has to be a SHA rather than
+# "whatever the branch was that day". 534f3b170 is the head of feature/hybrid-laser,
+# pushed 2026-08-29 -- the chablis clone and origin now agree, so a fresh Perlmutter
+# clone builds exactly what P4 was measured on.
+WARPX_COMMIT=534f3b170
 
 # QOS. "shared" bills per-GPU and fits these single-GPU runs; max wall 2 days, 5000 jobs.
 # "regular" takes whole 4-GPU nodes and would idle three of them. See perlmutter/README.md.

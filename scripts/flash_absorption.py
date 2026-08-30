@@ -35,10 +35,16 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-NORAD = ("/home/hhelal/shared/simulations/FLASH_LaserAblation-Ploegstra_2026-08/"
-         "Ablation_prod_08-17/lez1d_LaserEnergyProfile.dat")
-RAD = ("/home/hhelal/shared/simulations/FLASH_LaserAblationRad-Ploegstra_2026-08/"
-       "Ablation_prod_rad_08-17/lez1drad_LaserEnergyProfile.dat")
+# Same $LP_FLASH_DIR / $LP_FLASH_RAD override as xcode_compare, so one env var moves the
+# whole analysis stack to wherever the delivery has been copied.
+NORAD = os.path.join(os.environ.get(
+    "LP_FLASH_DIR",
+    "/home/hhelal/shared/simulations/FLASH_LaserAblation-Ploegstra_2026-08/"
+    "Ablation_prod_08-17"), "lez1d_LaserEnergyProfile.dat")
+RAD = os.path.join(os.environ.get(
+    "LP_FLASH_RAD",
+    "/home/hhelal/shared/simulations/FLASH_LaserAblationRad-Ploegstra_2026-08/"
+    "Ablation_prod_rad_08-17"), "lez1drad_LaserEnergyProfile.dat")
 
 T_HANDOFF = 0.1     # ns -- where every PIC leg starts
 T_END = 1.0         # ns -- end of FLASH's flat top

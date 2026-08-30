@@ -172,7 +172,7 @@ Read as: *claim (line asserted → line overturned) → what is true now.*
 - ~~FLASH's `f_abs` convention never re-derived (6118)~~ — **CLOSED 2026-08-29**, and it retracted the headline. See ledger 30.
 - **NEW: is FLASH converged at the critical surface?** `dx_min` 0.781 µm, no cells in `0.9 < n̂ < 1`. Needs `lrefine_max` 5/6 reruns — 38 s each on the collaborator's side (`runs/P5/README.md` F1).
 - ~~**the fitted IC is 1.80× too absorbing**~~ — **CLOSED 2026-08-29 (later)**: the IC is now LIFTED from FLASH (`corona_profile: flash_table`), and the rendered deck's optical depth matches FLASH's to **0.4 %** against the analytic fit's 1.798×. Sensitivity to the handoff is measured by the `P5_flashic_t02`/`_t04` ladder.
-- **NEW: `warpx-cda` is 7 commits ahead of origin** (all `HybridPICModel` + docs, none touching `LaserDeposition`/`Initialization`). Push before building on Perlmutter.
+- ~~`warpx-cda` is 7 commits ahead of origin~~ — **pushed 2026-08-29**, `fcb48c9fe..534f3b170`; `WARPX_COMMIT` pinned to it.
 - The three legs are not τ-matched: PSC 2.69 `τ_own`, WarpX 5.39, FLASH 26.96, and PSC's `T_e` is still rising — **509 eV is a lower bound** (6098).
 - The 511 keV `T_e` trajectory is non-monotonic (377 → 459 → 279 → 509 eV); the endpoint is on a recovery limb where `fabs` pinned at 1.000 (6102).
 - **The energy-partition inversion has never been explained** — only the inference from it was retracted. Electron share, τ_own 0.5 → 5.4: WarpX kinetic **−3.49 → −0.08**, WarpX hybrid 0.98 → 0.70, PSC 0.66 → 0.62 (5064, 5329).
@@ -7136,8 +7136,15 @@ the lift A/B) · `P5_full_off` · `P5_seed` · `P5_flashic_t02` / `_t04` · `P5_
 2026-08-11). The move is for **concurrency**, not per-GPU speed: ~60 h serial on chablis's
 two 4070s becomes one wall clock of ~8–13 h as single-GPU array tasks.
 
-⚠ **`warpx-cda` sits 7 commits ahead of `origin/feature/hybrid-laser`.** All seven touch
-`HybridPICModel` and docs; **none touch `LaserDeposition` or `Initialization`**, so a
-Perlmutter clone at `fcb48c9fe` builds a correct binary for every P5 leg. Push them anyway
-before building.
+✅ **`warpx-cda` pushed, `fcb48c9fe..534f3b170`** (2026-08-29). The chablis clone and origin
+now agree, and `perlmutter/site.conf.example` pins `WARPX_COMMIT=534f3b170`, so a fresh
+Perlmutter clone builds exactly the code P4 was measured on. The seven commits were all
+`HybridPICModel` and docs — none touched `LaserDeposition` or `Initialization` — so this
+changes nothing about the P5 legs' physics; it removes a provenance ambiguity.
+
+**The FLASH delivery is now an env var, not a hardcoded path.** `$LP_FLASH_DIR` /
+`$LP_FLASH_RAD` override the defaults in `xcode_compare.py` and `flash_absorption.py`, which
+every FLASH-reading tool imports. The minimal set the analysis needs is **7.6 MB** (51
+plotfiles + `lez1d_LaserEnergyProfile.dat`), not the delivery's 36. Editing a hardcoded path
+on a second machine is how two clones start disagreeing about what they measured.
 
