@@ -3,19 +3,15 @@ meta:
   phase: 5
   deck: inputs_P5_seed
   description: >-
-    SEED REPLICATE of P5_full, run only to tau_own 5.390 (the parent's endpoint). One
-    change from P5_full: numerics.random_seed. Nothing else, including max_step's
-    divisibility by the FLASH dump cadence.
-    It exists because P5's headline is a ratio-versus-tau CURVE, and a curve needs a band.
-    The measured noise floor in this project is 12-13.5% on a single-time plume T_e --
-    mr100-class T_e appears in RESULTS.md as 157.7 / 138.9 / 148.6 / 166.6 / 181.8 / 182 eV
-    for identical physics -- but that floor was established across legs that differed in
-    more than the seed, so it is an upper bound of unknown tightness. This run measures the
-    seed-only component directly, over the window where P5_full overlaps both its own
-    parent and this replicate.
-    Deliberately a fixed seed rather than a rerun: CUDA is not run-to-run reproducible, so
-    "just run it twice" would confound the seed with nondeterminism and give a number that
-    cannot be attributed. Cost ~4.4 h, and it can share a GPU slot after a longer leg ends.
+    SEED REPLICATE of the spine P5_flashic, over the first 0.3 ns. Two changes and no
+    others: numerics.random_seed, and a shortened max_step.
+    P5's headline is a ratio-versus-tau CURVE, and a curve needs a band. The project's
+    quoted 12-13.5% noise floor was measured across legs that differed in more than the
+    seed, so it is an upper bound of unknown tightness. This measures the seed-only
+    component directly.
+    A FIXED seed rather than a plain rerun: CUDA is not run-to-run reproducible
+    (ablastr's RandomSeed.H says so outright), so "run it twice" confounds the seed with
+    nondeterminism and yields a number attributable to neither.
   reference: TEST_PLAN.md 13; decision register runs/P5/README.md (D1-D6)
   parent: runs/P4/P4_lez_kin_mrreal_drift
 
@@ -69,20 +65,23 @@ plasma:
     # to the delivered FLASH run at t = 0.1 ns: an exponential of scale 29.8024 d_e anchored
     # at n_cr, sitting 9.9173 d_e in front of the target face. rms(ln n) = 0.107 against a
     # Gaussian's 0.361. This is the fit that put zeta_cr within 3% of FLASH's.
-    corona_profile: exponential
-    scale_length_de: 29.8024
-    corona_density_over_ncr: 1.0
-    corona_offset_de: 9.9173
+    corona_profile: flash_table   # LIFTED, not fitted -- see meta.description
+    ic_table: ic_flash.yaml       # written by scripts/flash_ic_fit.py; TRACKED, and the
+                                  # deck is a pure function of it, so re-rendering this
+                                  # deck later does not need the FLASH delivery mounted.
+                                  # The four analytic primaries it replaces --
+                                  # scale_length_de 29.8024, corona_density_over_ncr 1.0,
+                                  # corona_offset_de 9.9173, and the isothermal
+                                  # theta_e_init -- are deliberately GONE, not overridden:
+                                  # leaving them would read as if they still did something.
     shape: planar
-    theta_e_init: 7.4032e-4   # 378.3 eV -- FLASH's 0.1 ns ablation layer, RAW eV. At mu = 1
-    theta_i_init: 2.2622e-4   # 115.6 eV -- the raw-eV/similarity distinction of HANDOFF.md
-                              # 5 does not arise: they coincide. T_e/T_i = 3.27 at t = 0.
-    theta_e_solid: 2.466e-6   # 1.26 eV in the SOLID -- NOT FLASH's 290 K. The cold solid is
-    theta_i_solid: 3.914e-6   # Debye-unresolvable on a uniform grid; a known departure.
-    # The handoff is a rarefaction ALREADY IN MOTION: FLASH's corona carries
-    # v/C_S0 = 0.548 + 0.05598 zeta. These are the parent's CORRECTED values (uza ~ 1/s,
-    # uzb ~ 1/s^2 -- HANDOFF.md 6). Do not hold them fixed from a reduced-mass leg.
-    drift_uz_de: [3.5638e-4, 8.4922e-6]
+    # theta_e_init / theta_i_init are GONE: the temperature profile comes from the table.
+    theta_e_solid: 2.466e-6   # now a FLOOR on the lifted T_e, not a replacement for it.
+    theta_i_solid: 3.914e-6   # Debye-unresolvability is why; deck.py emits it as thmin.
+    # drift_uz_de is GONE: v_z comes from the table too. This is the key that HANDOFF.md
+    # 6 records as needing 1/s and 1/s^2 and which, held fixed from a reduced-mass parent,
+    # started a corona 4.29x too fast and opened a density notch. A lifted profile cannot
+    # carry that class of error at all.
   ambient: null               # PIC needs no chamber gas; FLASH needs 1e-10 g/cm^3
 
 field:
@@ -122,10 +121,8 @@ numerics:
   max_grid_size: 22040        # = the WHOLE domain. On a GPU a 1D WarpX run is 7.9x faster
                               # with one box than with the default decomposition (project
                               # memory). Must be reset whenever n_cell changes.
-  max_step: 2031000           # = 10 x 203100. tau_own 5.3907, t_FLASH = 0.30001 ns --
-                              # the parent P4_lez_kin_mrreal_drift's endpoint, so this run
-                              # is simultaneously (a) the seed band for P5_full and (b) a
-                              # second sample for the target-thickening A/B.
+  max_step: 2031000           # = 10 x 203100. t_FLASH 0.1 -> 0.300 ns, the window where
+                              # the spine overlaps both this replicate and the P4 parent.
   ppc:
     target: 500               # first rung of the ladder, held from the parent so the
                               # A/B over the overlap window is single-variable
@@ -164,12 +161,12 @@ gates:
   compression_factor: 2.0
 
 controls:
-  laser_off: P5_full_off      # shared with P5_full: same deck, same duration window. The
+  laser_off: P5_full_off      # ITS OWN control, at real mass and full duration. The
                               # inherited P4_lez_kin_ic6_off is a DIFFERENT deck (reduced
                               # mass, 4.5 d_i0 target, 5.39 tau) and a G3 subtraction is
                               # only meaningful against a run differing in the laser alone.
   parent_short: P4_lez_kin_mrreal_drift   # the free A/B over tau_own 0 - 5.39
-  replicate_of: P5_full                   # this run IS the band
+  replicate: P5_seed                      # the noise band
   density_cap_ab: P5_full_n20             # the 10 -> 20 n_cr test at real mass
   sibling_flash: P4_lez_flash
 

@@ -22,6 +22,7 @@ mesh-coordinate order. The propagation axis is always ``z`` and is always last.
 from __future__ import annotations
 
 import math
+import os
 
 from . import units
 from .config import boundary_faces, has_background_field, is_vacuum
@@ -173,6 +174,28 @@ def _density_exprs(cfg: dict) -> tuple[str, str | None]:
     # Tying the corona's amplitude to the slab density, as the Gaussian form does, forces
     # the corona to start at n_max and pushes the critical surface far out -- which is
     # exactly the 4.06 d_i0 vs FLASH's 0.23 d_i0 error in P4_lez_kin.
+    # LIFTED FROM FLASH. `corona_profile: flash_table` replaces the analytic slab+corona
+    # with FLASH's actual profile, rendered from the node table `scripts/flash_ic_fit.py`
+    # wrote. The analytic exponential it supersedes has rms(ln n) = 0.107 and is 1.80x too
+    # absorbing at matched resolution (RESULTS 2026-08-29); the table runs ~0.003.
+    tab = _ic_table(cfg, cfg.get("_run_dir"))
+    if tab is not None:
+        # INERT KEYS. With the density coming entirely from the table, `thickness_de`,
+        # `scale_length_de`, `corona_density_over_ncr` and `corona_offset_de` no longer
+        # shape anything -- the slab's extent is wherever the table's flat tail runs to,
+        # i.e. the domain edge. A config key that LOOKS load-bearing and is not is exactly
+        # how `reflect_symmetry_axis` went unnoticed for 27 runs, so the deck says so.
+        _inert = [k for k in ("thickness_de", "scale_length_de",
+                              "corona_density_over_ncr", "corona_offset_de",
+                              "theta_e_init", "theta_i_init", "drift_uz_de")
+                  if tgt.get(k) is not None]
+        ln_n = _flash_profile_expr(tab, "ln_n_over_ncr")
+        t_expr = f"ncr*exp({ln_n})"
+        if str(tgt.get("shape", "planar")) == "finite_width":
+            t_expr = f"({t_expr})*(abs(x)<=0.5*targw)"
+        a_expr = None if is_vacuum(cfg) else f"namb*(1)"
+        return t_expr, a_expr
+
     expo = str(tgt.get("corona_profile", "gaussian")) == "exponential"
     ncor = tgt.get("corona_density_over_ncr")
     zoff = float(tgt.get("corona_offset_de", 0.0))
@@ -203,6 +226,64 @@ def _density_exprs(cfg: dict) -> tuple[str, str | None]:
         t_expr = f"({t_expr})*(abs(x)<=0.5*targw)"
     a_expr = f"namb*{outside}" if not is_vacuum(cfg) else None
     return t_expr, a_expr
+
+
+# ---------------------------------------------------------------------------------------
+# FLASH table -> WarpX parser expressions
+# ---------------------------------------------------------------------------------------
+def _ic_table(cfg: dict, run_dir=None) -> dict | None:
+    """Load `plasma.target.ic_table` if the run uses a lifted FLASH initial condition.
+
+    Returns None for every analytic run, so this is a no-op on the whole existing corpus.
+    """
+    tgt = cfg["plasma"]["target"]
+    if str(tgt.get("corona_profile", "gaussian")) != "flash_table":
+        return None
+    name = str(tgt.get("ic_table", "ic_flash.yaml"))
+    base = run_dir or cfg.get("_run_dir") or "."
+    path = name if os.path.isabs(name) else os.path.join(base, name)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"corona_profile: flash_table needs {path}.\n"
+            f"Generate it with:  scripts/flash_ic_fit.py {base} --time <ns>")
+    import yaml as _yaml
+    with open(path) as fh:
+        return _yaml.safe_load(fh)
+
+
+def _ramp_sum(nodes_z, nodes_v, var="z/de", fmt="{:.8g}") -> str:
+    """A piecewise-linear function of `var` as a flat sum of `max(0, .)` ramps.
+
+    f(z) = f_0 + sum_k dm_k * max(0, z - z_k),   dm_k = m_k - m_(k-1),  m_(-1) = 0
+
+    plus a closing term -m_last * max(0, z - z_N) so the function goes FLAT outside the
+    fitted span rather than extrapolating a slope off the end -- which, on a log-density
+    profile, is the difference between a vacuum and a runaway.
+
+    A flat sum rather than nested `if()`: amrex's parser handles both, but nesting 26 deep
+    is unreadable in a deck and each node here contributes exactly one term. `max` is in
+    the parser's function table (AMReX_Parser_Y.H) alongside min/heaviside/if.
+    """
+    z = [float(q) for q in nodes_z]
+    v = [float(q) for q in nodes_v]
+    if len(z) < 2:
+        raise ValueError("a ramp sum needs at least two nodes")
+    terms = [fmt.format(v[0])]
+    m_prev = 0.0
+    for k in range(len(z) - 1):
+        m = (v[k + 1] - v[k]) / (z[k + 1] - z[k])
+        dm = m - m_prev
+        m_prev = m
+        if dm != 0.0:
+            terms.append(f"{fmt.format(dm)}*max(0,{var}-({fmt.format(z[k])}))")
+    if m_prev != 0.0:
+        terms.append(f"{fmt.format(-m_prev)}*max(0,{var}-({fmt.format(z[-1])}))")
+    return "(" + " + ".join(terms).replace("+ -", "- ") + ")"
+
+
+def _flash_profile_expr(tab: dict, key: str) -> str:
+    p = tab["profiles"][key]
+    return _ramp_sum(p["z_de"], p["value"])
 
 
 def _theta_expr(role: str, kind: str) -> str:
@@ -303,6 +384,14 @@ def render(cfg: dict) -> str:
     a("my_constants.Mi     = mass_ratio*m_e")
     a("")
     a("# --- densities (in n_cr) and the reference skin depth ---")
+    # Floor for a FLASH-lifted temperature profile: the cold solid is Debye-unresolvable
+    # (gate G2), so theta_e_solid is applied as a FLOOR on the lifted T_e rather than as a
+    # replacement for it. flash_ic_fit.py reports what fraction of cells it binds on.
+    _th_floor = (cfg["plasma"]["target"].get("theta_e_solid")
+                 if str(cfg["plasma"]["target"].get("corona_profile", "")) == "flash_table"
+                 else None)
+    if _th_floor is not None:
+        a(f"my_constants.thmin  = {_num(float(_th_floor))}")
     a(f"my_constants.nt     = {_num(tgt['density_over_ncr'])}*ncr")
     if amb:
         a(f"my_constants.namb   = {_num(amb['density_over_ncr'])}*ncr")
@@ -676,8 +765,23 @@ def render(cfg: dict) -> str:
         # laser does anything -- or starts the corona far too cold, which raises inverse
         # bremsstrahlung by T^(-3/2) and changes the absorption regime, not just its
         # amount. WarpX takes `maxwellian_u_std_distribution_type = parser`.
-        solid = tgt_blk.get("theta_e_solid") is not None if role == "target" else False
-        if solid:
+        # FLASH-lifted T_e(z) and T_i(z). Lifting the density but keeping an isothermal
+        # corona would leave `K ~ T^(-3/2)` -- an absorption knob -- set by an assumption.
+        _tab = _ic_table(cfg, cfg.get("_run_dir")) if role == "target" else None
+        if _tab is not None:
+            key = "Te_eV" if kind == "electron" else "Ti_eV"
+            th = f"max(({_flash_profile_expr(_tab, key)})/{_num(511000.0)},thmin)"
+            u_std = f"sqrt({th})" if kind == "electron" else \
+                f"sqrt(({th})/mass_ratio)"
+            a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
+            for comp in ("ux_std", "uy_std", "uz_std"):
+                a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
+            solid = False
+        else:
+            solid = tgt_blk.get("theta_e_solid") is not None if role == "target" else False
+        if _tab is not None:
+            pass
+        elif solid:
             th_c = "th_t" if kind == "electron" else "th_ti"
             th_s = "th_ts" if kind == "electron" else "th_tis"
             gate = f"(z>{_face_expr(cfg)})" if inject_hi_side else f"(z<{_face_expr(cfg)})"
@@ -687,7 +791,7 @@ def render(cfg: dict) -> str:
             a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
-        else:
+        elif _tab is None:
             a(f'{name}.maxwellian_u_std_distribution_type = "constant"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f"{name}.{comp} = {u_std}")
@@ -699,7 +803,18 @@ def render(cfg: dict) -> str:
         # flow before it can expand, which is visible as the front-position ratio running
         # 1.69 at tau = 6.7 and only settling to 1.11 by tau = 27. Applied to BOTH species:
         # this is a fluid velocity, not a beam.
-        if role == "target" and tgt_blk.get("drift_uz_de") is not None:
+        if role == "target" and _tab is not None:
+            # FLASH's actual v_z(z), in units of c. The analytic form this replaces is a
+            # two-parameter linear ramp, and HANDOFF.md 6 records that getting its SCALING
+            # wrong (uza needs 1/s, uzb needs 1/s^2) cost a 4.05x error in L_n. A lifted
+            # profile has no scaling families to get wrong: it is already the right
+            # velocity in the right units at the right places.
+            vz = _flash_profile_expr(_tab, "vz_over_c")
+            a(f'{name}.maxwellian_u_mean_distribution_type = "parser"')
+            a(f'{name}.ux_mean_function(x,y,z) = "0"')
+            a(f'{name}.uy_mean_function(x,y,z) = "0"')
+            a(f'{name}.uz_mean_function(x,y,z) = "{vz}"')
+        elif role == "target" and tgt_blk.get("drift_uz_de") is not None:
             zf_ = _face_expr(cfg)
             if inject_hi_side:
                 ramp = f"(uza+uzb*(z-{zf_})/de)*(z>{zf_})"

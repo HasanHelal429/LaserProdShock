@@ -38,13 +38,16 @@ front), with no beam:
 ```
 1D  |  propagation axis z  |  lengths in d_e at critical density = 0.1693 um
 
-                                                                (no laser)
+                                                    x  LASER OFF (I = 0)
       ####~                                                             
       ^                                                                ^
       reflecting                                                    open
       z = -521                                                  z = +10499
 
-  grid : 22040 cells, dz = 0.5 d_e, dt = 0.09885 fs, 9139500 steps = 903.4 ps
+  #  target flat top : 10 n_cr, 500 d_e thick, centred at -250 d_e
+  ~  coronal ramp   : exponential, L_n = 29.8024 d_e on the LASER-FACING side (face at z = +0)
+  ' ' vacuum        : no ambient plasma
+  grid              : 22040 cells, dz = 0.5 d_e, dt = 0.09885 fs, 9139500 steps = 903.4 ps
 ```
 
 ## How it is used
@@ -56,3 +59,6 @@ unsubtracted curves are both reported; if they differ by more than the seed band
 
 ## Result
 *(to be filled in after the run)*
+
+## Retracted
+nothing yet — the run has not been launched.

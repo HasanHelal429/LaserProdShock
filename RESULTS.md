@@ -18,7 +18,7 @@ dated entry** — do not silently edit an earlier one.
 # CURRENT STATE — read this before quoting any number below
 
 *Maintained header, rewritten in place; everything under it is append-only history.*
-**Last updated 2026-08-29.** 80 dated entries follow, and a good many of their numbers have
+**Last updated 2026-08-29.** 81 dated entries follow, and a good many of their numbers have
 been superseded. This section is the live state and the retraction ledger. If a number below
 this block contradicts one in it, this block wins.
 
@@ -171,7 +171,8 @@ Read as: *claim (line asserted → line overturned) → what is true now.*
 **Live, Phase 4**
 - ~~FLASH's `f_abs` convention never re-derived (6118)~~ — **CLOSED 2026-08-29**, and it retracted the headline. See ledger 30.
 - **NEW: is FLASH converged at the critical surface?** `dx_min` 0.781 µm, no cells in `0.9 < n̂ < 1`. Needs `lrefine_max` 5/6 reruns — 38 s each on the collaborator's side (`runs/P5/README.md` F1).
-- **NEW: the fitted IC is 1.80× too absorbing** at matched resolution. Decision D5 in `runs/P5/README.md`: characterise it, or give `deck.py` a piecewise `density_function`.
+- ~~**the fitted IC is 1.80× too absorbing**~~ — **CLOSED 2026-08-29 (later)**: the IC is now LIFTED from FLASH (`corona_profile: flash_table`), and the rendered deck's optical depth matches FLASH's to **0.4 %** against the analytic fit's 1.798×. Sensitivity to the handoff is measured by the `P5_flashic_t02`/`_t04` ladder.
+- **NEW: `warpx-cda` is 7 commits ahead of origin** (all `HybridPICModel` + docs, none touching `LaserDeposition`/`Initialization`). Push before building on Perlmutter.
 - The three legs are not τ-matched: PSC 2.69 `τ_own`, WarpX 5.39, FLASH 26.96, and PSC's `T_e` is still rising — **509 eV is a lower bound** (6098).
 - The 511 keV `T_e` trajectory is non-monotonic (377 → 459 → 279 → 509 eV); the endpoint is on a recovery limb where `fabs` pinned at 1.000 (6102).
 - **The energy-partition inversion has never been explained** — only the inference from it was retracted. Electron share, τ_own 0.5 → 5.4: WarpX kinetic **−3.49 → −0.08**, WarpX hybrid 0.98 → 0.70, PSC 0.66 → 0.62 (5064, 5329).
@@ -7038,4 +7039,105 @@ and gate-checked (`P5_full`, `P5_full_off`, `P5_seed`, `P5_full_n20`); nothing i
 The `P5_full_n20` cap test is upgraded from a reservoir question to a **critical-surface
 gradient** question with a predicted direction, and two FLASH reruns (`lrefine_max` 5/6;
 `diff_eleFlCoef` 0.03/0.12) are now ahead of every WarpX run on value per cost.
+
+
+---
+
+## 2026-08-29 (later) — The initial condition is lifted, not fitted; P5 moves to Perlmutter
+
+Decisions D4 and D5 from `runs/P5/README.md` are closed and the phase is built out. No
+simulation has been run.
+
+### The 1.80× IC error is gone by construction
+
+`corona_profile: flash_table` replaces the four-parameter analytic exponential with a node
+table lifted straight from a FLASH plotfile. **All four handoff profiles** are lifted —
+`n_e`, `T_e`, `T_i`, `v_z` — because lifting only the density would leave the isothermal
+corona in place, and `K ∝ T^(−3/2)` makes that an absorption knob rather than a detail.
+
+Measured on the **rendered deck**, by evaluating its own emitted parser strings against
+FLASH's 0.1 ns profile:
+
+| | analytic exponential | lifted table |
+|---|---|---|
+| `rms(ln n)` vs FLASH | 0.107 | **0.00318** (26 nodes) |
+| max abs `d ln n` | — | 0.0096 |
+| `T_e` relative rms | *isothermal, n/a* | **0.00304** |
+| **optical depth ratio vs FLASH, same grid** | **1.798** | **1.0038** |
+
+That closes the profile-shape half of Finding 2. The other half — FLASH's grid having **no
+cells** in `0.9 < n/n_cr < 1`, worth 1.69× — is not ours to fix and is now collaborator ask
+F1 (`lrefine_max` 5 and 6; the no-rad run is 38 s).
+
+**Architecture.** `scripts/flash_ic_fit.py` reads FLASH once and writes `ic_flash.yaml`
+(tracked, human-readable); `deck.py` renders it as a **ramp sum**,
+`f(z) = f₀ + Σ dmₖ·max(0, z/dₑ − zₖ)`, flat rather than nested `if()`, with a closing term
+that cancels the last slope so the function goes flat outside the fitted span instead of
+extrapolating off a cliff. `max` is in amrex's parser table. So `config.yaml` remains the
+single source of truth, the deck stays a pure function of it, and **nothing downstream needs
+h5py or the FLASH mount** — which is what makes the Perlmutter move clean.
+
+Node placement is greedy max-error insertion, which spends nodes where curvature demands
+them: dense through the critical surface, sparse in the exponential tail. A uniform grid
+would do the opposite and under-resolve the turning point, where 41 % of the optical depth
+lives.
+
+**Kept departures**, both in the table's `clamp` block and both reported by the fitter: the
+10 `n_cr` cap (binds on 46.6 % of cells at 0.1 ns) and a `T_e` floor at `theta_e_solid`
+where FLASH's cold solid is Debye-unresolvable (45.6 %). Both are the solid.
+
+A cross-check worth recording: the table's density-weighted plume-band `T_e` comes out at
+**378.5 eV** against the analytic `theta_e_init` of 378.3 eV. **The old fit's temperature
+was right; its shape was not.** That is consistent with everything in `HANDOFF.md` §7.4 —
+the plume forgets the handoff temperature, and what absorption cares about is geometry.
+
+### A unit trap, caught by a guard rather than by a run
+
+`xcode_compare.flash_series` returns velocity normalised to **`C_S0`, not `c`** — it is
+built for the comparison axes, where every speed is in `C_S0`. Written into a field the deck
+renders as `u = γv/c`, that overstates the drift by `c/C_S0` = **1533×** and injects a
+**superluminal** initial condition. Measured at **4.01 c** before the conversion existed.
+
+`flash_ic_fit.py` now converts once, at the only place that knows both units, and
+**refuses to write a table with |v|/c > 0.2**. This is the same class of error as the
+`drift_uz_de` scaling families (`HANDOFF.md` §6, ledger 25) and it is invisible to
+inspection: 0.5 is a plausible `v/C_S0` and an implausible `v/c`, and nothing downstream
+would have flagged it.
+
+### The sensitivity study the lift makes possible
+
+FLASH ran the entire 1 ns, so it can seed a PIC leg at **any** time. `P5_flashic_t02` and
+`P5_flashic_t04` hand off at 0.2 and 0.4 ns and still end at 1.0 ns, so all three rungs share
+a window and are directly overlayable. **Collapse → the evolution has forgotten its handoff
+and the FLASH↔WarpX comparison is a comparison of physics. Separation → it is substantially
+a comparison of initial conditions, and running longer does not fix that.** Prior evidence is
+narrow and optimistic: `d(ln T_plume)/d(ln T_IC)` = 0.156, but measured on one knob, on a
+reduced-mass leg, with an analytic IC.
+
+The two effects run opposite ways and the ladder measures the net: a later handoff is
+better-conditioned (the cap clips 46.6 % of cells at 0.1 ns, 33.8 % at 0.2, 25.1 % at 0.4)
+but leaves a shorter window in which to forget it.
+
+### D4 closed: the ray_cfl ladder is built and gates the phase
+
+Four rungs at 0.05 / 0.10 / 0.25 / 0.50 on the spine's own IC, 20 300 steps each
+(2.0 ps = 0.054 `τ_own`) — the march is tested against a nearly static profile, which is the
+right test, and it costs minutes. Pass: **< 1 % in `E_abs` and < 1 cell in the deposition
+peak, between 0.10 and 0.05**, read across all four because convergence here is documented
+non-monotonic.
+
+### Twelve decks, and the phase moves to Perlmutter
+
+`runs/P5/`: `P5_flashic` (spine) · `P5_flashic_off` (its G3) · `P5_full` (analytic-IC arm of
+the lift A/B) · `P5_full_off` · `P5_seed` · `P5_flashic_t02` / `_t04` · `P5_flashic_n20` ·
+`P5_raycfl_{050,025,010,005}`. All generate and gate-check; nothing is launched.
+
+`perlmutter/` is ported from `KinShock2020/perlmutter/` (verified against the machine
+2026-08-11). The move is for **concurrency**, not per-GPU speed: ~60 h serial on chablis's
+two 4070s becomes one wall clock of ~8–13 h as single-GPU array tasks.
+
+⚠ **`warpx-cda` sits 7 commits ahead of `origin/feature/hybrid-laser`.** All seven touch
+`HybridPICModel` and docs; **none touch `LaserDeposition` or `Initialization`**, so a
+Perlmutter clone at `fcb48c9fe` builds a correct binary for every P5 leg. Push them anyway
+before building.
 

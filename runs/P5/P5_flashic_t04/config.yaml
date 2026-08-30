@@ -1,21 +1,25 @@
 meta:
-  run_id: P5_full_off
+  run_id: P5_flashic_t04
   phase: 5
-  deck: inputs_P5_full_off
+  deck: inputs_P5_flashic_t04
   description: >-
-    G3 LASER-OFF CONTROL for P5_full. Identical in every respect except that the laser
-    never fires. It exists because P5_full runs 4.5x longer than any real-mass leg before
-    it, and the quantity it exists to measure -- plume T_e -- is exactly the quantity a
-    grid-heating source also raises. dz/lambda_D is ~253 in the cold solid (1.8 in the
-    underdense plume, where every benchmark number is actually measured), so the solid is
-    a standing numerical heat source and the only question is its RATE. Over 0.2 ns that
-    rate was tolerable; nobody has measured it over 1.0 ns. Absorption and grid heating
-    both look like energy arriving, so the energy budget alone cannot separate them.
-    This run measures the heating rate instead of assuming it, and P5_full's T_e(tau) is
-    quoted only after subtracting it.
-    The inherited P4_lez_kin_ic6_off cannot do this job: it is a reduced-mass deck with a
-    4.5 d_i0 target running 5.39 tau_own. A G3 subtraction is only meaningful against a
-    run that differs in the laser and nothing else.
+    HANDOFF-TIME LADDER, rung t0 = 0.4 ns. Identical to P5_flashic except that the
+    initial condition is lifted from FLASH's 0.4 ns plotfile instead of its 0.1 ns one,
+    and max_step is shortened so the run still ends at t_FLASH = 1.0 ns.
+    This is the sensitivity test the lifted IC makes possible. FLASH ran the whole 1 ns,
+    so it can seed a PIC leg at ANY time, and the question the ladder answers is whether
+    the WarpX evolution REMEMBERS where it started. Over the shared window
+    0.4 -> 1.0 ns the rungs are the same physical problem handed over at different
+    points, so:
+      * if the rungs' trajectories collapse onto one another, the evolution has forgotten
+        the handoff and the FLASH<->WarpX comparison is a comparison of PHYSICS;
+      * if they do not, the comparison is substantially a comparison of INITIAL
+        CONDITIONS, and no amount of running longer fixes that.
+    There is prior evidence for the first: d(ln T_plume)/d(ln T_IC) = 0.156 measured on
+    P4_lez_kin_mr100_sim (HANDOFF.md 7.4) -- the plume temperature is set by the laser,
+    not by the handoff. But that was ONE knob on a reduced-mass leg with an analytic IC.
+    This ladder tests the whole initial condition at real mass.
+    A later rung is also strictly cheaper, so the ladder costs less than the spine.
   reference: TEST_PLAN.md 13; decision register runs/P5/README.md (D1-D6)
   parent: runs/P4/P4_lez_kin_mrreal_drift
 
@@ -30,10 +34,9 @@ reference:
 
 laser:
   wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
-  intensity: 0.0              # LASER OFF -- the one and only difference from P5_full.
-                              # config.py detects a control by intensity == 0 and the deck
-                              # generator keys off it. Cheaper than the parent run: no ray
-                              # march at all, so expect well under P5_full's ~19.8 h.
+  intensity: 1.0e17           # = 1e13 W/cm^2. FLASH's flat top runs to 1.0 ns, so the
+                              # laser stays on for the WHOLE of this run -- unlike the
+                              # parent, which stopped a fifth of the way into the flat top.
   direction: z
   inject_side: hi
   incidence_angle_deg: 0.0
@@ -70,20 +73,23 @@ plasma:
     # to the delivered FLASH run at t = 0.1 ns: an exponential of scale 29.8024 d_e anchored
     # at n_cr, sitting 9.9173 d_e in front of the target face. rms(ln n) = 0.107 against a
     # Gaussian's 0.361. This is the fit that put zeta_cr within 3% of FLASH's.
-    corona_profile: exponential
-    scale_length_de: 29.8024
-    corona_density_over_ncr: 1.0
-    corona_offset_de: 9.9173
+    corona_profile: flash_table   # LIFTED, not fitted -- see meta.description
+    ic_table: ic_flash.yaml       # written by scripts/flash_ic_fit.py; TRACKED, and the
+                                  # deck is a pure function of it, so re-rendering this
+                                  # deck later does not need the FLASH delivery mounted.
+                                  # The four analytic primaries it replaces --
+                                  # scale_length_de 29.8024, corona_density_over_ncr 1.0,
+                                  # corona_offset_de 9.9173, and the isothermal
+                                  # theta_e_init -- are deliberately GONE, not overridden:
+                                  # leaving them would read as if they still did something.
     shape: planar
-    theta_e_init: 7.4032e-4   # 378.3 eV -- FLASH's 0.1 ns ablation layer, RAW eV. At mu = 1
-    theta_i_init: 2.2622e-4   # 115.6 eV -- the raw-eV/similarity distinction of HANDOFF.md
-                              # 5 does not arise: they coincide. T_e/T_i = 3.27 at t = 0.
-    theta_e_solid: 2.466e-6   # 1.26 eV in the SOLID -- NOT FLASH's 290 K. The cold solid is
-    theta_i_solid: 3.914e-6   # Debye-unresolvable on a uniform grid; a known departure.
-    # The handoff is a rarefaction ALREADY IN MOTION: FLASH's corona carries
-    # v/C_S0 = 0.548 + 0.05598 zeta. These are the parent's CORRECTED values (uza ~ 1/s,
-    # uzb ~ 1/s^2 -- HANDOFF.md 6). Do not hold them fixed from a reduced-mass leg.
-    drift_uz_de: [3.5638e-4, 8.4922e-6]
+    # theta_e_init / theta_i_init are GONE: the temperature profile comes from the table.
+    theta_e_solid: 2.466e-6   # now a FLOOR on the lifted T_e, not a replacement for it.
+    theta_i_solid: 3.914e-6   # Debye-unresolvability is why; deck.py emits it as thmin.
+    # drift_uz_de is GONE: v_z comes from the table too. This is the key that HANDOFF.md
+    # 6 records as needing 1/s and 1/s^2 and which, held fixed from a reduced-mass parent,
+    # started a corona 4.29x too fast and opened a density notch. A lifted profile cannot
+    # carry that class of error at all.
   ambient: null               # PIC needs no chamber gas; FLASH needs 1e-10 g/cm^3
 
 field:
@@ -123,13 +129,9 @@ numerics:
   max_grid_size: 22040        # = the WHOLE domain. On a GPU a 1D WarpX run is 7.9x faster
                               # with one box than with the default decomposition (project
                               # memory). Must be reset whenever n_cell changes.
-  max_step: 9139500           # = 45 x 203100. tau_own 24.2598, i.e. t_FLASH = 1.00000 ns
-                              # exactly, the end of FLASH's flat top. At mu = 1 the WarpX
-                              # clock IS the FLASH clock: 0.9 ns of physical time, not the
-                              # parent's 54.66 ps of reduced-mass time.
-                              # COST: the parent ran 2030600 steps in 4h24m on one RTX
-                              # 4070, so this is ~19.8 h. Two 4070s exist -- run the G3
-                              # control on the other one concurrently.
+  max_step: 6093000           # = 30 x 203100. Starts at t_FLASH 0.4 ns and ends at
+                              # 1.0 ns, so this rung shares its whole window with the
+                              # 0.1 ns rung and the two are directly overlayable.
   ppc:
     target: 500               # first rung of the ladder, held from the parent so the
                               # A/B over the overlap window is single-variable
@@ -168,13 +170,13 @@ gates:
   compression_factor: 2.0
 
 controls:
-  laser_off: null            # this IS the control
+  laser_off: P5_full_off      # ITS OWN control, at real mass and full duration. The
                               # inherited P4_lez_kin_ic6_off is a DIFFERENT deck (reduced
                               # mass, 4.5 d_i0 target, 5.39 tau) and a G3 subtraction is
                               # only meaningful against a run differing in the laser alone.
-  physics_run: P5_full       # THE run this is a control for; tests/test_structures.py
-                              # diffs the two rendered decks line by line and fails on any
-                              # difference other than the drive.
+  ladder_of: P5_flashic                   # handoff-time rung t0 = 0.4 ns
+  replicate: P5_seed                      # the noise band
+  density_cap_ab: P5_full_n20             # the 10 -> 20 n_cr test at real mass
   sibling_flash: P4_lez_flash
 
 targets:

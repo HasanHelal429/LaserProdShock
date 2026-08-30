@@ -1,0 +1,27 @@
+# Copy to perlmutter/site.conf (gitignored) and fill in. Everything machine-specific and
+# personal lives here so nothing path-dependent is committed.
+
+# NERSC project. GPU allocations MUST end in "_g" -- a CPU project code here is the single
+# most common sbatch rejection on Perlmutter. KinShock2020 verified m5032_g on 2026-08-11.
+NERSC_ACCOUNT=m5032_g
+
+# Repo and WarpX source. BOTH on $PSCRATCH, never $HOME: the run dirs receive plotfiles
+# (every launcher cd's into them) and $HOME is quota'd and not for parallel I/O.
+LASERPROD_ROOT=${PSCRATCH:-${SCRATCH:-$HOME}}/LaserProdShock
+WARPX_SRC=${PSCRATCH:-${SCRATCH:-$HOME}}/warpx-cda
+
+# ONE build. This project has no A/B on the binary the way KinShock2020 did -- every P5
+# leg is full PIC with the ray-tracing deposition operator, so a single 1D CUDA binary
+# serves all of them.
+WARPX_BUILD=$WARPX_SRC/build_pm_1d
+
+# Pinned COMMIT, not a branch: the binary's provenance has to be a SHA. The chablis clone
+# sat 7 commits ahead of origin on 2026-08-29 -- all of them HybridPICModel and docs,
+# none touching LaserDeposition or Initialization -- so origin is sufficient for the
+# kinetic legs. Bump this once those are pushed and the two clones agree.
+WARPX_COMMIT=fcb48c9fe
+
+# QOS. "shared" bills per-GPU and fits these single-GPU runs; max wall 2 days, 5000 jobs.
+# "regular" takes whole 4-GPU nodes and would idle three of them. See perlmutter/README.md.
+DEFAULT_QOS=shared
+SPINE_TIME=24:00:00

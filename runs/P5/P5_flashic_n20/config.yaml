@@ -1,21 +1,27 @@
 meta:
-  run_id: P5_full_off
+  run_id: P5_flashic_n20
   phase: 5
-  deck: inputs_P5_full_off
+  deck: inputs_P5_flashic_n20
   description: >-
-    G3 LASER-OFF CONTROL for P5_full. Identical in every respect except that the laser
-    never fires. It exists because P5_full runs 4.5x longer than any real-mass leg before
-    it, and the quantity it exists to measure -- plume T_e -- is exactly the quantity a
-    grid-heating source also raises. dz/lambda_D is ~253 in the cold solid (1.8 in the
-    underdense plume, where every benchmark number is actually measured), so the solid is
-    a standing numerical heat source and the only question is its RATE. Over 0.2 ns that
-    rate was tolerable; nobody has measured it over 1.0 ns. Absorption and grid heating
-    both look like energy arriving, so the energy budget alone cannot separate them.
-    This run measures the heating rate instead of assuming it, and P5_full's T_e(tau) is
-    quoted only after subtracting it.
-    The inherited P4_lez_kin_ic6_off cannot do this job: it is a reduced-mass deck with a
-    4.5 d_i0 target running 5.39 tau_own. A G3 subtraction is only meaningful against a
-    run that differs in the laser and nothing else.
+    THE DENSITY-CAP A/B against the spine, at real mass and on the lifted IC. One change
+    from P5_flashic: density_over_ncr 10 -> 20.
+    Note how the cap acts here. With corona_profile: flash_table the density comes
+    entirely from the node table, and `density_over_ncr` is the CLIP APPLIED AT FIT TIME
+    by scripts/flash_ic_fit.py -- so this run's ic_flash.yaml must be regenerated with the
+    20 in place, and it is a genuinely different table, not the same table read
+    differently. At 0.1 ns the clip binds on 46.6% of cells at 10 n_cr; at 20 it binds on
+    fewer, and FLASH's real 795 n_cr solid comes 2x closer to being represented.
+    Why it is the next structural test: everything cheaper is eliminated. The deposition
+    operator is cleared (ledger 21), the density floor is worth <4% (ledger 20), and the
+    IC fit -- which WAS worth 1.80x in optical depth -- is now lifted rather than fitted.
+    What remains is the cap itself, and the 2026-08-29 audit gives it a MECHANISM and a
+    predicted direction: FLASH's critical surface sits in a near-vertical 795 n_cr front
+    while ours sits on a 10 n_cr plateau, so a higher cap steepens the gradient at the
+    turning point and should REDUCE absorption toward FLASH's.
+    G1 is the binding gate: omega_pe*dt = sqrt(20)*0.175 = 0.783 at t = 0 and 1.107 at
+    the gate's 2.0x compression, against a 1.2 limit -- an 8% margin. Read run_checks G1
+    before launch AND at the peak compressed density. If compression exceeds ~2.35x, drop
+    cfl to 0.25 and accept the 1.4x cost rather than trusting the margin.
   reference: TEST_PLAN.md 13; decision register runs/P5/README.md (D1-D6)
   parent: runs/P4/P4_lez_kin_mrreal_drift
 
@@ -30,10 +36,9 @@ reference:
 
 laser:
   wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
-  intensity: 0.0              # LASER OFF -- the one and only difference from P5_full.
-                              # config.py detects a control by intensity == 0 and the deck
-                              # generator keys off it. Cheaper than the parent run: no ray
-                              # march at all, so expect well under P5_full's ~19.8 h.
+  intensity: 1.0e17           # = 1e13 W/cm^2. FLASH's flat top runs to 1.0 ns, so the
+                              # laser stays on for the WHOLE of this run -- unlike the
+                              # parent, which stopped a fifth of the way into the flat top.
   direction: z
   inject_side: hi
   incidence_angle_deg: 0.0
@@ -55,11 +60,11 @@ laser:
 
 plasma:
   target:
-    density_over_ncr: 10.0    # the paper's n_max,PIC, held. FLASH's solid is 795 n_cr;
-                              # the overdense interior is a different object here and
-                              # n_e > n_cr is excluded from the acceptance criteria. The
-                              # cap is tested separately at real mass by P5_full_n20 --
-                              # this leg holds it so that P5_full_n20 is a clean A/B.
+    density_over_ncr: 20.0    # DOUBLED -- the one and only difference from P5_flashic.
+                              # Applied as the CLIP inside flash_ic_fit.py, so ic_flash.yaml
+                              # here is a different table. Still 40x below FLASH's 795 n_cr:
+                              # read as a two-point derivative, not a convergence.
+
     thickness_de: 500.0             # = 11.67 d_i0. NOT the paper's 4.5 -- see meta. The
                                     # extra 307 d_e is 1.4% of the 22040-cell domain, so
                                     # this costs essentially nothing, and it all sits
@@ -70,20 +75,23 @@ plasma:
     # to the delivered FLASH run at t = 0.1 ns: an exponential of scale 29.8024 d_e anchored
     # at n_cr, sitting 9.9173 d_e in front of the target face. rms(ln n) = 0.107 against a
     # Gaussian's 0.361. This is the fit that put zeta_cr within 3% of FLASH's.
-    corona_profile: exponential
-    scale_length_de: 29.8024
-    corona_density_over_ncr: 1.0
-    corona_offset_de: 9.9173
+    corona_profile: flash_table   # LIFTED, not fitted -- see meta.description
+    ic_table: ic_flash.yaml       # written by scripts/flash_ic_fit.py; TRACKED, and the
+                                  # deck is a pure function of it, so re-rendering this
+                                  # deck later does not need the FLASH delivery mounted.
+                                  # The four analytic primaries it replaces --
+                                  # scale_length_de 29.8024, corona_density_over_ncr 1.0,
+                                  # corona_offset_de 9.9173, and the isothermal
+                                  # theta_e_init -- are deliberately GONE, not overridden:
+                                  # leaving them would read as if they still did something.
     shape: planar
-    theta_e_init: 7.4032e-4   # 378.3 eV -- FLASH's 0.1 ns ablation layer, RAW eV. At mu = 1
-    theta_i_init: 2.2622e-4   # 115.6 eV -- the raw-eV/similarity distinction of HANDOFF.md
-                              # 5 does not arise: they coincide. T_e/T_i = 3.27 at t = 0.
-    theta_e_solid: 2.466e-6   # 1.26 eV in the SOLID -- NOT FLASH's 290 K. The cold solid is
-    theta_i_solid: 3.914e-6   # Debye-unresolvable on a uniform grid; a known departure.
-    # The handoff is a rarefaction ALREADY IN MOTION: FLASH's corona carries
-    # v/C_S0 = 0.548 + 0.05598 zeta. These are the parent's CORRECTED values (uza ~ 1/s,
-    # uzb ~ 1/s^2 -- HANDOFF.md 6). Do not hold them fixed from a reduced-mass leg.
-    drift_uz_de: [3.5638e-4, 8.4922e-6]
+    # theta_e_init / theta_i_init are GONE: the temperature profile comes from the table.
+    theta_e_solid: 2.466e-6   # now a FLOOR on the lifted T_e, not a replacement for it.
+    theta_i_solid: 3.914e-6   # Debye-unresolvability is why; deck.py emits it as thmin.
+    # drift_uz_de is GONE: v_z comes from the table too. This is the key that HANDOFF.md
+    # 6 records as needing 1/s and 1/s^2 and which, held fixed from a reduced-mass parent,
+    # started a corona 4.29x too fast and opened a density notch. A lifted profile cannot
+    # carry that class of error at all.
   ambient: null               # PIC needs no chamber gas; FLASH needs 1e-10 g/cm^3
 
 field:
@@ -168,13 +176,13 @@ gates:
   compression_factor: 2.0
 
 controls:
-  laser_off: null            # this IS the control
+  laser_off: P5_full_off      # ITS OWN control, at real mass and full duration. The
                               # inherited P4_lez_kin_ic6_off is a DIFFERENT deck (reduced
                               # mass, 4.5 d_i0 target, 5.39 tau) and a G3 subtraction is
                               # only meaningful against a run differing in the laser alone.
-  physics_run: P5_full       # THE run this is a control for; tests/test_structures.py
-                              # diffs the two rendered decks line by line and fails on any
-                              # difference other than the drive.
+  parent_short: P4_lez_kin_mrreal_drift   # the free A/B over tau_own 0 - 5.39
+  replicate: P5_seed                      # the noise band
+  density_cap_ab: P5_full_n20             # the 10 -> 20 n_cr test at real mass
   sibling_flash: P4_lez_flash
 
 targets:

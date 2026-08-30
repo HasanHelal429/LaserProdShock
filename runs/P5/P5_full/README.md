@@ -1,4 +1,12 @@
-# P5_full — the real-mass leg run for the whole FLASH pulse
+# P5_full — the ANALYTIC-IC arm of the initial-condition A/B
+
+> **Role changed 2026-08-29.** This was written as the phase spine. The spine is now
+> `P5_flashic`, which is this deck with the initial condition **lifted** from FLASH rather
+> than fitted to it. `P5_full` is kept and still runs, because the pair is the only
+> measurement of what the lift is worth: same mass, same duration, same everything, one
+> analytic four-parameter corona against one 26-node table. The audit predicts the analytic
+> arm over-absorbs by ~1.8× in optical depth; this is where that prediction gets tested on
+> a real run instead of an integral. Read its Question below as the A/B's, not the phase's.
 
 **Phase.** 5, `TEST_PLAN.md` §13
 **Question.** Is WarpX's plume `T_e` = 0.69 × FLASH's a *code difference*, or a *stopwatch
@@ -109,3 +117,6 @@ that → **≈ 19.8 h**. Two 4070s exist; `P5_full_off` goes on the other one co
 
 ## Result
 *(to be filled in after the run — including what is retracted)*
+
+## Retracted
+nothing yet — the run has not been launched.

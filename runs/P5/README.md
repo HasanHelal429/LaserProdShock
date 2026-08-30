@@ -60,22 +60,26 @@ is why F1 below outranks every WarpX run in the plan.
 
 ## The runs
 
-| ID | what | cost | tier |
-|---|---|---|---|
-| `P5_full` | real mass, real electron, **the whole 1 ns pulse**, thickened target, FLASH's own dump cadence | ~19.8 h | **1** |
-| `P5_full_off` | its G3 laser-off control, same duration | < 19.8 h, concurrent on GPU 1 | **1** |
-| `P5_seed` | seed replicate over `τ_own` 0–5.39; the error band for a trajectory claim | ~4.4 h | 2 |
-| `P5_full_n20` | the density cap 10 → 20 `n_cr` at real mass | ~19.8 h | 2 |
+**All twelve run on Perlmutter** — see `perlmutter/README.md`. Single-GPU array tasks, so
+the wall clock is the longest single leg rather than the sum.
 
-And two asks of the FLASH collaborator, which are **seconds of compute each** (the no-rad
-run is 38 s) and outrank everything above on value per cost:
+| ID | what | ~cost (A100) | order |
+|---|---|---|---|
+| `P5_raycfl_{050,025,010,005}` | the G4 march-convergence ladder, 2 ps each | minutes | **1 — gates the phase** |
+| `P5_seed` | seed replicate of the spine over 0.3 ns; the error band | ~1.5 h | 2 |
+| **`P5_flashic`** | **the spine**: real mass, whole 1 ns pulse, **IC lifted from FLASH** | 8–13 h | 2 |
+| `P5_flashic_off` | its G3 laser-off control | < spine | 2 |
+| `P5_full` | the same deck with the **analytic** IC — the A/B for the lift itself | 8–13 h | 2 |
+| `P5_flashic_t02`, `_t04` | handoff-time ladder: does the evolution remember its IC? | 7 / 5 h | 3 |
+| `P5_flashic_n20` | density cap 10 → 20 `n_cr` | 8–13 h | 4 — after the spine |
+
+And two asks of the FLASH collaborator, **seconds of compute each** (the no-rad run is
+38 s), which outrank everything above on value per cost:
 
 | ID | what | why |
 |---|---|---|
-| **F1** | rerun radiation-OFF at `lrefine_max` **5 and 6** (`dx_min` 0.39 / 0.20 µm), nothing else changed | Finding 2. Does FLASH's absorbed fraction **rise** when it resolves the critical layer? If it does, part of the "code difference" is a FLASH resolution artifact and the benchmark's anchor moves. |
-| **F2** | rerun at `diff_eleFlCoef` **0.03** and **0.12** (the deck runs the paper's 0.06) | The Larsen flux limiter sets the coronal scale length, which is what our IC is fitted to and what sets the absorbing path. If `L_n` moves by more than the 0.81 × we currently report against, FLASH's own calibration is inside our error bar. |
-
----
+| **F1** | rerun radiation-OFF at `lrefine_max` **5 and 6** (`dx_min` 0.39 / 0.20 µm) | Finding 2. Does FLASH's absorbed fraction **rise** when it resolves the critical layer? If it does, part of the "code difference" is a FLASH resolution artifact and the anchor moves. |
+| **F2** | rerun at `diff_eleFlCoef` **0.03** and **0.12** (the deck runs the paper's 0.06) | The Larsen flux limiter sets the coronal scale length — what our IC is lifted from and what sets the absorbing path. If `L_n` moves more than the 0.81× we report against, FLASH's own calibration is inside our error bar. |
 
 ## Decision register
 
@@ -107,15 +111,53 @@ RUN" since P4 and is *more* load-bearing now that Finding 2 puts 41 % of the fit
 optical depth in `0.9 < n̂ < 1`, right at the turning point. **Recommend running it before
 `P5_full`** — it is four short runs, not four long ones.
 
-**D5 — the initial condition. [OPEN, and it is the real fork]** Finding 2 says the fitted
-4-parameter exponential is 1.80 × too absorbing at matched resolution. Two ways forward:
-  * *(a) characterise it.* Keep the fit, quote every result against the measured `τ` offset,
-    and treat the IC as a stated systematic. Costs nothing; leaves a known 1.8 × in the
-    stack.
-  * *(b) fix it.* Give `deck.py` a piecewise `density_function` so the IC can carry FLASH's
-    actual profile rather than a fit of it. WarpX's parser takes nested `if()`, and the deck
-    already emits `parse_density_function`, so this is a modest build — but it changes the
-    IC contract that `HANDOFF.md` §5 treats as load-bearing, so it is your call, not mine.
+**D5 — the initial condition. [SET: lifted, and its sensitivity measured]** Option (b),
+built. `corona_profile: flash_table` replaces the four-parameter analytic exponential with a
+node table lifted straight from a FLASH plotfile, and **all four handoff profiles** go —
+`n_e`, `T_e`, `T_i`, `v_z` — not just the density. Measured on the *rendered deck*, by
+evaluating its own parser strings against FLASH:
+
+| | analytic exponential | lifted table |
+|---|---|---|
+| `rms(ln n)` vs FLASH | 0.107 | **0.0032** (26 nodes) |
+| `T_e` relative rms | *isothermal* | **0.0030** |
+| optical depth vs FLASH, same grid | **1.798** | **1.0038** |
+
+**The 1.80× is gone.** Three assumptions go with it: the exponential *form*, the isothermal
+corona (`K ∝ T^(−3/2)` makes that an absorption knob), and the two-parameter velocity ramp
+whose scaling families cost a 4.05× error in `L_n` once already — a lifted profile has no
+scaling families to get wrong.
+
+*Architecture.* `scripts/flash_ic_fit.py` reads FLASH **once** and writes `ic_flash.yaml`
+(tracked, diffable); `deck.py` renders it as a **ramp sum**, `f = f₀ + Σ dmₖ·max(0, z/dₑ −
+zₖ)`, flat rather than nested, with a closing term so it goes flat outside the fitted span
+instead of extrapolating off a cliff. So `config.yaml` stays the single source of truth, the
+deck stays a pure function of it, and **nothing downstream needs h5py or the FLASH mount** —
+which is what makes the Perlmutter move clean.
+
+*Kept departures*, both in the table's `clamp` block and both reported by the fitter: the
+10 `n_cr` cap (46.6 % of cells) and a `T_e` floor where FLASH's cold solid is
+Debye-unresolvable (45.6 %). Both are the solid.
+
+*Inert keys.* `thickness_de`, `scale_length_de`, `corona_density_over_ncr`,
+`corona_offset_de`, `theta_e_init`, `theta_i_init` and `drift_uz_de` now shape nothing. They
+are deleted from the lifted configs rather than left in place, and `make_inputs.py` prints a
+NOTE if any reappear.
+
+*One unit trap, caught by a guard.* `xcode_compare.flash_series` returns velocity normalised
+to `C_S0`, not `c`. Written into a field the deck renders as `u = γv/c`, that overstates the
+drift by `c/C_S0` = 1533× — a **4.01 c** initial condition, measured before the conversion
+existed. `flash_ic_fit.py` now converts once, at the only place that knows both units, and
+**refuses to write a table with |v|/c > 0.2**. Nothing downstream could have flagged it: 0.5
+is a plausible `v/C_S0` and an implausible `v/c`.
+
+**The sensitivity study.** FLASH ran the whole 1 ns, so it can seed a PIC leg at any time.
+`P5_flashic_t02` and `_t04` hand off at 0.2 and 0.4 ns and end at 1.0 ns like the spine, so
+the three rungs share a window and are directly overlayable. **Collapse → the evolution has
+forgotten the handoff and the benchmark compares physics. Separation → it substantially
+compares initial conditions, and running longer does not fix that.** Prior evidence is
+narrow and optimistic: `d(ln T_plume)/d(ln T_IC)` = 0.156 (`HANDOFF.md` §7.4) — but that was
+one knob, on a reduced-mass leg, with an analytic IC.
 
 **D6 — run order. [OPEN]** Recommended: send **F1 and F2 to the collaborator today** (they
 cost seconds and can invalidate the anchor), launch `P5_full` + `P5_full_off` on the two

@@ -45,6 +45,14 @@ def main() -> int:
 
     cfg = lpconfig.load(args.run_dir)
     rid = lpconfig.run_id(cfg)
+    _t = ((cfg.get("plasma") or {}).get("target") or {})
+    if str(_t.get("corona_profile", "")) == "flash_table":
+        _inert = [k for k in ("thickness_de", "scale_length_de", "corona_density_over_ncr",
+                              "corona_offset_de", "theta_e_init", "theta_i_init",
+                              "drift_uz_de") if _t.get(k) is not None]
+        if _inert:
+            print("  NOTE corona_profile: flash_table -- these config keys are INERT and "
+                  "shape nothing:\n       " + ", ".join(_inert))
     sc = lpconfig.derive(cfg)
 
     if args.diagram:

@@ -71,6 +71,7 @@ def load(path: str) -> dict:
                              f"{getattr(exc, 'problem', exc)}{hint}") from exc
     cfg["_path"] = os.path.abspath(path)
     cfg["_run_dir"] = os.path.dirname(cfg["_path"])
+    _inject_flash_table_scales(cfg)
     missing = [k for k in REQUIRED_SECTIONS if k not in cfg]
     if missing:
         raise KeyError(f"config missing required section(s): {missing}")
@@ -735,14 +736,44 @@ def _geometry_diagram_2d(cfg: dict, width: int = 58, height: int = 17) -> str:
     return "\n".join(L)
 
 
+def _inject_flash_table_scales(cfg: dict) -> None:
+    """For a `flash_table` run, take the gate/scale temperatures from the table.
+
+    `units.derive` needs one theta per species to build lambda_D, omega_pe*dt and C_S.
+    A lifted initial condition has a PROFILE, not a scalar, so the table carries a
+    density-weighted plume-band representative under `derived:` and it is injected here.
+
+    Deliberately NOT copied into config.yaml: two copies of the same number is how a
+    config and its initial condition drift apart, and this project has already paid for
+    that once (HANDOFF.md 6, the drift_uz_de families). config.yaml says which table to
+    use; the table says what is in it.
+    """
+    tgt = ((cfg.get("plasma") or {}).get("target") or {})
+    if str(tgt.get("corona_profile", "")) != "flash_table":
+        return
+    if tgt.get("theta_e_init") is not None:
+        return
+    path = os.path.join(cfg.get("_run_dir", "."), str(tgt.get("ic_table", "ic_flash.yaml")))
+    if not os.path.exists(path):
+        return          # deck.py raises the actionable error; do not pre-empt it here
+    with open(path) as fh:
+        d = yaml.safe_load(fh) or {}
+    der = d.get("derived") or {}
+    for k in ("theta_e_init", "theta_i_init"):
+        if der.get(k) is not None:
+            tgt[k] = float(der[k])
+
+
 def _corona_form(tgt):
     """The coronal ramp's functional form, as deck.py decides it.
 
     Kept in one place so the diagram and the deck cannot disagree: deck.py reads
     `corona_profile` with the same default.
     """
-    return ("exponential" if str(tgt.get("corona_profile", "gaussian")) == "exponential"
-            else "Gaussian")
+    cp = str(tgt.get("corona_profile", "gaussian"))
+    if cp == "flash_table":
+        return "FLASH table (lifted)"
+    return "exponential" if cp == "exponential" else "Gaussian"
 
 
 def geometry_diagram(cfg: dict, width: int = 66) -> str:
