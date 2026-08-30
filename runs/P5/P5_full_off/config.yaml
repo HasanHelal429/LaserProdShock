@@ -47,7 +47,9 @@ laser:
   min_macroparticles_per_cell: 1
   coulomb_log_mode: nrl
   intervals: 10
-  ray_cfl: 0.25               # gate G4
+  ray_cfl: 0.05                # PRODUCTION VALUE, set 2026-08-30 from the G4
+                              # ladder. Was 0.25; that understates E_abs by
+                              # 7.1% on this 10 n_cr target (gate G4).
   profile_intervals: 913950   # divisible by laser.intervals = 10 -> 10 real profile dumps
   beam:
     profile: uniform
@@ -168,6 +170,15 @@ gates:
   compression_factor: 2.0
 
 controls:
+  ray_cfl_ladder: [P5_raycfl_050, P5_raycfl_025, P5_raycfl_010, P5_raycfl_005, P5_raycfl_0025]
+                              # RUN 2026-08-29/30 on Perlmutter (array 57728667).
+                              # E_abs = 8.871e4 / 9.560e4 / 1.017e5 / 1.029e5 J at
+                              # 0.50/0.25/0.10/0.05. The 0.25 DEFAULT is 7.1% low --
+                              # ~3x the 2.5% excursion D4 assumed -- and 0.50/0.25
+                              # saturate at f_abs peak 1.0 with a shutoff while the
+                              # fine rungs peak at 0.65/0.75 and never shut off.
+                              # Production value is 0.05; 0.025 is in flight to test
+                              # whether the residual 1.18% closes below 1%.
   laser_off: null            # this IS the control
                               # inherited P4_lez_kin_ic6_off is a DIFFERENT deck (reduced
                               # mass, 4.5 d_i0 target, 5.39 tau) and a G3 subtraction is

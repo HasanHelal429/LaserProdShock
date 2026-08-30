@@ -178,7 +178,7 @@ laser_deposition.electron_temperature = th_t
 laser_deposition.temperature_mode     = local
 laser_deposition.temperature_floor    = 1.9569e-06
 laser_deposition.min_macroparticles_per_cell = 1.
-laser_deposition.ray_cfl              = 0.25
+laser_deposition.ray_cfl              = 0.05
 laser_deposition.intervals            = 10
 # per-cell (coords, n_e, H, P_abs) dump. ANALYSE THE STEP-0 TABLE: later
 # dumps drift as the kicks move electrons.

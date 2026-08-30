@@ -42,13 +42,29 @@ case "$WHAT" in
           runs/P5/P5_raycfl_010 runs/P5/P5_raycfl_005)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_raycfl"
     ;;
+  raycfl2)
+    # FIFTH rung, added after the first four did NOT converge: E_abs still moved 1.18%
+    # between 0.10 and 0.05, above this ladder's own 1% threshold. Minutes, so it runs in
+    # debug alongside whatever the spine is doing in shared.
+    RUNS=(runs/P5/P5_raycfl_0025)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_raycfl2"
+    ;;
+  controls)
+    # The two G3 laser-off controls. Both have intensity = 0, so NO ray is traced and
+    # ray_cfl is inert in them -- which makes them the only long legs that the G4 outcome
+    # cannot invalidate, and therefore the only ones safe to start before it is settled.
+    # P5_full_off had no launcher path at all before 2026-08-29.
+    RUNS=(runs/P5/P5_flashic_off runs/P5/P5_full_off)
+    JOBNAME="lp5_controls"
+    ;;
   spine)
     # The headline leg, its own G3 control, and the analytic-IC arm that measures what
     # lifting the initial condition was worth. All three are the same duration, so on
     # three GPUs the wall clock is one run.
+    # P5_flashic_off is NOT here: it is in the `controls` target, which can start before
+    # the G4 gate settles. Running it from both would put two tasks in one run dir.
     RUNS=(runs/P5/P5_seed          # 0.3 ns -- finishes first, surfaces mistakes cheaply
           runs/P5/P5_flashic       # THE SPINE
-          runs/P5/P5_flashic_off   # its G3 control
           runs/P5/P5_full)         # analytic IC: the A/B for the lift itself
     JOBNAME="lp5_spine"
     ;;
@@ -67,7 +83,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
