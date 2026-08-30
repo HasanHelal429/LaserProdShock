@@ -7148,3 +7148,105 @@ every FLASH-reading tool imports. The minimal set the analysis needs is **7.6 MB
 plotfiles + `lez1d_LaserEnergyProfile.dat`), not the delivery's 36. Editing a hardcoded path
 on a second machine is how two clones start disagreeing about what they measured.
 
+
+---
+
+## 2026-08-30 — **D4 does not close the way it was expected to: `ray_cfl = 0.25` is 7 % low, and 0.05 is not demonstrably converged either**
+
+First execution of Phase 5 on Perlmutter. The G4 ladder ran as array `57728667` — four
+tasks, all COMPLETED exit 0, `--verify` OK on every one, 5:33 / 5:56 / 7:06 / 9:03 on one
+A100 each, coarse to fine. `E_abs`, J per absent dim, at 2.006 ps:
+
+| `ray_cfl` | `E_abs` | Δ vs next coarser | `f_abs` peak | `f_abs` final | shutoff |
+|---|---|---|---|---|---|
+| 0.50 | 8.871e4 | — | 1.0000 | 0.4697 | 0.460 ps |
+| 0.25 (default) | 9.560e4 | +7.8 % | 1.0000 | 0.4287 | 1.246 ps |
+| 0.10 | 1.017e5 | +6.4 % | 0.6529 | 0.5399 | not reached |
+| 0.05 | 1.029e5 | **+1.18 %** | 0.7516 | 0.5467 | not reached |
+
+**The gate does not pass.** Its own criterion is < 1 % in `E_abs` between 0.10 and 0.05;
+the measured figure is 1.18 %. Marginal, but the threshold was not arbitrary, and the
+honest reading is "not shown to be converged" rather than "close enough".
+
+**The default is worse than D4 assumed.** D4 inherited a "2.5 % excursion" at `ray_cfl` =
+0.25. On this 10 `n_cr` target the default sits **7.1 % below** the finest rung — about
+three times that. Absorption is the headline observable of the phase, so any leg left at
+0.25 understates it by ~7 %. This supersedes the 2.5 % figure for turning-point targets of
+this density; the 2.5 % came from a ladder on a 1.5 `n_cr` slab with **no interior critical
+surface**, i.e. a problem in which no ray ever turned.
+
+**Coarse and fine disagree qualitatively, not just numerically.** 0.50 and 0.25 saturate at
+`f_abs` peak = 1.0000 and reach laser shutoff; 0.10 and 0.05 peak at 0.65 / 0.75 and never
+shut off inside 2 ps. That is a different absorption *history*, not a shifted number — and
+it is only visible because the ladder is read as a set. A two-rung check at 0.25/0.10 would
+have shown a 6.4 % gap and told you nothing about which side was right.
+
+Non-monotonicity is confirmed exactly as documented: `f_abs` peak *rises* 0.653 → 0.752 from
+0.10 to 0.05 while `E_abs` rises monotonically throughout.
+
+**The deposition peak is the reassuring half.** All four rungs put it within 0–2 cells — cell
+1067 identically at the mid dump, ±1 at the others — so acceptance criterion A5 is
+essentially met. It is the *energy integral*, not the deposition *location*, that has not
+settled. Gates: G1 PASS (`ω_pe·dt` = 0.783 at 2× compression), G5 PASS (500 ppc,
+`Tlocalfrac` = 1.000 throughout, `Vskip` = 0.000), G2/G7 INFO as always.
+
+### What was done about it
+
+Production `ray_cfl` set to **0.05** on all five long legs (`P5_flashic`, `P5_full`,
+`P5_seed`, `P5_flashic_off`, `P5_full_off`), and a **fifth rung `P5_raycfl_0025`** added to
+test whether the residual closes below 1 %. The rung costs ~12 min and reports long before
+the spine finishes, so the spine can be killed early if 0.05 is not converged either. Cost
+of the change: 0.05 ran 1.53× the wall of 0.25 at fixed step count, so the 8–13 h spine
+becomes ~12–20 h — still inside `SPINE_TIME` = 24 h and `shared`'s 2-day cap.
+
+Launched the same day: `57753369` raycfl2 (debug), `57753370` controls, `57753371` spine.
+
+### Two pairing bugs, found while making the change
+
+* **`P5_flashic.controls.laser_off` named `P5_full_off`** — which is `P5_full`'s control and
+  carries the **analytic** IC. G3 on the headline leg would have subtracted a different
+  initial condition rather than just the laser, four lines below a comment insisting a G3
+  subtraction is only meaningful against a run differing in the laser alone.
+  `P5_flashic_off` already declared `physics_run: P5_flashic`; only the forward link was
+  wrong. Corrected.
+* **`P5_full_off` was in no `submit.sh` target** and could not be launched at all. Added a
+  `controls` target carrying both laser-off runs, and removed `P5_flashic_off` from `spine`
+  so the two targets cannot put two array tasks in one run directory.
+
+With the ladder declared and the pairing corrected, all five legs render **0 warn / 0 fail**
+(was 2 warn). 652 tests pass.
+
+### Three defects in the Perlmutter tooling, none of which had ever been executed
+
+`perlmutter/README.md` said "ported, not yet executed". It was, and the port had lost three
+things — each of which would have cost a queue wait or a silently wrong run:
+
+1. **`submit.sh` wrote the array run list to `$TMPDIR`.** On Perlmutter `/tmp` is a per-node
+   tmpfs, so a list written on a login node is invisible to the compute node running the
+   task: `job.sbatch` would `sed` an absent file, get an empty `SPEC`, and exit 2 on **every
+   task**, after the full queue wait. `KinShock2020` puts it on `$PSCRATCH` for exactly this
+   reason and the port dropped that. Moved to `perlmutter/.runlists/<target>-<stamp>.txt`.
+2. **The build's key check reported MISSING for all eight keys.** Under `set -o pipefail`,
+   `strings BIN | grep -q KEY` returns **141**: `grep -q` exits at the first match, `strings`
+   dies of SIGPIPE, and the `else` branch fires *on a match*. The one safety net against a
+   silently ignored deck flag was a false-negative machine on its first run. It also used
+   `grep -x`, which cannot match here at all — the constant pool packs literals with no NUL
+   between them. Now greps a saved dump, substring, once rather than twice per key.
+3. **`site.conf` was not gitignored** despite `site.conf.example` saying it was.
+
+### `maxwellian_u_mean_distribution_type`: a false alarm, and why
+
+After the pipefail fix, 7 of 8 keys verified and this one still did not. It is **not**
+missing. `ParseVelocityVector` takes `std::string const&`, so the call site constructs a
+string of compile-time-known length, the literal needs no NUL terminator, and the linker
+packs it flush against its neighbour (`..._distribution_t` runs straight into
+`VelocityProperti`). `maxwellian_u_std_distribution_type` goes through `query()` as a
+`const char*`, needs the NUL, and so does appear as a clean `strings` line — which is
+exactly the difference observed. WarpX's **"Unused ParmParse Variables"** list settles it:
+the key is absent from that list, so it *was* queried and the lifted FLASH drift profile
+was applied. Only six inert `my_constants` helpers went unused.
+
+**Generalisable lesson:** `strings | grep` is a *proxy* for "this binary implements this
+key", and it has both false negatives (this one) and no positive proof of use. The
+authoritative check is the unused-input list, available seconds after launch, which is why
+`--verify` is mandated then and not at the end.
