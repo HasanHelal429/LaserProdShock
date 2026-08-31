@@ -74,8 +74,15 @@ def crossing_resolution(run_dir, n_cr, dz):
     a = np.loadtxt(ps[sorted(ps)[len(ps) // 2]])
     z, ne = a[:, 0], a[:, 1]
     r = ne / n_cr
-    i = np.argmax(r < 1.0) if np.any(r < 1.0) else None
-    if not i:
+    # THE crossing is where the profile goes overdense -> underdense on the laser side,
+    # not simply the first cell under critical: a domain whose low-z end is vacuum has
+    # r < 1 at index 0, which is not a turning point at all. (That edge case silently
+    # returned "no crossing" for the analytic-ramp ladder until 2026-08-31.)
+    cross = np.nonzero((r[:-1] >= 1.0) & (r[1:] < 1.0))[0]
+    if cross.size == 0:
+        return None
+    i = int(cross[-1]) + 1
+    if i < 1 or i >= len(r) - 1:
         return None
     drdz = (r[i + 1] - r[i - 1]) / (z[i + 1] - z[i - 1])
     if drdz == 0:
@@ -101,7 +108,7 @@ def localise(run_a, run_b, n_cr, step=None):
     tot = d.sum()
     order = np.argsort(-np.abs(d))
     top = [{"cell": int(i), "z": float(z[i]), "r": float(ne[i] / n_cr),
-            "dE": float(d[i]), "frac": float(d[i] / tot) if tot else float("nan")}
+            "dE": float(d[i]), "frac": float(abs(d[i]) / abs(tot)) if tot else float("nan")}
            for i in order[:5]]
     return {"step": k, "total": float(tot), "top": top,
             "edge_lo": float(d[:5].sum()), "edge_hi": float(d[-5:].sum())}
@@ -227,7 +234,7 @@ def main():
                   f"lo {loc['edge_lo']:+.2e}, hi {loc['edge_hi']:+.2e}")
             for t in loc["top"]:
                 print(f"      cell {t['cell']:6d}  r = {t['r']:7.3f}  "
-                      f"dE = {t['dE']:+.4e}  ({100*t['frac']:+.1f} % of total)")
+                      f"dE = {t['dE']:+.4e}  ({100*t['frac']:5.1f} % of |total|)")
             print("    A divergence at the turning point (r ~ 1) is the sub-grid layer;\n"
                   "    one at the domain edge is upstream Finding 1 instead.")
     print()
