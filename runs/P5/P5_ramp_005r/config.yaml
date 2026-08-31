@@ -1,0 +1,205 @@
+meta:
+  run_id: P5_ramp_005r
+  phase: 5
+  deck: inputs_P5_ramp_005r
+  description: >-
+    SEED REPLICATE of P5_ramp_005 -- byte-identical config except random_seed. It exists
+    to put an ERROR BAR on E_abs, without which neither ray_cfl ladder can be read.
+    The analytic-ramp ladder scatters +0.96 / +2.76 / -0.90 / +1.41 % between rungs. Those
+    increments CHANGE SIGN, which is the signature of scatter rather than of a systematic
+    drift -- but "scatter about what, and how big" is unanswerable without a same-config
+    replicate, and no P5 leg has one at this duration. The project's only E_abs stability
+    figure, 0.6%, was measured BETWEEN GEOMETRIES on a different phase, not between seeds
+    on this deck, and its f_abs(0) figure of 10.4% 1-sigma across seed alone shows the two
+    quantities behave very differently.
+    Note also that WarpX on GPU is not reproducible even at fixed seed (ablastr's
+    RandomSeed.H says so outright and two chablis runs confirmed it), so this measures the
+    combined seed-plus-nondeterminism floor -- which is exactly the floor a convergence
+    claim has to clear.
+  reference: TEST_PLAN.md 13; decision register runs/P5/README.md (D1-D6)
+  parent: runs/P4/P4_lez_kin_mrreal_drift
+
+reference:
+  # REAL aluminium: m_Al/m_e = 26.9815 * 1836.15 = 49542. No mass reduction, so mu = 1
+  # and every mu-scaling family in HANDOFF.md 6 is the identity here. That is the point
+  # of this leg -- it is the only configuration in which absorption is not broken by
+  # construction (HANDOFF.md 7.4: tau_abs ~ mu^0.490, and only more ion mass fixes it).
+  length_scale: critical
+  mass_ratio: 49542.0
+  charge_state: 13
+
+laser:
+  wavelength_um: 1.064        # paper II.A -- pins n_cr = 9.848e26 m^-3, d_e,cr = 0.1693 um
+  intensity: 1.0e17           # = 1e13 W/cm^2. FLASH's flat top runs to 1.0 ns, so the
+                              # laser stays on for the WHOLE of this run -- unlike the
+                              # parent, which stopped a fifth of the way into the flat top.
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 13.0                 # fully ionised Al, as in FLASH (ms_targZ = ms_targZMin = 13)
+  coulomb_log: 6.3            # NRL e-i at n_cr, T_e = 823 eV, Z = 13. Recorded, not used:
+                              # temperature_mode is local and coulomb_log_mode is nrl, so
+                              # the operator computes lnLambda per cell. Kept for the audit
+                              # trail (TEST_PLAN 12.8 risk 4 -- record BOTH conventions).
+  temperature_mode: local
+  temperature_floor_theta: 1.9569e-6  # 1 eV -- never binds; FLASH's EOS floor is 2 eV
+  min_macroparticles_per_cell: 1
+  coulomb_log_mode: nrl
+  intervals: 10
+  ray_cfl: 0.05                    # THE LADDER VARIABLE (gate G4)
+                              # ladder. Was 0.25; that understates E_abs by
+                              # 7.1% on this 10 n_cr target (gate G4).
+  profile_intervals: 2030   # divisible by laser.intervals = 10 -> 10 real profile dumps
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+
+plasma:
+  target:
+    density_over_ncr: 10.0    # the paper's n_max,PIC, held. FLASH's solid is 795 n_cr;
+                              # the overdense interior is a different object here and
+                              # n_e > n_cr is excluded from the acceptance criteria. The
+                              # cap is tested separately at real mass by P5_full_n20 --
+                              # this leg holds it so that P5_full_n20 is a clean A/B.
+    thickness_de: 500.0             # = 11.67 d_i0. NOT the paper's 4.5 -- see meta. The
+                                    # extra 307 d_e is 1.4% of the 22040-cell domain, so
+                                    # this costs essentially nothing, and it all sits
+                                    # BEHIND the critical surface where the laser never
+                                    # reaches, leaving absorption untouched at t = 0.
+    center_de: -250.0               # solid-vacuum interface at z = 0, as in both codes
+    # THE FLASH-FITTED CORONA, carried unchanged from the parent. Fitted over 1e-3..1 n_cr
+    # to the delivered FLASH run at t = 0.1 ns: an exponential of scale 29.8024 d_e anchored
+    # at n_cr, sitting 9.9173 d_e in front of the target face. rms(ln n) = 0.107 against a
+    # Gaussian's 0.361. This is the fit that put zeta_cr within 3% of FLASH's.
+    corona_profile: exponential
+    scale_length_de: 29.8024
+    corona_density_over_ncr: 1.0
+    corona_offset_de: 9.9173
+    shape: planar
+    theta_e_init: 7.4032e-4   # 378.3 eV -- FLASH's 0.1 ns ablation layer, RAW eV. At mu = 1
+    theta_i_init: 2.2622e-4   # 115.6 eV -- the raw-eV/similarity distinction of HANDOFF.md
+                              # 5 does not arise: they coincide. T_e/T_i = 3.27 at t = 0.
+    theta_e_solid: 2.466e-6   # 1.26 eV in the SOLID -- NOT FLASH's 290 K. The cold solid is
+    theta_i_solid: 3.914e-6   # Debye-unresolvable on a uniform grid; a known departure.
+    # The handoff is a rarefaction ALREADY IN MOTION: FLASH's corona carries
+    # v/C_S0 = 0.548 + 0.05598 zeta. These are the parent's CORRECTED values (uza ~ 1/s,
+    # uzb ~ 1/s^2 -- HANDOFF.md 6). Do not hold them fixed from a reduced-mass leg.
+    drift_uz_de: [3.5638e-4, 8.4922e-6]
+  ambient: null               # PIC needs no chamber gas; FLASH needs 1e-10 g/cm^3
+
+field:
+  orientation: none
+  vA_over_c: 0.0
+
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    # Span 11020 d_e = 22040 cells at dz = 0.5, divisible by blocking_factor 8 (2755).
+    # lo keeps the parent's 21.4251 d_e (0.5 d_i0) of margin behind the thickened target.
+    lo_de: -521.4251
+    hi_de: 10498.5749
+    # Headroom check: the parent's plume front (n_e = 1e-2 n_cr) sat at zeta = 14.31 at
+    # tau_own 5.39, against FLASH's 19.62. Extrapolating linearly to tau_own 24.26 puts
+    # this leg's front near zeta 64, i.e. 2743 d_e -- a quarter of the 10499 d_e of vacuum
+    # ahead of the target. The box holds the whole pulse with ~4x margin. It is NOT the
+    # binding constraint; the target reservoir is.
+  boundary:
+    axis:
+      lo: reflecting          # target REAR. Absorbing piles compression against the wall
+      hi: open                # plume side. Reflecting makes unphysical counterstreaming.
+numerics:
+  density_min_frac: 1e-06     # six decades of resolved density. RESULTS 2026-08-18: this
+                              # one parameter, not the closure or the ppc, is what moved
+                              # the T_e shape onto FLASH's (RISE 1.504 -> 1.133 vs 1.148).
+  arena_init_size_mb: 4096
+  cfl: 0.35
+  particle_shape: 2
+  random_seed: 20260831       # FIXED, so P5_seed is a deliberate replicate rather than a
+                              # reliance on CUDA's run-to-run nondeterminism. The measured
+                              # noise floor is 12-13.5% on a single-time T_e (RESULTS
+                              # CURRENT STATE), and a trajectory claim needs a band, not
+                              # an anecdote.
+  max_grid_size: 22040        # = the WHOLE domain. On a GPU a 1D WarpX run is 7.9x faster
+                              # with one box than with the default decomposition (project
+                              # memory). Must be reset whenever n_cell changes.
+  max_step: 20300           # 2.0 ps = 0.054 tau_own, IDENTICAL to every raycfl rung so the
+                            # two ladders are directly comparable. The ray march is tested
+                            # against a nearly static profile, which is the right test.
+  ppc:
+    target: 500               # held from every other P5 leg so the two ladders are
+                              # single-variable against each other
+    ambient: 0
+collisions:
+  enabled: true               # the paper: auxiliary runs with collisions off "demonstrated
+                              # drastically different plasma evolution". Meaningless without.
+  type: coulomb
+  intervals: 10
+  coulomb_log: 6.3
+  pairs:
+    - [targ_electrons, targ_electrons]
+    - [targ_electrons, targ_ions]
+    - [targ_ions, targ_ions]
+
+diagnostics:
+  # MATCHED TO FLASH'S CADENCE. FLASH writes every 0.02 ns; at mu = 1 that is 203100 steps
+  # here. So every WarpX dump lands on a real FLASH plotfile time and the trajectory
+  # comparison needs NO interpolation in time -- which matters, because the whole point of
+  # this leg is a ratio-versus-tau curve rather than a single-time ratio.
+  plotfile_intervals: 4060   # 45 dumps, t_FLASH 0.12, 0.14 ... 1.00 ns
+  field_intervals: 2030      # 90 dumps, streaks. Cheap: no particles.
+  phase_intervals: 20300      # 30 dumps, for the phase-space movie
+  reduced_intervals: 203     # held from the parent: 495 samples of the energy ledger.
+                               # The energy-partition inversion is an OPEN item (RESULTS
+                               # CURRENT STATE) and has only ever been looked at over
+                               # tau_own 0.5-5.4. This is the first leg that can resolve
+                               # it out to 24.
+
+gates:
+  omega_pe_dt_max: 1.2        # at 10 n_cr: sqrt(10)*0.175 = 0.55. Check at the PEAK
+                              # COMPRESSED density this run reaches, not at t = 0 (G1).
+  dz_over_lambdaD_max: 8.0    # WILL WARN in the cold dense target, as in every prior run
+  ppc_target_min: 500
+  compression_factor: 2.0
+
+controls:
+  ray_cfl_ladder: [P5_raycfl_050, P5_raycfl_025, P5_raycfl_010, P5_raycfl_005, P5_raycfl_0025]
+                              # RUN 2026-08-29/30 on Perlmutter (array 57728667).
+                              # E_abs = 8.871e4 / 9.560e4 / 1.017e5 / 1.029e5 J at
+                              # 0.50/0.25/0.10/0.05. The 0.25 DEFAULT is 7.1% low --
+                              # ~3x the 2.5% excursion D4 assumed -- and 0.50/0.25
+                              # saturate at f_abs peak 1.0 with a shutoff while the
+                              # fine rungs peak at 0.65/0.75 and never shut off.
+                              # Production value is 0.05; 0.025 is in flight to test
+                              # whether the residual 1.18% closes below 1%.
+  ladder_of: P5_full          # analytic-ramp ray_cfl ladder; read as a set      # ITS OWN control, at real mass and full duration. The
+                              # inherited P4_lez_kin_ic6_off is a DIFFERENT deck (reduced
+                              # mass, 4.5 d_i0 target, 5.39 tau) and a G3 subtraction is
+                              # only meaningful against a run differing in the laser alone.
+  parent_short: P4_lez_kin_mrreal_drift   # the free A/B over tau_own 0 - 5.39
+  replicate: P5_seed                      # the noise band
+  density_cap_ab: P5_full_n20             # the 10 -> 20 n_cr test at real mass
+  sibling_flash: P4_lez_flash
+
+targets:
+  T_e_SS_eV: 823.0            # Manheimer at mu = 1. Eq. (15) carries Z^(-1/3), NOT Z^(+1/3)
+  C_S_km_s: 195.0
+  d_i0_real_um: 7.256
+  ion_response_time_ps: 37.2
+  pulse_in_response_times: 26.9
+  tol_n_e: 0.20
+  tol_T_e: 0.20
+  tol_T_i: 0.20
+  tol_V_z: 0.10
+  critical_surface_speed_over_Cs: 0.8
+  # WHAT THIS RUN IS FOR. The parent gave the project's cleanest cross-code number --
+  # matched f_abs (0.840 vs 0.870), WarpX at 0.69x FLASH's plume T_e -- but at ONE time,
+  # at which neither code is near its asymptote. Retraction ledger 15 already killed one
+  # "benchmark passes" for exactly this reason. This leg replaces the single ratio with a
+  # ratio-versus-tau curve over the whole pulse. A FLAT 0.69 is a code difference. A
+  # RISING curve is a rate difference and the 0.69 was a stopwatch artifact.
+  flash_Te_max_eV_at_1ns: 953.5    # DELIVERY.md, radiation OFF
+  flash_f_abs_asserted: 0.8704     # DELIVERY.md. Convention NEVER re-derived -- an open
+                                   # item, and the matched-f_abs claim rests on it.
+                                   # scripts/flash_absorption.py closes it BEFORE launch.

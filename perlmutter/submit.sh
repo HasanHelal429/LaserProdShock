@@ -62,9 +62,24 @@ case "$WHAT" in
     # ladder that diverged) plus the laser-off control at the ladder's OWN duration, which
     # is what makes the ladder's energy closure readable. All six are 20300 steps, minutes
     # each; six tasks exceed debug's 5-task cap, so they go to shared.
+    # debug, not shared: every rung is a 20300-step twin of a raycfl rung (5-13 min), and
+    # gpu_shared was 429 deep when this was written while debug schedules in minutes.
+    # EXACTLY 5 tasks, because debug caps a user at 5 -- which is why the laser-off control
+    # is its own target (`offctl`) rather than a sixth entry here.
     RUNS=(runs/P5/P5_ramp_050 runs/P5/P5_ramp_025 runs/P5/P5_ramp_010
-          runs/P5/P5_ramp_005 runs/P5/P5_ramp_0025 runs/P5/P5_raycfl_off)
-    TIME="01:00:00"; JOBNAME="lp5_rampcfl"
+          runs/P5/P5_ramp_005 runs/P5/P5_ramp_0025)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_rampcfl"
+    ;;
+  seedrep)
+    # The error bar. A convergence verdict compares increments against a floor, and no P5
+    # leg had a same-config replicate at this duration.
+    RUNS=(runs/P5/P5_ramp_005r)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_seedrep"
+    ;;
+  offctl)
+    # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
+    RUNS=(runs/P5/P5_raycfl_off)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_offctl"
     ;;
   controls)
     # The two G3 laser-off controls. Both have intensity = 0, so NO ray is traced and
@@ -100,7 +115,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
