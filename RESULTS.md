@@ -7308,3 +7308,73 @@ divergence lives in the last cell, it is the overshoot and it is a code fix, not
 resolution limit.
 
 **D4 is not closed. It is now the phase's blocking item**, ahead of the spine.
+
+---
+
+## 2026-08-30 (diagnosis) — **the ray march cannot converge here: the critical layer is 0.12 cells thick. This is a grid-resolution defect, not an arc-length one**
+
+Localised the non-convergence using the per-cell `laserdep_profile` dumps already on
+disk — no new runs. Comparing `ray_cfl` = 0.25 against 0.025 at dump 012180:
+
+* **It is not the exit-boundary overshoot (Finding 1).** The last five cells at each end
+  of the domain contribute `lo = 0` and `hi = -4.9e4` out of a total difference of
+  `+9.5e15` — eleven orders of magnitude down. Finding 1 is real but is not this.
+* **It is the turning point.** Cell **1066 alone carries 75 %** of the entire difference
+  (`+7.1e15` of `+9.5e15`); cells 1066–1068 carry more than all of it (the rest is
+  negative). Cell 1066 has `n_e/n_cr` = **1.04** — it is *overdense*.
+* At `ray_cfl` = 0.25 that overdense cell receives **zero** deposition; at 0.025 it
+  receives **8.4e22**, the largest value in the profile. The finer march has walked the ray
+  *past* the critical surface into the evanescent region and deposited there.
+
+### Why refining `ray_cfl` makes it worse rather than better
+
+At the crossing the density scale length is `L_n = |1/(dr/dz)| = 5.95 d_e,cr` = **11.9
+cells**. So:
+
+| layer | thickness |
+|---|---|
+| `1-r < 0.1` | 1.19 cells |
+| `1-r < 0.01` | **0.119 cells** |
+| `1-r < 1e-4` (where `den_of` clamps) | **0.0012 cells** |
+
+**There is not one grid cell with `0.99 < r < 1.01`.** The density steps
+1.099 → 1.040 → 0.931 across adjacent cells. The entire singular layer is sub-grid.
+
+`den_of` returns `sqrt(max(1 - r, n_floor2))` with `n_floor = 1e-2`, so `K` is capped at
+100× its underdense value; and the turning branch fires only on `den_end <= n_floor`, i.e.
+`r >= 0.9999`. Between the last resolved underdense cell and that trigger there is nothing
+but **multilinear interpolation between two cells straddling critical** — a straight line
+the grid invented. Refining `ray_cfl` resolves that invented line ever more finely, creeping
+toward its interpolated `r = 1` where `K` is clamp-limited. More steps in the clamped sliver
+= more absorption, without bound. **`ray_cfl` is converging to the integral of a profile
+that does not physically exist, and the value it approaches is set by `n_floor`, not by the
+plasma.**
+
+### Why upstream's own convergence test did not catch this
+
+`run_convergence` reports the `ray_cfl` and `n_cell` sweeps as *bit-identical* at equal
+`ray_cfl × Δz` **"because multilinear density interpolation is exact for a linear ramp"**.
+That is the whole answer: on a linear ramp the interpolated profile *is* the true profile,
+so `L_eff = 1/drds` in the analytic near-critical layer is exact and the discrete/analytic
+partition sums to a resolution-independent total. Finding 2's non-monotonic-but-converging
+result (0.9953 → 1.0253 → 1.0046) was measured on exactly that ramp. P5's corona is a
+**lifted FLASH table**, not a linear ramp, and at the crossing it is steep enough that the
+grid cannot represent the layer at all — so `L_eff` becomes a grid artifact and the
+partition stops being consistent. Finding 2's advice ("`ray_cfl ≤ 0.06` when a turning point
+matters") is therefore **not sufficient** for a target whose critical layer is sub-grid.
+
+### What this does and does not condemn
+
+* **A5 (deposition location) still holds** — the peak sits in cell 1066–1068 across all five
+  rungs, within ±1 cell at every dump. The operator puts energy in the right *place*.
+* **`run_scaling`'s coefficient audit still stands** — K is correct term by term
+  (measured/analytic flat at 1.00097 over a 275× range), and that was measured away from a
+  turning point.
+* What is unreliable is *how much* is absorbed on a target with an unresolved critical
+  layer, i.e. every P5 leg at 10 `n_cr`.
+
+**Falsifiable predictions.** (1) A `dz` ladder at fixed `ray_cfl` should converge where the
+`ray_cfl` ladder did not. (2) The same `ray_cfl` ladder run on an *analytic linear ramp* at
+10 `n_cr` should reproduce upstream's convergence. (3) Lowering `n_floor` at fixed `ray_cfl`
+should *raise* `E_abs`, since the clamp is what currently bounds it. Any one of these
+failing kills this diagnosis.
