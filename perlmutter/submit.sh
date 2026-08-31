@@ -49,6 +49,23 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_raycfl_0025)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_raycfl2"
     ;;
+  dzladder)
+    # TIER 1a -- THE decisive test of the 2026-08-30 diagnosis. ray_cfl held at 0.25; the
+    # GRID is the variable. The dz = 0.5 rung is P5_raycfl_025, ALREADY RUN -- do not
+    # repeat it. Cost is 4x and 16x that rung (2x/4x cells AND 2x/4x steps, since dt
+    # scales with dz at fixed cfl), so ~25 min and ~95 min.
+    RUNS=(runs/P5/P5_dz_025 runs/P5/P5_dz_0125)
+    TIME="06:00:00"; JOBNAME="lp5_dzladder"
+    ;;
+  rampcfl)
+    # TIER 1b + 1c -- the analytic-ramp ray_cfl ladder (the control for the lifted-IC
+    # ladder that diverged) plus the laser-off control at the ladder's OWN duration, which
+    # is what makes the ladder's energy closure readable. All six are 20300 steps, minutes
+    # each; six tasks exceed debug's 5-task cap, so they go to shared.
+    RUNS=(runs/P5/P5_ramp_050 runs/P5/P5_ramp_025 runs/P5/P5_ramp_010
+          runs/P5/P5_ramp_005 runs/P5/P5_ramp_0025 runs/P5/P5_raycfl_off)
+    TIME="01:00:00"; JOBNAME="lp5_rampcfl"
+    ;;
   controls)
     # The two G3 laser-off controls. Both have intensity = 0, so NO ray is traced and
     # ray_cfl is inert in them -- which makes them the only long legs that the G4 outcome
@@ -83,7 +100,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
