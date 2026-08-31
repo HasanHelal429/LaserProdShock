@@ -1,0 +1,15 @@
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P5/P5_full_off
+# logging_started 2026-08-30T15:36:20  total_steps=9139500  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-30T15:36:50 | 9180/9139500 ( 0.1%) | 0h00m | 0.0033 s/step(wall) | 0.0031 s/step(warpx) | ETA ~8h17m | x1.04 | load 13.5 | laser OFF (I0 = 0)
+2026-08-30T17:03:17 | 915360/9139500 (10.0%) | 1h26m | 0.0057 s/step(wall) | 0.0057 s/step(warpx) | ETA ~13h04m | x1.01 | load 17.0 | laser OFF (I0 = 0)
+2026-08-30T18:07:37 | 1832700/9139500 (20.1%) | 2h31m | 0.0042 s/step(wall) | 0.0049 s/step(warpx) | ETA ~8h32m | x0.85 | load 14.4 | laser OFF (I0 = 0)
+2026-08-30T19:02:46 | 2747122/9139500 (30.1%) | 3h26m | 0.0036 s/step(wall) | 0.0045 s/step(warpx) | ETA ~6h25m | x0.80 | load 22.0 | laser OFF (I0 = 0)
+2026-08-30T19:53:33 | 3656000/9139500 (40.0%) | 4h17m | 0.0034 s/step(wall) | 0.0042 s/step(warpx) | ETA ~5h06m | x0.80 | load 14.3 | laser OFF (I0 = 0)
+2026-08-30T20:43:43 | 4575305/9139500 (50.1%) | 5h07m | 0.0033 s/step(wall) | 0.0040 s/step(warpx) | ETA ~4h09m | x0.82 | load 14.8 | laser OFF (I0 = 0)
+2026-08-30T21:34:16 | 5494463/9139500 (60.1%) | 5h57m | 0.0033 s/step(wall) | 0.0039 s/step(warpx) | ETA ~3h20m | x0.85 | load 12.9 | laser OFF (I0 = 0)
+2026-08-30T22:24:26 | 6407824/9139500 (70.1%) | 6h48m | 0.0033 s/step(wall) | 0.0038 s/step(warpx) | ETA ~2h30m | x0.87 | load 5.3 | laser OFF (I0 = 0)
+2026-08-30T23:14:11 | 7318134/9139500 (80.1%) | 7h37m | 0.0033 s/step(wall) | 0.0037 s/step(warpx) | ETA ~1h39m | x0.88 | load 5.1 | laser OFF (I0 = 0)
+2026-08-31T00:04:04 | 8226287/9139500 (90.0%) | 8h27m | 0.0033 s/step(wall) | 0.0037 s/step(warpx) | ETA ~0h50m | x0.89 | load 5.2 | laser OFF (I0 = 0)
+2026-08-31T00:54:26 | 9139500/9139500 (100.0%) | 9h18m | 0.0033 s/step(wall) | 0.0037 s/step(warpx) | ETA ~0h00m | x0.91 | load 5.1 | laser OFF (I0 = 0)
+DONE 2026-08-31T00:54:26 | 9139500/9139500 (100.0%) | total wall 9h18m | mean 0.0037 s/step(wall) | reached max_step
