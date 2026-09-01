@@ -77,3 +77,10 @@ perlmutter/site.conf
 # exit line.
 slurm-*.out
 slurm-*.err
+
+# srun wrappers written by the upstream-suite harnesses at job start (the upstream
+# sweep drivers invoke the binary directly, which on Perlmutter must go through srun)
+.w1
+.w2
+.w3
+.warpx1d_srun

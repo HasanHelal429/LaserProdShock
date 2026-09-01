@@ -97,6 +97,19 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_Ln_010_fine runs/P5/P5_Ln_060_fine)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_t3fine"
     ;;
+  tier3a)
+    # Tier 3 remainder, batch A -- moved to debug because gpu_shared sat ~400 deep while
+    # debug schedules in minutes. EXACTLY 5 tasks (debug's per-user cap), chosen so this
+    # batch alone completes TWO answers: the whole underdense control family, and both
+    # endpoints of the straight-ray drift (0.25 and 0.025).
+    RUNS=(runs/P5/P5_under_025 runs/P5/P5_under_005 runs/P5/P5_under_0025
+          runs/P5/P5_straight_025 runs/P5/P5_straight_0025)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_t3a"
+    ;;
+  tier3b)
+    RUNS=(runs/P5/P5_straight_005 runs/P5/P5_ncr_200)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_t3b"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -136,7 +149,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
