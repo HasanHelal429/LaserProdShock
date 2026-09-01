@@ -91,6 +91,12 @@ case "$WHAT" in
           runs/P5/P5_under_025 runs/P5/P5_under_005 runs/P5/P5_under_0025)
     TIME="01:00:00"; JOBNAME="lp5_tier3"
     ;;
+  tier3fine)
+    # The two rungs that make Tier 3c an isolation experiment instead of an optical-depth
+    # scaling: drift(ray_cfl 0.25 -> 0.025) at 0.20 and 1.20 cells across the layer.
+    RUNS=(runs/P5/P5_Ln_010_fine runs/P5/P5_Ln_060_fine)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_t3fine"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -130,7 +136,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
