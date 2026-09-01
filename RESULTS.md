@@ -7590,3 +7590,58 @@ in ascending order of work:
    let the spine run at dz = 0.5 as originally planned.
 4. **Accept 36.3 h at 0.52 cells** and quote absorption with an explicit ~3–4 % resolution
    band, on the strength of the measured drift curve. Defensible only if stated as such.
+
+---
+
+## 2026-08-31 (Tier 2, 1D) — **the operator reproduces its own accuracy baselines on the Perlmutter CUDA build, to four decimals where it matters**
+
+First time `warpx-cda/laser_deposition/`'s suite has been run anywhere but chablis. All 11
+1D tests ran, **zero failures**, binary `build_pm_1d/bin/warpx.1d` at `534f3b170`. Scored
+with upstream's own analysis scripts, not with log greps.
+
+| test | quantity | measured here | `ACCURACY.md` |
+|---|---|---|---|
+| `run_scaling` | fitted exponent `n_e` | **2.0184** | 2.0184 |
+| | `Z_eff` / `lnΛ` | **0.9999 / 0.9999** | 0.9999 / 0.9999 |
+| | `θ_e` | **−1.4999** | −1.4999 |
+| | `λ₀` | **2.0276** | 2.0276 |
+| | full-K ratio across 275× | 1.000001–1.000979 | flat at 1.00097 |
+| `run_profile_uniform` | median residual, interior | **0.000 %** | 0.000 % over 510 cells |
+| | fitted `K` | **0.16 %** | 0.16 % |
+| `run_profile_ramp` | deposition peak `z` | **699.71 µm, exact** | exact |
+| | total absorbed | 1.81 % | 2.5 % |
+| `run_te_error` | over-absorption at 1e20/21/22 | **1.33× / 2.84× / 8.54×** | 1.3× / 2.8× / 8.5× |
+| `run_energy_closure` | tracer vs `I₀t` | **1.000000** | 1.000000 |
+| | electron KE gain | **1.0196** | 0.9957 |
+| `run_te_gradient` | imposed `K` span | 31.76× (expect 31.62) | 32.4× |
+
+**The coefficient audit, the Beer–Lambert profile and the temperature-mode error reproduce
+essentially exactly.** `K` is correct term by term on this build; the deposition *profile*
+in a uniform slab is exact to the printed precision; and Finding 3's frozen-K error is
+reproduced to within 0.05 in ratios of 1.3–8.5. Whatever is wrong at the turning point,
+**it is not the absorption coefficient and not the deposition kernel.**
+
+Two entries differ from chablis and are worth keeping in view:
+
+* **`run_profile_ramp` total absorbed: 1.81 % here against 2.5 % documented.** This is the
+  turning-point test, and Finding 2 already records its convergence as non-monotonic with a
+  ~2.5 % excursion at the default `ray_cfl`, so 1.8 % is inside the documented scatter
+  rather than in conflict with it. Consistent with the 2026-08-31 picture: this deck's ramp
+  is *linear*, so its layer is representable and the error stays small and bounded.
+* **`run_energy_closure` electron KE gain: 1.0196 here against 0.9957 documented** — a 2.4 %
+  shift, and it changes sign. The tracer side is exact (1.000000), so this is the
+  particle-side accounting. It is the **same sign** as the unexplained P5 excess (rungs
+  closing at 1.14–1.74× after subtracting a matched control), and this test runs with
+  `algo.maxwell_solver = none` on a static plasma, i.e. with no grid-heating channel at
+  all. A +2 % particle-side excess with no field solver is small but should not be filed
+  as noise without a replicate.
+
+### Methodological note, because it nearly became a false finding
+
+Reading `Pabs` out of `run.log` with `grep -m1` gives the value at **step 1**, before any
+heating, at which `temperature_mode = fixed` and `local` agree by construction — the ratio
+reads 1.0150 at every intensity and looks like a flat contradiction of Finding 3. Taking the
+*final* `Pabs` instead gives 1.67/5.16/20.6, which looks like a 2.4× regression. Neither is
+the documented quantity: `ACCURACY.md`'s over-absorption is a ΔT-based measure computed by
+`plot_te_error.py`, which reproduces 1.33/2.84/8.54. **Score this suite with its own scripts;
+the log greps in the sweep drivers are progress indicators, not results.**
