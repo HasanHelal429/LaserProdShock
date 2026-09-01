@@ -7807,3 +7807,32 @@ pusher rather than by the operator.
 Total +0.9 % with a sign change — scatter about ~1.377e5 at roughly the seed floor, against
 the refracting march's +3.27 % on the identical IC. Confirms the recommendation: for a
 plane-stratified target, `refraction = 0` is the better production mode.
+
+### Tier 2 coverage, final
+
+16 of the 18 upstream test directories now run on the Perlmutter CUDA build, all exit 0:
+
+* **1D (`build_pm_1d`)** — `psc_xcheck`, `sharp_edge`, `te_gradient` (+`fixed`),
+  `profile_uniform`, `profile_ramp`, `testC_match`, `scaling` (20 runs), `te_error`
+  (10 runs), `energy_closure`, `laser_shock_dt`.
+* **2D/3D (`build_pm_23`)** — `psc_oblique`, `refraction`, `expanding`, `3d_slab`,
+  `turning_angles` (4 angles), `convergence` (22 runs).
+
+`run_expanding` finished at `Pabs` 4.23276e12, final absorbed fraction 0.0393, cumulative
+1.3048 J/m. Its earlier MPICH abort was a **wrong deck name in our harness**
+(`inputs_expanding` vs `inputs_expanding_laser`), not a code failure.
+
+Not run, deliberately:
+
+* **`run_laser_shock_2d`** — 118 000 steps at 160×3200 is ~12 h on one A100 and it is a
+  physics application run rather than an operator check. Stays in `ACCURACY.md`'s "Not
+  covered", now with a cost attached to the decision.
+* **`run_laser_shock`** (1D, 128 000 steps) — the deck Finding 4 invalidated. Its corrected
+  control `run_laser_shock_dt` **was** run here (exit 0, `Pabs` 9.26752e17).
+
+Two coverage gaps found in the analysis tooling rather than the operator:
+
+* `plot_expanding_effect.py` expects a laser-on/laser-off pair under `on/` and `off/`; a
+  single-deck run cannot feed it. It is an effect plot, not a baseline.
+* `compare_expanding.py` still reports Test C as unscoreable without a PSC log — the
+  absolute cross-code validation `ACCURACY.md` lists as blocked on code access. Unchanged.
