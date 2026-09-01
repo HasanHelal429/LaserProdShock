@@ -114,7 +114,13 @@ def localise(run_a, run_b, n_cr, step=None):
     top = [{"cell": int(i), "z": float(z[i]), "r": float(ne[i] / n_cr),
             "dE": float(d[i]), "frac": float(abs(d[i]) / abs(tot)) if tot else float("nan")}
            for i in order[:5]]
-    return {"step": k, "total": float(tot), "top": top,
+    # When the rungs agree, |total| collapses toward zero while individual cells still
+    # carry PIC-noise-sized differences that CANCEL. Fractions of |total| are then
+    # meaningless (they read in the thousands of percent), so flag that case rather than
+    # printing nonsense: it is the signature of convergence, not of a divergence.
+    peak = float(np.abs(d).max()) if len(d) else 0.0
+    return {"step": k, "total": float(tot), "top": top, "peak_abs": peak,
+            "cancels": bool(peak > 0 and abs(tot) < 0.1 * peak),
             "edge_lo": float(d[:5].sum()), "edge_hi": float(d[-5:].sum())}
 
 
@@ -236,6 +242,11 @@ def main():
             print(f"\n  WHERE THEY DISAGREE (dump {loc['step']}, finest minus coarsest)")
             print(f"    total {loc['total']:+.4e};  domain edges: "
                   f"lo {loc['edge_lo']:+.2e}, hi {loc['edge_hi']:+.2e}")
+            if loc["cancels"]:
+                print(f"    NOTE |total| is under 10% of the largest single-cell difference "
+                      f"({loc['peak_abs']:.2e}):\n         the per-cell differences CANCEL. "
+                      f"That is local PIC-noise redistribution with\n         no net effect "
+                      f"-- i.e. the rungs agree. The percentages below are not meaningful.")
             for t in loc["top"]:
                 print(f"      cell {t['cell']:6d}  r = {t['r']:7.3f}  "
                       f"dE = {t['dE']:+.4e}  ({100*t['frac']:5.1f} % of |total|)")

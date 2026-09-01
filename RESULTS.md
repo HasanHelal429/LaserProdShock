@@ -7645,3 +7645,46 @@ reads 1.0150 at every intensity and looks like a flat contradiction of Finding 3
 the documented quantity: `ACCURACY.md`'s over-absorption is a ΔT-based measure computed by
 `plot_te_error.py`, which reproduces 1.33/2.84/8.54. **Score this suite with its own scripts;
 the log greps in the sweep drivers are progress indicators, not results.**
+
+---
+
+## 2026-08-31 (Tier 3f) — **with no turning point the ray march is EXACTLY convergent. The defect is pinned to the near-critical branch**
+
+The cleanest statement this campaign can make about the module. `P5_under_{025,005,0025}`:
+identical to `P5_ramp_025` except the target and corona are capped at **0.5 `n_cr`**, so
+there is no interior critical surface, no `1/√(1−n/n_cr)` singularity anywhere along the
+ray, and nothing for the analytic near-critical layer to do.
+
+| `ray_cfl` | `E_abs` | drift |
+|---|---|---|
+| 0.25 | 2.0067e5 | — |
+| 0.05 | 2.0067e5 | **+0.00 %** |
+| 0.025 | 2.0067e5 | **+0.00 %** |
+
+**Identical to five significant figures** — not "within the 0.80 % seed floor", *identical*.
+A 10× change in the arc-length step changes the absorbed energy not at all. Per-cell
+differences do exist at the 2e14 level but they **cancel** to a net −3.9e12, i.e. 0.002 % —
+local PIC-noise redistribution with no net effect. (`ladder_report.py` now detects and says
+so, rather than printing fractions of a near-zero total as thousands of percent.)
+
+Set against the other three ladders, the picture is complete:
+
+| configuration | `1−r < 0.01` layer | drift 0.25 → 0.025 |
+|---|---|---|
+| **underdense, no turning point** | **n/a** | **+0.00 %** |
+| lifted FLASH, 10 `n_cr` | 0.16 cells | +9.79 % |
+| analytic `L_n` = 10 `d_e` | 0.20 cells | +11.49 % |
+| analytic `L_n` = 29.8 `d_e` | 0.60 cells | +3.27 % |
+| analytic `L_n` = 60 `d_e` | 1.20 cells | −0.51 % |
+
+**Conclusion. The eikonal march, the absorption coefficient and the deposition kernel are
+sound.** Tier 2 showed `K` correct term by term on this build (exponents to four decimals,
+Beer–Lambert residual 0.000 %); this shows the march itself is exactly convergent when it
+never has to cross a critical surface. **Every failure measured in this campaign is
+localised to the near-critical branch** — the analytic singular layer and the approach to
+it — and it scales with how badly the grid resolves that layer.
+
+That is a far more useful finding than "the ladder didn't converge". It says the module is
+usable, that the admissible regime is defined by G8, and that a single localised code fix
+(an `L_eff` not taken from a one-cell finite difference of an unresolvable gradient) would
+remove the constraint rather than merely bound it.

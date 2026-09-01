@@ -1,0 +1,7 @@
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P5/P5_straight_025
+# logging_started 2026-08-31T23:53:31  total_steps=20300  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-08-31T23:54:01 | 8023/20300 (39.5%) | 0h00m | 0.0037 s/step(wall) | 0.0034 s/step(warpx) | ETA ~0h00m | x1.09 | load 0.9 | laser 0.981 of peak, Eabs 5.357e+04 J
+2026-08-31T23:54:31 | 15743/20300 (77.6%) | 0h01m | 0.0039 s/step(wall) | 0.0037 s/step(warpx) | ETA ~0h00m | x1.06 | load 1.1 | laser 0.785 of peak, Eabs 1.063e+05 J
+2026-08-31T23:55:01 | 20300/20300 (100.0%) | 0h01m | 0.0066 s/step(wall) | 0.0039 s/step(warpx) | ETA ~0h00m | x1.71 | load 1.0 | laser 0.761 of peak, Eabs 1.375e+05 J
+DONE 2026-08-31T23:55:01 | 20300/20300 (100.0%) | total wall 0h01m | mean 0.0044 s/step(wall) | reached max_step
