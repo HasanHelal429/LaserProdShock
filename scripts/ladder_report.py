@@ -101,10 +101,14 @@ def localise(run_a, run_b, n_cr, step=None):
         return None
     k = step if step in pa and step in pb else common[len(common) // 2]
     A, B = np.loadtxt(pa[k]), np.loadtxt(pb[k])
-    n = min(len(A), len(B))
-    z, ne = A[:n, 0], A[:n, 1]
+    # Compare in PHYSICAL z, never by cell index: a dz ladder's rungs have different cell
+    # counts, so index i is a different location in each and an index-wise difference is
+    # meaningless (it reported vacuum cells as top contributors until 2026-08-31).
+    # P_abs is a density [W/m^3]; resample the other rung onto this one's centres.
+    z, ne = A[:, 0], A[:, 1]
     dz = z[1] - z[0]
-    d = (B[:n, 3] - A[:n, 3]) * dz
+    Pb = np.interp(z, B[:, 0], B[:, 3]) if len(B) != len(A) else B[:, 3]
+    d = (Pb - A[:, 3]) * dz
     tot = d.sum()
     order = np.argsort(-np.abs(d))
     top = [{"cell": int(i), "z": float(z[i]), "r": float(ne[i] / n_cr),
