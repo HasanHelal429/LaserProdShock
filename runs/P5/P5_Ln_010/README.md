@@ -43,7 +43,17 @@ TIER 3c REGIME MAP -- corona scale length L_n = 10.0 d_e, everything else held.
 
 ## Result
 
-*(pending — submitted 2026-08-31)*
+**Ran 2026-08-31/09-01 (jobs 57803769, 57804731), COMPLETED exit 0, `--verify` OK.**
+
+The scale-length sweep at fixed `ray_cfl` moved `E_abs` **2.5×** (6.99e4 / 9.16e4 / 1.348e5
+/ 1.781e5 at `L_n` = 10 / 15 / 29.8 / 60 `d_e`). **That is optical depth, not resolution** —
+a longer corona holds more plasma at absorbing densities. Reading it as a resolution test is
+withdrawn; see the fine rungs for what replaced it.
+
+The isolation experiment is the drift when *only* `ray_cfl` moves: **+11.49 %** at 0.20
+cells across the `1−r < 0.01` layer, **−0.51 %** at 1.20 cells. With the analytic ramp
+(+3.27 % at 0.60) and the lifted table (+9.79 % at 0.16) that is a monotonic curve crossing
+the 0.80 % seed floor at ~1 cell — the measurement gate **G8** is built on.
 
 ## Retracted
 

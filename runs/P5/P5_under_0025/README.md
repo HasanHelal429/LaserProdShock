@@ -40,7 +40,17 @@ TIER 3f -- THE CLEAN CONTROL: an UNDERDENSE target, so no ray ever turns. ray_cf
 
 ## Result
 
-*(pending — submitted 2026-08-31)*
+**Ran 2026-08-31 (job 57808833), COMPLETED exit 0, `--verify` OK.**
+
+**`E_abs` = 2.0067e5 at `ray_cfl` = 0.25, 0.05 AND 0.025 — identical to five significant
+figures.** Not "within the seed floor"; identical. A 10× change in arc-length step changes
+absorbed energy not at all. Per-cell differences exist at the 2e14 level but cancel to a net
+−3.9e12 (0.002 %) — PIC-noise redistribution with no net effect.
+
+This is the cleanest statement the campaign makes about the module: **with no critical
+surface to cross, the ray march is exactly convergent.** Combined with Tier 2 (K correct
+term by term, Beer–Lambert residual 0.000 %), every failure measured is localised to the
+near-critical branch.
 
 ## Retracted
 

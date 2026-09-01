@@ -41,7 +41,16 @@ TIER 3e -- refraction = 0 (straight rays + analytic Snell), rung ray_cfl = 0.05.
 
 ## Result
 
-*(pending — submitted 2026-08-31)*
+**Ran 2026-09-01 (jobs 57808833, 57809576), COMPLETED exit 0, `--verify` OK.**
+
+`E_abs` = 1.3753e5 / 1.3746e5 / 1.3880e5 at `ray_cfl` = 0.25 / 0.05 / 0.025 — increments
+**−0.05 %** then **+0.98 %**, a sign change, i.e. scatter at about the 0.80 % seed floor.
+The refracting RK4 march on the **identical** IC and grid drifts **+3.27 %**.
+
+So `refraction = 0` is **3.4× less `ray_cfl`-sensitive**, agrees with the refracting march
+to 1.97 % on the absolute, and is cheaper. The operator's documentation calls it exact for a
+plane-stratified target, which every P5 leg is. **Recommended as the production mode.** It
+does not fix the sub-grid layer — both modes share the analytic near-critical layer.
 
 ## Retracted
 

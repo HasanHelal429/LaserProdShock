@@ -40,7 +40,17 @@ TIER 3a REGIME MAP -- target peak density 3.0 n_cr, everything else held.
 
 ## Result
 
-*(pending — submitted 2026-08-31)*
+**Ran 2026-09-01 (jobs 57803769, 57809576), COMPLETED exit 0, `--verify` OK.**
+
+`E_abs` = 1.3460e5 / 1.3590e5 / 1.3480e5 / 1.3770e5 at 1.5 / 3 / 10 / 20 `n_cr` — a spread
+of **2.3 % across a 13× change in peak density**, about three times the seed floor, i.e.
+nearly flat. The ray turns at `n_cr`, so **the solid behind the critical surface is
+optically invisible**: absorption is set by the corona's scale length (which moved `E_abs`
+2.5×), not by the target density.
+
+So P5's 10 `n_cr` cap is **not an absorption lever**, and `P5_full_n20`'s 10 → 20 A/B is a
+reservoir/compression test rather than an absorption test. G1 reaches 1.107 against a 1.2
+budget at 20 `n_cr`, so the cap is limited by the particle pusher, not by the operator.
 
 ## Retracted
 
