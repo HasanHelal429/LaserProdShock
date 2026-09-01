@@ -41,7 +41,18 @@ alone, which is what makes the subtraction meaningful.
 
 ## Result
 
-*(pending — submitted 2026-08-31 as target `rampcfl`)*
+**Ran 2026-08-31, job 57797415, COMPLETED exit 0, `--verify` OK.**
+
+With **no laser at all**: `ΔKE` = **−5.4e3** (negative — the particles do *not* heat) and
+`ΔE_field` = **+4.07e4**, growing **linearly** through the run (4 % of it in the first
+sample interval, so not a startup transient). Net **+3.53e4 J from zero energy input** =
+34 % of the 0.05 rung's `E_abs`, though only ~1 % of the plasma's total energy.
+
+So grid heating on this timescale pumps the **field**, not the particles — the standing G2
+description was wrong about the channel. Subtracting this control, the ladder rungs still
+close at **1.14–1.74×**. The subtraction assumes grid heating is laser-independent; it is
+not (a hotter plasma has a longer `λ_D` and should grid-heat *less*), so this is likely an
+over-subtraction and the true excess is larger.
 
 ## Retracted
 

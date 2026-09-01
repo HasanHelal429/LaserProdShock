@@ -7378,3 +7378,117 @@ matters") is therefore **not sufficient** for a target whose critical layer is s
 10 `n_cr` should reproduce upstream's convergence. (3) Lowering `n_floor` at fixed `ray_cfl`
 should *raise* `E_abs`, since the clamp is what currently bounds it. Any one of these
 failing kills this diagnosis.
+
+---
+
+## 2026-08-31 — **Tier 1: the prediction was wrong. Neither knob converges, and grid refinement cannot rescue this initial condition**
+
+Eight runs plus a seed replicate, all COMPLETED exit 0 with `--verify` OK on every one.
+The 2026-08-30 diagnosis said the critical layer is sub-grid and predicted that refining
+**dz** would converge where refining `ray_cfl` did not. **It does not.**
+
+### First: an error bar, which nothing in P5 had
+
+`P5_ramp_005r` is `P5_ramp_005` with a different `random_seed` and nothing else.
+
+| quantity | 005 | 005r | difference |
+|---|---|---|---|
+| `E_abs` | 1.3730e5 | 1.3840e5 | **+0.80 %** |
+| `f_abs` peak | 1.0000 | 1.0000 | 0.00 % |
+| `f_abs` final | 0.7070 | 0.5875 | **−16.90 %** |
+
+So the run-to-run floor on `E_abs` is **~0.8 %** (one replicate — a scale, not a σ). The
+16.9 % swing in `f_abs` final against 0.8 % in `E_abs` is a sharp restatement of the
+existing rule: quote `E_abs`, never the instantaneous absorbed fraction.
+
+### The three ladders, measured against that floor
+
+| ladder | variable | total drift | increments (× floor) |
+|---|---|---|---|
+| lifted FLASH table | `ray_cfl` 0.50→0.025 | **+18.3 %** | +7.77 (9.7×), +6.35 (7.9×), +1.23 (1.5×), +1.98 (2.5×) |
+| analytic ramp | `ray_cfl` 0.50→0.025 | +4.3 % | +0.96 (1.2×), +2.76 (3.4×), **−0.90** (1.1×), +1.41 (1.8×) |
+| lifted FLASH table | **dz** 0.5→0.125 | +4.6 % | +0.98 (1.2×), **+3.55 (4.4×)** |
+
+**The `ray_cfl` ladder on the lifted table is the only one that is unambiguously
+diverging** — its first two increments are 8–10× the floor and one-signed.
+
+**The analytic-ramp ladder is at or near the floor** — three of four increments are
+1.1–1.8× and they *change sign*. That is scatter. The earlier flat "NOT CONVERGED" verdict
+on it is **retracted**: the correct statement is "consistent with convergence to within
+~1–3 %".
+
+**The dz ladder does not converge either**, and its increment *grows* (+0.98 → +3.55 %).
+That was the stated falsification criterion for the sub-grid diagnosis.
+
+### Why the prediction failed — and it is not that the diagnosis was simply wrong
+
+Refining dz does **not** buy proportional layer resolution:
+
+| run | dz/`d_e` | `L_n` at crossing | `1−r < 0.01` layer | cells with `0.99<r<1.01` |
+|---|---|---|---|---|
+| `P5_raycfl_025` | 0.5 | 16.2 cells | 0.16 cells | 0 |
+| `P5_dz_025` | 0.25 | 16.6 cells | 0.17 cells | 0 |
+| `P5_dz_0125` | 0.125 | 28.9 cells | 0.29 cells | 0 |
+| `P5_ramp_050` (analytic) | 0.5 | **94.5 cells** | **0.95 cells** | **2** |
+
+A **4× finer grid bought only 1.8×** more cells across `L_n`. The physical layer sharpens
+as it is resolved — the lifted FLASH profile has an intrinsically steep critical region
+(and the measured gradient is itself a two-cell finite difference, so it localises as dz
+falls). The layer therefore stays sub-grid at **every** dz tested, and `E_abs` keeps
+drifting. Grid refinement is not a lever on this initial condition.
+
+### The criterion that does emerge, and it is quantitative
+
+Across all three ladders the one that converged to the noise floor is the one — and only
+the one — with **≈1 cell across the `1−r < 0.01` layer** (0.95, versus 0.16–0.29 for every
+lifted rung). That is a usable pre-launch gate:
+
+> **resolve `1−r < 0.01`, i.e. dz ≲ 0.01·`L_n`, or the absorbed energy is not converged.**
+
+For the lifted table `L_n` = 1.372e-6 m, so this needs dz ≈ 0.08 `d_e` — **6× finer than
+baseline**, 137 750 cells, and the 2 ps ladder alone would cost ~10 h. Over the spine's
+1 ns it is out of the question. And that is only for the `1−r < 0.01` layer; the `n_floor`
+clamp region (`1−r < 1e-4`) would need dz ~ 1.4e-10 m, which is not a computation anyone
+will do.
+
+**Conclusion: the singular layer cannot be resolved by brute force at any affordable cost.**
+An integrable `1/√(1−r)` singularity has to be handled analytically, and the operator does
+try to — but its analytic layer takes `L_eff = 1/drds` from the grid-interpolated gradient,
+which is exactly the quantity the grid cannot supply here. That is the defect, and it is in
+the operator's near-critical branch, not in the marcher.
+
+### Energy closure, closed for the first time
+
+`P5_raycfl_off` — same deck, `intensity = 0`, no ray traced — over the ladder's own 20300
+steps:
+
+* `ΔKE` = **−5.4e3** (slightly negative). **The particles do not heat.** The standing G2
+  story, that the Debye-under-resolved cold target is a numerical *heat* source, is not
+  what happens on this timescale.
+* `ΔE_field` = **+4.07e4**, growing **linearly** through the run (only 4 % of it in the
+  first sample interval, so not a startup transient). Grid heating here pumps the *field*.
+* Net **+3.53e4 J from zero energy input** — 34 % of the 0.05 rung's `E_abs`, though only
+  ~1 % of the plasma's total energy. It looms large only because the laser deposits little
+  next to the target's thermal content.
+
+Subtracting it, the rungs still close at **1.14–1.74×**: the system gains 14–74 % more than
+the tracer says was deposited, and the ratio *scatters* rather than trending with `ray_cfl`.
+Caveat, stated rather than buried: the subtraction assumes grid heating is independent of
+the laser. It is not — the laser warms the plasma, lengthening `λ_D`, which should *reduce*
+grid heating and make this an **over**-subtraction, i.e. the true excess is larger.
+
+### What holds
+
+Deposition **location** is stable in every ladder — the disagreement sits at cells
+1066–1071, `r` = 0.79–1.01, the turning point, in all three, with the domain edges
+contributing ~0. **Upstream Finding 1 (exit overshoot) is not involved in any of this.**
+A5 stands; `run_scaling`'s term-by-term coefficient audit stands.
+
+### Where that leaves the phase
+
+`ray_cfl` = 0.25 remains the best available value for the lifted IC — not because it is
+converged, but because the divergence is monotonic in refinement, so the *coarse* end is
+the least contaminated by the clamped sliver. That is an uncomfortable place to stand and
+it should not be dressed up: **P5 has no converged absorption number on the lifted IC, and
+cannot get one by refinement.** The options are the code fix (Tier 4 F3/F4), the analytic
+IC, or a later FLASH handoff whose corona is shallower.

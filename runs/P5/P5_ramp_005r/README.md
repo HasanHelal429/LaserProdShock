@@ -40,7 +40,15 @@ too systematically one-signed to be noise.
 
 ## Result
 
-*(pending — submitted 2026-08-31)*
+**Ran 2026-08-31, job 57797691, COMPLETED exit 0. `E_abs` = 1.3840e5 J vs `P5_ramp_005`'s
+1.3730e5 — a difference of **+0.80 %**.**
+
+That is the run-to-run floor every ladder verdict is now measured against. `f_abs` peak was
+identical (1.0000) while `f_abs` **final** moved **−16.9 %**, which restates the project
+rule sharply: quote `E_abs`, never the instantaneous absorbed fraction.
+
+One replicate gives a scale, not a σ. It is enough to show the lifted-IC ladder's +18.3 %
+is real (first increments 8–10× this) and that the analytic ramp's scatter is not.
 
 ## Retracted
 

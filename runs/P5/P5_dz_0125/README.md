@@ -48,7 +48,19 @@ unchanged at 2.007 ps), same diagnostics cadence in physical time.
 
 ## Result
 
-*(pending — submitted 2026-08-31 as target `dzladder`)*
+**Ran 2026-08-31, job 57795781, COMPLETED exit 0, `--verify` OK. `E_abs` = 9.9956e4 J.**
+
+**The prediction in this README failed.** dz = 0.5 → 0.25 → 0.125 gives 9.5601 / 9.6534 /
+9.9956 e4, increments **+0.98 % then +3.55 %** — the increment *grows*, which is this
+run's own stated falsification criterion.
+
+The reason is instructive rather than fatal: refining dz did **not** buy proportional layer
+resolution. `L_n` at the crossing went 16.2 → 16.6 → 28.9 cells for a **4×** finer grid, so
+`1−r < 0.01` stayed at 0.16 → 0.17 → 0.29 cells and **no rung ever had a single cell in
+`0.99 < r < 1.01`**. The lifted FLASH profile's critical region sharpens as it is resolved.
+Reaching the ~1-cell criterion would need dz ≈ 0.08 `d_e` (137 750 cells, ~10 h for 2 ps);
+the `n_floor` clamp region would need dz ~ 1.4e-10 m. **Grid refinement is not a lever on
+this initial condition.**
 
 ## Retracted
 

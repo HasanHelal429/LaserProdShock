@@ -44,7 +44,14 @@ arm is not — a result about **which initial condition P5 can use**, not just a
 
 ## Result
 
-*(pending — submitted 2026-08-31 as target `rampcfl`)*
+**Ran 2026-08-31, job 57797221, COMPLETED exit 0, `--verify` OK. `E_abs` = 1.3925e5 J.**
+
+The five-rung ladder gives 1.3356 / 1.3484 / 1.3856 / 1.3730 / 1.3925 e5 — increments
++0.96 / +2.76 / −0.90 / +1.41 %, against a measured seed floor of **0.80 %**
+(`P5_ramp_005r`). Three of four are 1.1–1.8× the floor and they **change sign**: that is
+scatter, not drift. **Consistent with convergence to within ~1–3 %.** This ladder's
+critical layer is 0.95 cells across `1−r < 0.01` (94.5 cells across `L_n`) — the only one
+of the three ladders that resolves it, and the only one that sits at the floor.
 
 ## Retracted
 
