@@ -7492,3 +7492,101 @@ the least contaminated by the clamped sliver. That is an uncomfortable place to 
 it should not be dressed up: **P5 has no converged absorption number on the lifted IC, and
 cannot get one by refinement.** The options are the code fix (Tier 4 F3/F4), the analytic
 IC, or a later FLASH handoff whose corona is shallower.
+
+---
+
+## 2026-08-31 (Tier 3) — **the admissibility criterion is measured: the operator converges once the `1−r < 0.01` layer spans ≳1 cell**
+
+The Tier 1 correlation is now a curve. Drift is `E_abs(ray_cfl 0.025)/E_abs(0.25) − 1`, i.e.
+`E_abs` moving when **only** the march changes and the physics is held exactly fixed,
+against the 0.80 % seed floor:
+
+| `1−r < 0.01` layer | configuration | drift | × floor |
+|---|---|---|---|
+| 0.16 cells | lifted FLASH table, dz 0.5 | +9.79 % | 12.2× |
+| 0.20 cells | analytic, `L_n` = 10 `d_e` | **+11.49 %** | 14.4× |
+| 0.60 cells | analytic, `L_n` = 29.8 `d_e` | +3.27 % | 4.1× |
+| 1.20 cells | analytic, `L_n` = 60 `d_e` | **−0.51 %** | **0.6×** |
+
+Within the analytic family — one knob, the corona scale length — drift falls **monotonically
+11.49 → 3.27 → −0.51 %** and crosses **below the noise floor** at ~1 cell. The sign flip at
+1.20 cells is what noise looks like. The lifted-FLASH point sits on the same curve.
+
+**Gate G8 is therefore validated as measured rather than asserted**, and the criterion is:
+
+> **Resolve `1−r < 0.01`, i.e. dz ≲ 0.01·`L_n`. Below ~1 cell the absorbed energy is not
+> converged and refining `ray_cfl` makes it worse; at ≳1 cell the ray march is convergent
+> to the run-to-run floor.**
+
+### A correction: the first pass of Tier 3c measured the wrong quantity
+
+Sweeping `L_n` at fixed `ray_cfl` moved `E_abs` **2.5×** (6.99e4 / 9.16e4 / 1.348e5 /
+1.781e5 at `L_n` = 10 / 15 / 29.8 / 60 `d_e`), cleanly monotonic — and that is **physics**,
+not numerics: a longer corona holds more plasma at absorbing densities so the optical depth
+along the ray rises with `L_n`. Absolute `E_abs` cannot separate "better-resolved layer"
+from "more plasma to absorb in". Reading that sweep as a resolution test is **withdrawn**;
+the drift table above is what replaces it. The physics scaling is itself worth keeping — it
+says the coupled energy is roughly linear in coronal scale length over this range — but it
+is a separate result.
+
+### What this means for the phase, concretely
+
+The lifted FLASH IC at 0.1 ns has `L_n` = 10.8 `d_e` configured (8.1 measured), giving 0.16–0.22
+cells. It is **five to six times too steep** for the operator at dz = 0.5 `d_e`, and Tier 1
+showed refinement cannot close that. Three routes remain, and they are now orderable by
+cost rather than by guess:
+
+1. **A later FLASH handoff.** The corona expands and flattens with time, so `L_n` grows.
+   `P5_flashic_t02` and `_t04` (0.2 and 0.4 ns) already exist as a handoff-time ladder built
+   for a different reason — measuring whether the evolution forgets its IC. They are now
+   *also* the cheapest test of whether a shallower corona clears G8. **Their `ic_flash.yaml`
+   tables should be checked against G8 before anything else is run**: if 0.4 ns clears ~1
+   cell, the phase has a converged spine for the price of a handoff time.
+2. **The analytic IC.** `P5_full` sits at 0.60 cells — 4.1× the floor, better than the
+   lifted arm but still not converged.
+3. **The code fix** (Tier 4 F3/F4): give the analytic near-critical layer an `L_eff` that
+   does not come from a one-cell finite difference of an unresolvable gradient.
+
+### The admissibility map, and the cost that goes with it
+
+G8 is derivable pre-launch, so the whole (handoff time × dz) space can be mapped without
+running anything. Cells across the `1−r < 0.01` layer:
+
+| handoff | `L_n` | dz = 0.5 | dz = 0.25 | dz = 0.125 |
+|---|---|---|---|---|
+| 0.1 ns | 10.8 `d_e` | 0.22 | 0.43 | 0.86 |
+| 0.2 ns | 16.0 `d_e` | 0.32 | 0.64 | **1.28 ✓** |
+| 0.4 ns | 26.2 `d_e` | 0.52 | **1.05 ✓** | 2.09 ✓ |
+
+The handoff ladder does flatten the corona — `L_n` grows at ~51 `d_e`/ns — but **a later
+handoff alone never gets there**: reaching 1 cell at dz = 0.5 would need t ≈ 0.87 ns, i.e.
+the end of FLASH's flat top, with no window left to simulate. It has to be combined with
+grid refinement.
+
+Costing those, at the measured 46.7 steps/s (lifted IC, laser on, `ray_cfl` 0.25 — and
+0.25 is *sufficient* once the layer is resolved, since 0.25 → 0.025 moved only −0.51 % at
+1.20 cells, so no extra march cost is needed):
+
+| configuration | G8 | wall on 1 A100 |
+|---|---|---|
+| 0.4 ns handoff, dz 0.5 | 0.52 ✗ | **36.3 h** — fits, not converged |
+| 0.4 ns handoff, dz 0.25 | 1.05 ✓ | **145 h** — 3.0× over the 48 h cap |
+| 0.2 ns handoff, dz 0.125 | 1.28 ✓ | 773 h — 16× over |
+
+**So no G8-passing configuration of the full-pulse spine fits in one job.** That is the
+phase's real constraint, and it is sharper than "the ladder didn't converge". The options,
+in ascending order of work:
+
+1. **Checkpoint/restart, and chain.** 145 h is four 48 h jobs, and `shared` allows 5000.
+   WarpX supports this natively (`<diag>.diag_type = checkpoint`, `amr.restart`,
+   `warpx.checkpoint_signals` for a signal-triggered dump before the wall). **The
+   LaserProdShock deck renderer has no checkpoint support at all** — that is the single
+   highest-value piece of tooling this phase is missing, and it is modest: a `checkpoint`
+   diagnostic in `deck.py` plus restart handling in `run_warpx`.
+2. **Shorten the physical window.** 0.4 ns handoff, dz 0.25, run 0.2 ns instead of 0.6:
+   ~48 h, converged, but a shorter trajectory to compare against FLASH.
+3. **Fix the operator** (F3/F4): an `L_eff` that is not a one-cell finite difference of an
+   unresolvable gradient. This removes the constraint rather than paying for it, and would
+   let the spine run at dz = 0.5 as originally planned.
+4. **Accept 36.3 h at 0.52 cells** and quote absorption with an explicit ~3–4 % resolution
+   band, on the strength of the measured drift curve. Defensible only if stated as such.
