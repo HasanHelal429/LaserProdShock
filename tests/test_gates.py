@@ -60,7 +60,7 @@ def gate(c, key):
 def test_baseline_has_no_failing_gate():
     gs = lpconfig.gates(cfg())
     assert not [g for g in gs if g.status == "fail"]
-    assert {g.key for g in gs} == {"G1", "G2", "G3", "G4", "G5", "G6", "G7"}
+    assert {g.key for g in gs} == {"G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"}
 
 
 def test_G1_reproduces_the_upstream_failure():
@@ -265,3 +265,53 @@ def test_bad_coulomb_log_mode_is_rejected():
     c = copy.deepcopy(BASE)
     c["laser"].pop("coulomb_log_mode", None)
     lpconfig.validate(c)
+
+
+# --------------------------------------------------------------------------- #
+# G8 -- critical-layer resolution. Added 2026-08-31 from the Tier 1 measurement:
+# the only ladder that converged to the 0.80% seed floor was the only one with
+# ~1 cell across the 1-r < 0.01 layer, and refining ray_cfl on an unresolved
+# layer made absorption WORSE (+18.3% over 0.50 -> 0.025).
+
+def test_G8_underdense_has_no_layer_to_resolve():
+    """No critical surface means no singular layer, so the gate must not warn."""
+    c = cfg(**{"plasma.target.density_over_ncr": 0.5,
+               "plasma.target.corona_density_over_ncr": 0.5})
+    g = gate(c, "G8")
+    assert g.status == "info"
+    assert "underdense" in g.detail
+
+
+def test_G8_flags_a_subgrid_layer_and_passes_a_resolved_one():
+    """The gate keys on 0.01*L_n/dz, i.e. cells across the layer -- not on ray_cfl.
+
+    An exponential corona's L_n at critical IS its scale length, so this is a clean
+    single-knob test: at dz = 0.5 d_e, L_n = 10 d_e gives 0.20 cells (sub-grid) and
+    L_n = 60 d_e gives 1.20 cells (resolved).
+    """
+    thin = gate(cfg(**{"plasma.target.corona_profile": "exponential",
+                       "plasma.target.scale_length_de": 10.0,
+                       "geometry.dz_over_de": 0.5}), "G8")
+    assert thin.status == "warn"
+    assert thin.value < 1.0
+
+    wide = gate(cfg(**{"plasma.target.corona_profile": "exponential",
+                       "plasma.target.scale_length_de": 60.0,
+                       "geometry.dz_over_de": 0.5}), "G8")
+    assert wide.status == "pass"
+    assert wide.value >= 1.0
+
+
+def test_G8_scales_with_dz_not_with_ray_cfl():
+    """Refining the MARCH must not change the gate; refining the GRID must.
+
+    This is the whole content of the Tier 1 finding, encoded so it cannot be lost:
+    ray_cfl is not a remedy for an unresolved layer.
+    """
+    base = {"plasma.target.corona_profile": "exponential",
+            "plasma.target.scale_length_de": 30.0, "geometry.dz_over_de": 0.5}
+    g0 = gate(cfg(**base), "G8")
+    g_march = gate(cfg(**{**base, "laser.ray_cfl": 0.01}), "G8")
+    g_grid = gate(cfg(**{**base, "geometry.dz_over_de": 0.125}), "G8")
+    assert g_march.value == g0.value          # ray_cfl buys nothing here
+    assert g_grid.value > g0.value            # dz does

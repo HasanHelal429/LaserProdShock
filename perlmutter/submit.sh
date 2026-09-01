@@ -76,6 +76,21 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_ramp_005r)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_seedrep"
     ;;
+  tier3)
+    # TIER 3 REGIME MAP -- 12 runs, all 20300-step twins of the Tier 1 rungs so every
+    # number is directly comparable to the ladders and to the 0.80% seed floor.
+    #   Ln_*       corona scale length 10/15/60 d_e -- THE lever on layer resolution
+    #   ncr_*      peak density 1.5/3/20 n_cr -- the reservoir, and the regimes upstream
+    #              actually validated (its ladders ran 1.5 n_cr; every P5 leg is 10)
+    #   straight_* refraction = 0, ray_cfl 0.25/0.05/0.025 -- isolates the RK4 marcher
+    #   under_*    UNDERDENSE, no turning point at all -- the clean control that says
+    #              whether the operator is sound away from the critical surface
+    RUNS=(runs/P5/P5_Ln_010 runs/P5/P5_Ln_015 runs/P5/P5_Ln_060
+          runs/P5/P5_ncr_015 runs/P5/P5_ncr_030 runs/P5/P5_ncr_200
+          runs/P5/P5_straight_025 runs/P5/P5_straight_005 runs/P5/P5_straight_0025
+          runs/P5/P5_under_025 runs/P5/P5_under_005 runs/P5/P5_under_0025)
+    TIME="01:00:00"; JOBNAME="lp5_tier3"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -115,7 +130,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

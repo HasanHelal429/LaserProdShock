@@ -11,7 +11,7 @@ Two kinds of check live here:
     warnings where the deck is merely suspicious.
 
 ``gates``
-    the **numerical gates G1-G7** of ``TEST_PLAN.md`` 6, each of which exists because
+    the **numerical gates G1-G8** of ``TEST_PLAN.md`` 6, each of which exists because
     it was violated somewhere in the prior work. Gates never raise: they return a
     list of :class:`Gate` results so ``run_checks.py`` can print them, plot them, and
     a run README can record them. A deck may legitimately sit outside a gate (the
@@ -408,6 +408,51 @@ class Gate:
         return self.status in ("pass", "info")
 
 
+def critical_scale_length_de(cfg: dict) -> float | None:
+    """`L_n` = |1/(d(n/n_cr)/dz)| at the critical surface, in `d_e,ref`.
+
+    This is the quantity that decides whether the ray tracer can integrate the
+    near-critical layer at all, and it is knowable **before launch** from the
+    configured profile -- which is the whole point of gate G8.
+
+    * ``exponential``: the corona is ``n = n_anchor exp(-(z-z0)/L)``, so
+      ``d(n/n_cr)/dz = -(n/n_cr)/L`` and at ``n = n_cr`` that is ``1/L``. The scale
+      length IS `L_n`, independent of how dense the solid behind it is.
+    * ``flash_table``: differentiate the tabulated ``ln(n/n_cr)`` at its zero
+      crossing. ``d(n/n_cr)/dz = (n/n_cr) d(ln n/n_cr)/dz`` = the slope there.
+    * anything else: unknown, and G8 says so rather than guessing.
+    """
+    tgt = (cfg.get("plasma") or {}).get("target") or {}
+    kind = str(tgt.get("corona_profile", "gaussian"))
+    if kind == "exponential":
+        L = float(tgt.get("scale_length_de", 0.0) or 0.0)
+        return L if L > 0 else None
+    if kind == "flash_table":
+        rd = cfg.get("_run_dir", "")
+        path = os.path.join(rd, str(tgt.get("ic_table", "ic_flash.yaml")))
+        if not os.path.isfile(path):
+            return None
+        try:
+            import yaml
+            tab = yaml.safe_load(open(path))["profiles"]["ln_n_over_ncr"]
+            z, v = list(tab["z_de"]), list(tab["value"])
+        except Exception:
+            return None
+        # walk to the LAST node pair straddling ln(n/n_cr) = 0, i.e. the critical
+        # surface on the laser-facing side
+        idx = [i for i in range(len(v) - 1)
+               if (v[i] >= 0.0 > v[i + 1]) or (v[i] > 0.0 >= v[i + 1])]
+        if not idx:
+            return None
+        i = idx[-1]
+        dz = z[i + 1] - z[i]
+        if dz == 0:
+            return None
+        slope = (v[i + 1] - v[i]) / dz          # d ln(n/n_cr)/dz at the crossing
+        return abs(1.0 / slope) if slope else None
+    return None
+
+
 def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
     """Evaluate the pre-run numerical gates. Never raises."""
     sc = sc or units.derive(cfg)
@@ -544,6 +589,58 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
                     f"= {sc.dz*1e6:.4f} um. The free parameter is dz/lambda_D (G2), "
                     "not resolution in d_e: coarsening 0.5 -> 1.0 d_e blew a run up "
                     "upstream (ambient to u ~ 0.15 c, B_y/B_0 = 82)."))
+
+    # --- G8: critical-layer resolution ---
+    #
+    # ADDED 2026-08-31, from the Tier 1 result. K carries 1/sqrt(1 - n_e/n_cr), an
+    # INTEGRABLE singularity at the critical surface. The operator handles it with an
+    # analytic near-critical layer whose scale length L_eff it takes from the
+    # grid-interpolated density gradient -- so the grid has to be able to represent that
+    # layer. Measured across three ladders: the only one that converged to the 0.80% seed
+    # floor was the only one with ~1 cell across 1-r < 0.01 (0.95 cells; L_n = 94.5 cells).
+    # Every lifted-FLASH rung had 0.16-0.29 cells there and drifted -- +18.3% in ray_cfl,
+    # and refining dz did NOT fix it because the physical layer sharpens as it is resolved.
+    #
+    # So this is not advice about ray_cfl. Upstream's "ray_cfl <= 0.06 when a turning point
+    # matters" (ACCURACY.md Finding 2) was measured on a LINEAR ramp, where multilinear
+    # interpolation is exact and the analytic layer gets a correct L_eff. It does not carry
+    # over to a profile whose critical layer is sub-grid.
+    if sc.n_targ_over_ncr <= 1.0:
+        out.append(Gate("G8", "critical layer resolved", "info", None,
+                        f"target peak {sc.n_targ_over_ncr:.2f} n_cr < 1: underdense, no "
+                        "critical surface and no singular layer to resolve."))
+    else:
+        Ln_de = critical_scale_length_de(cfg)
+        dz_de = float(cfg["geometry"]["dz_over_de"])
+        if Ln_de is None:
+            out.append(Gate("G8", "critical layer resolved", "info", None,
+                            "L_n at the critical surface is not derivable from this "
+                            "corona_profile; measure it post-run with "
+                            "scripts/ladder_report.py before quoting absorption."))
+        else:
+            cells_Ln = Ln_de / dz_de
+            cells_layer = 0.01 * cells_Ln
+            ok = cells_layer >= 1.0
+            out.append(Gate(
+                "G8", "critical layer resolved", "pass" if ok else "warn",
+                round(cells_layer, 3),
+                f"L_n = {Ln_de:.3g} d_e = {cells_Ln:.1f} cells; the 1-r < 0.01 layer is "
+                f"{cells_layer:.2f} cells. "
+                + ("Resolved (>= 1 cell), which is the only configuration measured to "
+                   "converge to the seed floor. NOTE this is a t=0 estimate from the "
+                   "CONFIGURED profile; confirm against the run with "
+                   "scripts/ladder_report.py, which measures it from the CIC density."
+                   if ok else
+                   f"SUB-GRID. Absorbed energy is NOT converged and cannot be made so by "
+                   f"refining ray_cfl -- that makes it worse (+18.3% over 0.50 -> 0.025 on "
+                   f"the lifted IC). Resolving it needs dz <~ {0.01*Ln_de:.3g} d_e, i.e. "
+                   f"{dz_de/(0.01*Ln_de):.0f}x finer. Use a shallower corona (a later "
+                   f"handoff), an analytic IC, or fix the operator's L_eff. This is a "
+                   f"t=0 estimate from the CONFIGURED profile and is OPTIMISTIC for a "
+                   f"tabulated IC, whose node spacing smooths the gradient: the lifted "
+                   f"table configures 10.8 d_e here but the runs measured 8.1 / 4.2 / 3.6 "
+                   f"d_e at dz = 0.5 / 0.25 / 0.125, i.e. the physical layer sharpens as "
+                   f"it is resolved. Threshold calibrated on three ladders, not derived.")))
     return out
 
 
