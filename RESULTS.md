@@ -7765,3 +7765,45 @@ analytic near-critical layer is shared by both modes — but it removes the RK4 
 the turning surface as a second, independent error source, and it costs less. The caveat
 from `CLAUDE.md` applies: a stale `refraction` key once went unnoticed for 2000 steps, so
 `--verify` is mandatory on any leg that sets it.
+
+---
+
+## 2026-09-01 (Tier 3a, 3e complete) — **absorbed energy is set by the corona, not by the solid; and the straight-ray ladder is flat**
+
+### 3a: peak density barely matters for absorption
+
+Analytic exponential corona anchored at `n_cr`, `ray_cfl` = 0.25, only the target's flat-top
+density varied:
+
+| `n_max`/`n_cr` | `E_abs` | `f_abs` final | G1 `ω_pe·Δt` at 2× |
+|---|---|---|---|
+| 1.5 | 1.3460e5 | 0.6602 | 0.303 |
+| 3.0 | 1.3590e5 | 0.6979 | 0.429 |
+| 10.0 | 1.3480e5 | 0.6803 | 0.783 |
+| 20.0 | 1.3770e5 | 0.8935 | 1.107 |
+
+**`E_abs` spans 2.3 % across a 13× change in peak density** — about three times the 0.80 %
+seed floor, i.e. nearly flat. That is the expected consequence of the geometry and worth
+stating plainly: the ray turns at `n_cr`, so **the solid behind the critical surface is
+optically invisible to the laser**. Absorbed energy is set by the corona — its scale length
+(3c: `E_abs` moved **2.5×** across `L_n` = 10 → 60 `d_e`) and not by how dense the target
+behind it is. The reservoir matters for what the ablation can *supply* later, not for how
+much light is absorbed now.
+
+Two practical consequences. First, **P5's choice of a 10 `n_cr` cap is not an absorption
+lever** — `P5_full_n20`'s 10 → 20 `n_cr` A/B should be read as a reservoir/compression test,
+not as an absorption test. Second, **20 `n_cr` is admissible on this grid**: G1 reaches 1.107
+against the 1.2 budget at 2× compression, so the density cap is limited by the particle
+pusher rather than by the operator.
+
+### 3e: the straight-ray ladder, all three rungs
+
+| `ray_cfl` | `E_abs` | Δ |
+|---|---|---|
+| 0.25 | 1.3753e5 | — |
+| 0.05 | 1.3746e5 | −0.05 % |
+| 0.025 | 1.3880e5 | +0.98 % |
+
+Total +0.9 % with a sign change — scatter about ~1.377e5 at roughly the seed floor, against
+the refracting march's +3.27 % on the identical IC. Confirms the recommendation: for a
+plane-stratified target, `refraction = 0` is the better production mode.
