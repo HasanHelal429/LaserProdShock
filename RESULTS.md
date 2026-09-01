@@ -7688,3 +7688,80 @@ That is a far more useful finding than "the ladder didn't converge". It says the
 usable, that the admissible regime is defined by G8, and that a single localised code fix
 (an `L_eff` not taken from a one-cell finite difference of an unresolvable gradient) would
 remove the constraint rather than merely bound it.
+
+---
+
+## 2026-09-01 (Tier 2 2D/3D + Tier 3e) — **the interpolation claim is confirmed bit-for-bit; straight-ray mode is the better production mode; and oblique absorption does not reproduce**
+
+### The sentence the whole diagnosis rests on, verified directly
+
+`ACCURACY.md`: *"the `ray_cfl` and `n_cell` sweeps give bit-identical answers at equal
+`ray_cfl × Δz`, because multilinear density interpolation is exact for a linear ramp."*
+On this build, on that ramp:
+
+| `ray_cfl` | `Pabs` | `n_cell` | `Pabs` | |
+|---|---|---|---|---|
+| 0.5 | 5.876210e12 | 512 | 5.876210e12 | bit-identical |
+| 0.25 | 6.003950e12 | 1024 | 6.003950e12 | bit-identical |
+| 0.125 | 5.952360e12 | 2048 | 5.952360e12 | bit-identical |
+| 0.0625 | 5.928050e12 | 4096 | 5.928050e12 | bit-identical |
+
+So on a **linear** ramp `Δs = ray_cfl × Δz` is the only knob, and grid refinement is exactly
+equivalent to march refinement. **On the lifted FLASH table they do not coincide at all** —
+halving dz gave +0.98 %, halving `ray_cfl` gave +7.77 %. That non-coincidence *is* the
+interpolation error, now measured on both sides of the comparison. The linear ramp also
+spreads only **2.28 %** across `ray_cfl` 1.0 → 0.03 (0.25 sitting +1.74 % above the finest,
+inside Finding 2's documented ~2.5 %) against **+18.3 %** on the lifted table.
+
+| test | measured | `ACCURACY.md` |
+|---|---|---|
+| `run_convergence` ray bundle | 1.001647 flat from 2 → 16 (Δ ~1e-6) | <1e-5 |
+| `run_convergence` sub-cycling | 1.000182–1.000267 | 5e-5 |
+| `run_turning_angles` turning depth `z_m` | 0.6 / 1.2 / 0.8 / **1.4** cells at 0/30/45/60° | within 1.4 cells to 60° |
+| `run_3d_slab` circularity | **1.000002** | 1.000001 |
+| `run_3d_slab` absorbed | 0.74 % low | 0.10 % |
+
+### OPEN: oblique absorbed fraction does not reproduce
+
+`run_turning_angles` gets the **turning depth exactly right** — 0.6 to 1.4 cells across
+0–60°, matching the documented bound — but the absorbed *fraction* does not:
+
+| θ₀ | measured | analytic | ratio |
+|---|---|---|---|
+| 0° | 0.585012 | 0.589770 | **0.992** |
+| 30° | 0.225791 | 0.352126 | **0.641** |
+| 45° | 0.083602 | 0.145736 | **0.574** |
+| 60° | 0.017313 | 0.027461 | **0.630** |
+
+`ACCURACY.md`'s headline for this run is "absfrac 2.1 %". At normal incidence we get 0.8 %,
+consistent. At every oblique angle the operator absorbs **36–43 % less** than analytic.
+Normal incidence is fine and the geometry is fine, so this is specific to oblique
+absorption, and it is far too large to be noise.
+
+**Not called a regression yet.** The baseline may have been measured in a different mode —
+Finding 1's discussion notes the straight-ray path "turns EVERY oblique ray at `n_m` instead
+of no ray at all", so `refraction` matters here, and these runs report `refraction 1`. The
+next step is to rerun the angle sweep with `refraction = 0` and compare; if the discrepancy
+survives both modes it is a defect in oblique absorption on this build. **Every P5 leg is at
+normal incidence, so nothing in this campaign depends on it** — but any 2D or finite-spot
+work does, and Phase 1's `P1_vac_2d_spot*` legs are exactly that.
+
+### Tier 3e: straight-ray mode is the better production mode for these targets
+
+Same analytic-ramp IC, same grid, 0.60 cells across the layer:
+
+| mode | `E_abs`(0.25) | `E_abs`(0.025) | drift | × floor |
+|---|---|---|---|---|
+| refracting RK4 | 1.3484e5 | 1.3925e5 | +3.27 % | 4.1× |
+| **straight rays + analytic Snell** | 1.3750e5 | 1.3880e5 | **+0.95 %** | **1.2×** |
+
+`refraction = 0` is **3.4× less `ray_cfl`-sensitive and sits at the noise floor**, while
+agreeing with the refracting march to 1.97 % on the absolute value. It is also cheaper, and
+the operator's own documentation calls it *exact* for a plane-stratified target — which
+every P5 leg is (`shape: planar`, 1D).
+
+**Recommendation: run P5 with `refraction = 0`.** It does not fix the sub-grid layer — the
+analytic near-critical layer is shared by both modes — but it removes the RK4 approach to
+the turning surface as a second, independent error source, and it costs less. The caveat
+from `CLAUDE.md` applies: a stale `refraction` key once went unnoticed for 2000 steps, so
+`--verify` is mandatory on any leg that sets it.

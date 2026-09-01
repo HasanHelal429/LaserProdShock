@@ -55,7 +55,7 @@ one () { local d="$1" deck="$2" w="$3"; shift 3
 
 one run_psc_oblique  inputs_psc_oblique  "$WARPX_2D"
 one run_refraction   "$(ls $LD/run_refraction/inputs_* | head -1 | xargs basename)" "$WARPX_2D"
-one run_expanding    inputs_expanding    "$WARPX_2D"
+one run_expanding    inputs_expanding_laser "$WARPX_2D"   # NOT inputs_expanding -- the deck carries the _laser suffix
 one run_3d_slab      inputs_3d_slab      "$WARPX_3D"
 
 for s in run_turning_angles run_convergence; do
