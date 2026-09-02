@@ -7,6 +7,7 @@ here at commit time, and the config -> deck -> numbers round trip is checked so 
 
 from __future__ import annotations
 
+import copy
 import glob
 import os
 import sys
@@ -332,3 +333,54 @@ def test_density_min_is_scaled_with_the_ion_density_function():
     assert "targ_electrons" in got and "targ_ions" in got
     assert got["targ_electrons"].strip() == "1.e-4*nt"
     assert got["targ_ions"].strip() == f"1.e-4*nt/{Z}", got["targ_ions"]
+
+
+# --------------------------------------------------------------------------- #
+# Checkpoint/restart. A G8-passing spine costs ~145 h against a 48 h queue limit,
+# so the phase's headline result depends on chaining working. These pin the deck
+# side; runs/P5/P5_ckpt is the live end-to-end acceptance test.
+
+def _ckpt_cfg(**patch):
+    """A real P5 config, patched. Built from a run dir rather than from a synthetic BASE
+    so these tests exercise the same rendering path the campaign actually launches."""
+    c = copy.deepcopy(lpconfig.load(os.path.join(ROOT, "runs", "P5", "P5_raycfl_025")))
+    c.setdefault("diagnostics", {})
+    for dotted, val in patch.items():
+        node = c
+        parts = dotted.split(".")
+        for q in parts[:-1]:
+            node = node[q]
+        node[parts[-1]] = val
+    return c
+
+
+def test_checkpoint_is_opt_in():
+    """A checkpoint is the FULL state -- every particle -- and WarpX keeps every one it
+    writes, so defaulting it on would quietly fill $PSCRATCH. Absent unless asked for."""
+    d = lpdeck.parse_inputs_str(lpdeck.render(_ckpt_cfg()))
+    assert "chk.diag_type" not in d
+    assert "warpx.break_signals" not in d
+    assert "chk" not in d["diagnostics.diags_names"].split()
+
+
+def test_checkpoint_emits_diag_and_break_signal():
+    """Both halves are required, and the second is the non-obvious one: without
+    break_signals the wall arrives as SIGKILL and everything since the last scheduled
+    checkpoint is lost -- which is how P5_flashic_off lost 65% of a 24 h run."""
+    c = _ckpt_cfg(**{"diagnostics.checkpoint_intervals": 5000})
+    d = lpdeck.parse_inputs_str(lpdeck.render(c))
+    assert "chk" in d["diagnostics.diags_names"].split()
+    assert d["chk.diag_type"] == "checkpoint"
+    assert d["chk.intervals"] == "5000"
+    assert d["warpx.break_signals"] == "HUP"
+
+
+def test_checkpoint_does_not_disturb_the_other_diagnostics():
+    """The checkpoint is an ADDITION: a leg's plotfile/field/phase cadence, which is what
+    every analysis tool reads, must be identical with and without it."""
+    a = lpdeck.parse_inputs_str(lpdeck.render(_ckpt_cfg()))
+    b = lpdeck.parse_inputs_str(
+        lpdeck.render(_ckpt_cfg(**{"diagnostics.checkpoint_intervals": 5000})))
+    for k in ("diag1.intervals", "diag1.diag_type", "EP.intervals", "FE.intervals",
+              "PN.intervals", "max_step"):
+        assert a.get(k) == b.get(k), f"{k} changed when checkpointing was enabled"

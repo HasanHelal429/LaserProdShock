@@ -313,9 +313,14 @@ def _diag_intervals(cfg: dict):
     red = int(d.get("reduced_intervals", max(1, round(max_step / 250))))
     fields = d.get("field_intervals")
     phase = d.get("phase_intervals")
+    # Checkpointing is OPT-IN and has no default. A checkpoint is the full simulation
+    # state -- every particle -- so on a 22040-cell 500-ppc leg each one is GB-scale and
+    # WarpX keeps every one it writes. Defaulting it on would quietly fill $PSCRATCH.
+    chk = d.get("checkpoint_intervals")
     return (plot, red,
             int(fields) if fields else None,
-            int(phase) if phase else None)
+            int(phase) if phase else None,
+            int(chk) if chk else None)
 
 
 # --------------------------------------------------------------------------- #
@@ -332,7 +337,7 @@ def render(cfg: dict) -> str:
     ax_names = units.axis_names(dims)
     n_cell, lo, hi, dz, dx = units.cells_and_extent(geo, sc.de_ref)
     (flo, fhi), (plo_bc, phi_bc) = _bc_tokens(cfg)
-    plot_int, red_int, field_int, phase_int = _diag_intervals(cfg)
+    plot_int, red_int, field_int, phase_int, chk_int = _diag_intervals(cfg)
     species = _species_table(cfg)
     t_expr, a_expr = _density_exprs(cfg)
     inject_hi = str(las.get("inject_side", "lo")) == "hi"
@@ -957,7 +962,8 @@ def render(cfg: dict) -> str:
         a(f"{nm}.intervals = {red_int}")
     a("")
     diags = ["diag1"] + (["diag_fields"] if field_int else []) \
-                      + (["diag_phase"] if phase_int else [])
+                      + (["diag_phase"] if phase_int else []) \
+                      + (["chk"] if chk_int else [])
     a(f"diagnostics.diags_names = {' '.join(diags)}")
     a("")
     a(f"# diag1: fields + all particles (~{int(num['max_step'])//plot_int} frames)")
@@ -995,6 +1001,20 @@ def render(cfg: dict) -> str:
         a(f"diag_phase.species       = {' '.join(ions)}")
         for sp in ions:
             a(f"diag_phase.{sp}.random_fraction = {_num(frac)}")
+    if chk_int:
+        a("")
+        a("# chk: CHECKPOINT/RESTART. The measured cost of a converged spine is ~145 h on")
+        a("# one A100 against a 48 h queue limit, so a long leg cannot run in a single job")
+        a("# -- and P5_flashic_off already died at 65% on the 24 h wall with nothing to")
+        a("# resume from. This is what makes a chained submission possible.")
+        a("#")
+        a("# `warpx.break_signals = HUP` plus a Slurm `--signal` (see perlmutter/job.sbatch)")
+        a("# stops cleanly BEFORE the wall; WarpX's own dump_last_timestep = 1 default then")
+        a("# writes a checkpoint on the way out, so the pre-wall state is never lost even")
+        a("# if the wall lands between two scheduled checkpoints.")
+        a(f"chk.intervals  = {chk_int}")
+        a("chk.diag_type  = checkpoint")
+        a("warpx.break_signals = HUP")
     a("")
     return "\n".join(L)
 

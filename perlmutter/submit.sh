@@ -7,6 +7,18 @@
 #   perlmutter/submit.sh cap                                   # the 10 -> 20 n_cr A/B
 #   perlmutter/submit.sh all                                   # every long leg at once
 #   perlmutter/submit.sh spine --dry                           # print sbatch, submit nothing
+#   perlmutter/submit.sh spine --chain 4                       # 4 dependent jobs, resumed
+#
+# --chain N submits N copies of the same array, each depending on the previous with
+# `afterany`, so a leg longer than the queue limit finishes across several jobs. The
+# measured cost of a G8-passing spine is ~145 h against a 48 h cap, so this is the
+# difference between a converged headline result and none. It requires the leg's config to
+# set diagnostics.checkpoint_intervals -- run_warpx restarts from the newest checkpoint it
+# finds and otherwise still refuses to touch an existing diags/, so a chained submission on
+# a non-checkpointing leg fails safely on the second job rather than corrupting the first.
+#
+# `afterany`, not `afterok`: WarpX exits non-zero when Slurm signals it before the wall,
+# which is exactly the case the chain exists to continue from.
 #
 # Site-specific values come from perlmutter/site.conf. sbatch #SBATCH directives cannot
 # read shell variables, which is why -A/-q/-t/--array are passed here rather than baked
@@ -19,12 +31,13 @@ export LP_PM
 source "$LP_PM/_common.sh"
 
 WHAT="${1:-}"; shift || true
-DRY=0; QOS_OVERRIDE=""; TIME_OVERRIDE=""
+DRY=0; QOS_OVERRIDE=""; TIME_OVERRIDE=""; CHAIN=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry)  DRY=1; shift ;;
         --qos)  QOS_OVERRIDE="$2"; shift 2 ;;
         --time) TIME_OVERRIDE="$2"; shift 2 ;;
+        --chain) CHAIN="$2"; shift 2 ;;
         *) echo "unknown option '$1'" >&2; exit 2 ;;
     esac
 done
@@ -117,6 +130,12 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_gridheat_seed runs/P5/P5_gridheat_dz025)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_gridheat"
     ;;
+  ckpt)
+    # GROUP 4 acceptance test. Run once, then raise max_step and run again: segment 2
+    # must restart from the checkpoint rather than refuse or start over.
+    RUNS=(runs/P5/P5_ckpt)
+    TIME="00:20:00"; QOS="debug"; JOBNAME="lp5_ckpt"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -156,7 +175,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
@@ -187,6 +206,19 @@ for r in "${RUNS[@]}"; do
 done
 (( fail == 0 )) || exit 1
 
+if (( CHAIN > 1 )); then
+    # Refuse to chain a leg that cannot resume: without a checkpoint the second job would
+    # hit run_warpx's existing-output refusal and the chain would be a queue of failures.
+    # Checked HERE, with the other pre-flight, so `--dry --chain` reports it -- a guard
+    # that only fires on a real submission cannot be tested without submitting.
+    for r in "${RUNS[@]}"; do
+        grep -q 'checkpoint_intervals' "$LASERPROD_ROOT/${r%%:*}/config.yaml" 2>/dev/null || {
+            echo "submit: --chain needs diagnostics.checkpoint_intervals in ${r%%:*}/config.yaml" >&2
+            echo "        (otherwise job 2 refuses to touch job 1's diags/ -- by design)" >&2
+            exit 2; }
+    done
+fi
+
 # A file rather than an exported variable: sbatch --export is comma-separated and mangles
 # anything containing spaces.
 #
@@ -213,4 +245,15 @@ if (( DRY )); then
     echo "(--dry: nothing submitted; runlist left at $RUNLIST)"
     exit 0
 fi
-"${CMD[@]}"
+
+prev=""
+for ((i = 1; i <= CHAIN; ++i)); do
+    if [[ -n "$prev" ]]; then
+        out="$(sbatch --dependency=afterany:"$prev" --parsable \
+               "${CMD[@]:1}")" || exit 1
+    else
+        out="$(sbatch --parsable "${CMD[@]:1}")" || exit 1
+    fi
+    prev="${out%%;*}"
+    echo "  segment $i/$CHAIN -> job $prev${prev:+ }$([[ $i -gt 1 ]] && echo '(afterany)')"
+done

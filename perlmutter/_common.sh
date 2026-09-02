@@ -64,9 +64,21 @@ run_warpx() {
         [[ -f "$run_dir/ic_flash.yaml" ]] && cp "$run_dir/ic_flash.yaml" "$work/"
     fi
 
-    if compgen -G "$work/diags/*" > /dev/null; then
-        echo "run_warpx: $work/diags already has output -- refusing to overwrite in place." >&2
-        echo "           Move it aside or delete it, then resubmit." >&2
+    # RESTART, or refuse. The refusal is a safety property -- two runs sharing a diags/
+    # clobber each other, which has already cost this group a rerun -- so it is kept for
+    # every case EXCEPT the one where resuming is well defined: a checkpoint written by
+    # this same run. A leg whose deck asks for checkpoints is meant to be chained; a leg
+    # whose deck does not is still protected exactly as before.
+    local restart=""
+    if compgen -G "$work/diags/chk*" > /dev/null; then
+        # highest step wins; the names are zero-padded so a lexical sort is numeric
+        restart="$(ls -d "$work"/diags/chk* 2>/dev/null | sort | tail -1)"
+        echo "run_warpx: RESTARTING from $(basename "$restart")"
+    elif compgen -G "$work/diags/*" > /dev/null; then
+        echo "run_warpx: $work/diags already has output and no checkpoint to resume from" >&2
+        echo "           -- refusing to overwrite in place. Move it aside or delete it," >&2
+        echo "           then resubmit. (Add diagnostics.checkpoint_intervals to the" >&2
+        echo "           config if this leg should be resumable.)" >&2
         return 1
     fi
 
@@ -91,7 +103,15 @@ run_warpx() {
     # array task dies before the logger is reaped and before --verify reports why.
     local rc=0
     set +e
-    srun --cpu-bind=cores "$bin" "$(basename "$deck")" > run.log 2>&1
+    # A restart APPENDS to run.log rather than truncating it: the LASERDEP history and
+    # the step trace from the earlier segments are the run's only record of what it did
+    # before the wall, and every analysis tool reads them out of this one file.
+    if [[ -n "$restart" ]]; then
+        srun --cpu-bind=cores "$bin" "$(basename "$deck")" \
+             amr.restart="$restart" >> run.log 2>&1
+    else
+        srun --cpu-bind=cores "$bin" "$(basename "$deck")" > run.log 2>&1
+    fi
     rc=$?
     set -e
     if [[ -n "$logger_pid" ]]; then

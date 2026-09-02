@@ -15,6 +15,13 @@
 #SBATCH -J laserprod
 #SBATCH -o slurm-%A_%a.out
 #SBATCH -e slurm-%A_%a.err
+# Signal the job steps 10 min before the wall so WarpX (warpx.break_signals = HUP, emitted
+# by deck.py whenever a leg asks for checkpoints) can stop cleanly and write a final
+# checkpoint on the way out. Without this the wall arrives as SIGKILL and everything since
+# the last scheduled checkpoint is lost -- which is how P5_flashic_off lost 65% of a 24 h
+# run with nothing to resume from. Harmless on a leg with no checkpoint diagnostic: WarpX
+# does not register the handler, and the signal is ignored.
+#SBATCH --signal=1@600
 
 set -euo pipefail
 # shellcheck disable=SC1090
