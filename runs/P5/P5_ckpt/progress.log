@@ -1,0 +1,11 @@
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P5/P5_ckpt
+# logging_started 2026-09-02T14:04:33  total_steps=2000  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-09-02T14:05:03 | 1510/2000 (75.5%) | 0h00m | 0.0199 s/step(wall) | 0.0163 s/step(warpx) | ETA ~0h00m | x1.22 | load 1.1 | laser 0.937 of peak, Eabs 6842 J
+2026-09-02T14:05:33 | 2000/2000 (100.0%) | 0h01m | 0.0612 s/step(wall) | 0.0171 s/step(warpx) | ETA ~0h00m | x3.57 | load 1.0 | laser 0.954 of peak, Eabs 9086 J
+DONE 2026-09-02T14:05:33 | 2000/2000 (100.0%) | total wall 0h01m | mean 0.0300 s/step(wall) | reached max_step
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P5/P5_ckpt
+# logging_started 2026-09-02T14:39:21  total_steps=4000  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-09-02T14:39:51 | 3554/4000 (88.8%) | 0h00m | 0.0084 s/step(wall) | 0.0164 s/step(warpx) | ETA ~0h00m | x0.52 | load 0.9 | laser 0.444 of peak, Eabs 7213 J
+DONE 2026-09-02T14:39:51 | 3554/4000 (88.8%) | total wall 0h00m | mean 0.0084 s/step(wall) | end marker

@@ -35,7 +35,24 @@ costs two days.
 
 ## Result
 
-*(pending)*
+**PASSED, 2026-09-02.** Segment 1 (job 57869919 → 57871106) ran 2000 steps and wrote
+`chk000000/001000/002000`. `max_step` was then raised to 4000 and the leg resubmitted
+(57871958). Segment 2:
+
+| check | result |
+|---|---|
+| found and used the checkpoint | `run_warpx: RESTARTING from chk002000` |
+| `run.log` appended, not truncated | 402 `LASERDEP` lines = 201 + 201 |
+| continued, not restarted | steps 1–4000, **4000 distinct**, no duplicates |
+| new checkpoints written | `chk003000`, `chk004000` |
+| exit | 0 |
+
+**It failed on the first attempt, which is why it exists.** The renderer emitted
+`chk.diag_type = checkpoint`, but `checkpoint` is a **format**: WarpX aborted at
+initialisation with *"diag_type must be Full, TimeAveraged, BackTransformed or
+BoundaryScraping"*. The correct form is `chk.diag_type = Full` + `chk.format = checkpoint`
+(see `Examples/Tests/pml/inputs_base_2d`). Two minutes to find here; it would have been two
+days on the spine.
 
 ## Retracted
 

@@ -124,7 +124,7 @@ numerics:
   max_grid_size: 22040        # = the WHOLE domain. On a GPU a 1D WarpX run is 7.9x faster
                               # with one box than with the default decomposition (project
                               # memory). Must be reset whenever n_cell changes.
-  max_step: 2000             # 2.0 ps = 0.054 tau_own. Long enough for ~2030 LASERDEP
+  max_step: 4000             # 2.0 ps = 0.054 tau_own. Long enough for ~2030 LASERDEP
                               # samples on a profile that has not yet moved; short enough
                               # that all four rungs finish in minutes.
   ppc:

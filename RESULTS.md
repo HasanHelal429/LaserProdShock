@@ -7968,3 +7968,36 @@ Two consequences worth carrying forward:
   budget is orders of magnitude larger and the same measurement becomes sharp. G6 should be
   asked there, not on the ladder rungs — which is, belatedly, exactly why the gate is marked
   `[POST]`.
+
+---
+
+## 2026-09-02 (Group 4) — **checkpoint/restart works: a leg longer than the queue limit can now finish**
+
+`runs/P5/P5_ckpt`, a 2000-step acceptance leg, then `max_step` raised to 4000 and
+resubmitted. Segment 2 announced `RESTARTING from chk002000`, logged steps 1–4000 with
+**4000 distinct** step numbers and no duplicates, left 402 `LASERDEP` lines where segment 1
+had 201, and wrote `chk003000`/`chk004000`. Exit 0.
+
+So the pieces hold together: `deck.py` emits the checkpoint diagnostic and
+`warpx.break_signals = HUP`; `job.sbatch` asks Slurm for `--signal=1@600` so WarpX is warned
+ten minutes before the wall; `run_warpx` restarts from the newest `diags/chk*` and appends
+to `run.log`; `submit.sh --chain N` submits dependent segments with `afterany`.
+
+**This removes the constraint that had no converged spine fitting in one job.** 145 h is
+four 48 h segments, and `shared` allows 5000. It also protects every long leg from the wall
+— `P5_flashic_off` lost 65 % of a 24 h run with nothing to resume from, and that cannot
+happen again on a leg that asks for checkpoints.
+
+**It failed on the first attempt.** The renderer emitted `chk.diag_type = checkpoint`, but
+`checkpoint` is a **format**, not a diag type: WarpX aborts at initialisation with
+*"diag_type must be Full, TimeAveraged, BackTransformed or BoundaryScraping"*. The correct
+form is `chk.diag_type = Full` plus `chk.format = checkpoint`. Two minutes to find on a
+2000-step leg; on the spine it would have been two days, and it is exactly the class of
+error the acceptance test was written to absorb. Both keys are now asserted in
+`tests/test_structures.py`.
+
+A second bug surfaced the same way: the `--chain` guard that refuses a leg without
+`checkpoint_intervals` was originally placed **after** the `--dry` early exit, so
+`--dry --chain` silently accepted a leg that would have failed on its second segment. A
+guard that only fires on a real submission cannot be tested without submitting; it now sits
+with the other pre-flight checks.
