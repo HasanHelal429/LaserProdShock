@@ -8001,3 +8001,62 @@ A second bug surfaced the same way: the `--chain` guard that refuses a leg witho
 `--dry --chain` silently accepted a leg that would have failed on its second segment. A
 guard that only fires on a real submission cannot be tested without submitting; it now sits
 with the other pre-flight checks.
+
+---
+
+## 2026-09-02 (Group 1a/1b) — **the operator now reports its own near-critical behaviour, and what it reports is stark: up to 32 % of absorbed power lands in evanescent cells**
+
+Branch `fix/near-critical-layer`, built in a separate worktree so the shared checkout stays
+at `534f3b170` and `build_pm_1d`'s provenance is untouched. Two changes, both
+diagnostics-only.
+
+**1b — `n_floor` is an input (`laser_deposition.n_floor`), and it sets the answer.**
+Same deck, 200 steps, only the floor varied:
+
+| `n_floor` | `E_abs` |
+|---|---|
+| 1e-1 | 981.8 |
+| **1e-2 (the hardcoded default)** | **883.9** |
+| 1e-3 | 615.9 |
+
+**One decade moves absorbed energy by −30 % / +11 %** — and in the *opposite* direction to
+the naive expectation. Lowering the floor does not admit a larger `K`; it fires the turning
+trigger *closer* to critical, shrinking the analytic layer's window `w = 1 − r_prev`. So
+absorption on a turning-point target is dominated by that analytic layer, and the layer's
+extent is set by a bare numerical constant with no physical meaning.
+
+**1a — the self-check.** Three numbers on every `LASERDEP` line: `rmax` (closest any ray
+came to critical), `overfrac` (fraction of absorbed power deposited into cells that are
+themselves overdense) and `layerfrac` (fraction coming from the analytic layer rather than
+from marched steps). At full ladder duration:
+
+| leg | max `rmax` | max `overfrac` | max `layerfrac` |
+|---|---|---|---|
+| lifted FLASH, `ray_cfl` 0.25 | 1.051 | **0.320** | 0.143 |
+| lifted FLASH, 0.025 | 1.002 | 0.073 | **0.250** |
+| **underdense — no turning point** | **0.713** | **0** | **0** |
+| analytic ramp | 1.164 | 0.321 | 0.202 |
+
+**Up to 32 % of the absorbed laser power is being deposited into cells where `n_e > n_cr`**,
+i.e. where the wave is evanescent and cannot propagate at all. And 14–25 % of it comes from
+the analytic layer, whose size 1b just showed is arbitrary. The underdense control reads
+**exactly zero on both**, which is precisely what its exactly-flat ladder predicted — so the
+diagnostic discriminates the cases the campaign spent days separating, and would have said
+so on run one.
+
+**Regression: no answer changed.** Three of the four registered operator CI tests pass with
+the instrumented binary — `1d_laser_deposition` 0.0059 (tol 0.05), `1d_laser_deposition_ramp`
+0.0160 (tol 0.06), `2d_laser_deposition_oblique` 0.0027 (tol 0.06). The fourth needs the
+`checksumAPI` module, absent from this venv; that is a harness dependency, not a result.
+
+### The first version of the self-check was wrong, and reported zeros
+
+`clampfrac` and `overfrac` initially read 0 everywhere — even where `rmax` = 1.045 proved
+rays had gone past critical. Both counters were structurally dead: they sat inside
+`if (!vac && !turning)`, the block **skipped on the turning step**, which is the only step
+that reaches the singular region; and the layer counter tested `ne_prev`, the last
+*underdense* sample by construction, which can never satisfy `>= 1`. A diagnostic that
+cannot fire on the case it was written for reports clean and means nothing. `overfrac` now
+tests the density at the **deposit cell**, and `layerfrac` replaced the dead clamp counter.
+Worth stating plainly because the failure mode — an instrument that reads zero because it
+is not connected — is indistinguishable from good news.
