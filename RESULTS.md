@@ -7836,3 +7836,26 @@ Two coverage gaps found in the analysis tooling rather than the operator:
   single-deck run cannot feed it. It is an effect plot, not a baseline.
 * `compare_expanding.py` still reports Test C as unscoreable without a PSC log — the
   absolute cross-code validation `ACCURACY.md` lists as blocked on code access. Unchanged.
+
+### Figures, and one number corrected
+
+`scripts/tier_figures.py` writes six campaign-level figures to `media/P5/P5_tiers/`. They
+summarise **across** runs, because every conclusion here is a statement about a set — a
+single ladder rung read alone is exactly how the 2026-08-30 non-convergence was first
+misread as near-convergence. Ladder energies are recomputed from each run's own `LASERDEP`
+history rather than hardcoded, so re-running a leg updates the figures.
+
+| figure | what it shows |
+|---|---|
+| `tier3_drift_vs_layer_resolution.png` | the headline: drift falls monotonically with layer resolution and enters the seed floor at ~1 cell |
+| `tier1_three_ladders.png` | four `ray_cfl` ladders on one frame; only the lifted table runs away, the underdense control is exactly flat |
+| `tier3_admissibility_map.png` | G8 over (handoff time × dz), with the cost of each passing cell |
+| `tier2_upstream_agreement.png` | this build ÷ `ACCURACY.md`, everything at 1.0 except oblique absorption |
+| `tier1_where_it_breaks.png` | per-cell deposition difference against local density — one spike at `n/n_cr` ≈ 1, domain edges at zero |
+| `tier1_energy_closure_control.png` | the laser-off control: field energy linear from zero, kinetic flat |
+
+**Correction.** The `L_n` = 60 `d_e` drift is **−0.48 %**, not the −0.51 % quoted in the
+Tier 3 entry above. That figure was computed from `laser_report`'s 5-significant-figure
+display values (1.7810e5 / 1.7720e5) rather than from the tracer (1.780550e5 / 1.771970e5).
+No conclusion changes — both are well inside the 0.80 % floor and both are negative — but
+the recomputed value is the one the figures carry, and the two should agree.
