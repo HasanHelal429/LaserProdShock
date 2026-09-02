@@ -7929,3 +7929,42 @@ whose own value carries ±3e4 of scatter against a ~1.5e5 signal — so they are
 roughly ±20 %, not the three-figure precision implied. The rungs still gain more than the
 tracer reports, but *how much more* is not yet measured. Closing that needs several
 replicates of both the control and a rung, not one of each.
+
+### As a fraction of the run's total energy — which is the framing that settles it
+
+Total system energy at t = 0 is **3.377e6 J** in every one of these 20 300-step legs. Against
+that:
+
+| run | ΔE / E_total | `E_abs` / E_total | excess |
+|---|---|---|---|
+| **laser OFF**, dz 0.5 | **+1.05 %** | — | — |
+| **laser OFF**, other seed | **−0.38 %** | — | — |
+| **laser OFF**, dz 0.25 | **−0.90 %** | — | — |
+| laser ON, `ray_cfl` 0.50 | +4.57 % | 2.63 % | 1.95 % |
+| laser ON, 0.25 | +4.92 % | 2.83 % | 2.09 % |
+| laser ON, 0.10 | +5.64 % | 3.01 % | 2.63 % |
+| laser ON, 0.05 | +4.51 % | 3.05 % | 1.46 % |
+| laser ON, 0.025 | +6.44 % | 3.11 % | 3.33 % |
+
+**The three laser-off runs, which receive no energy at all, span 1.95 percentage points of
+the total** (−0.90 % to +1.05 %). The laser itself only ever deposits **2.6–3.1 %**. And the
+"excess" the rungs show over their tracer is **1.46–3.33 %** — i.e. **0.8× to 1.7× the
+scatter of runs with no energy input whatsoever.**
+
+**So the energy excess is not established.** The Tier 1c ratios (1.14–1.74×, and the earlier
+raw 1.5–2.1×) are arithmetically correct but they divide by `E_abs`, which is itself only 3 %
+of the system energy — so a ~2 % wobble becomes a "74 % excess". Both framings are hereby
+retired in favour of this one. What can honestly be said is: **over 2 ps the energy budget
+of these runs is not resolved better than ~2 % of total, and every effect being argued about
+lives inside that.**
+
+Two consequences worth carrying forward:
+
+* **G6 is not closeable on a 2 ps leg**, with this diagnostic, at this ppc. The signal
+  (`E_abs`) and the noise are the same size. It is not a defect in the operator or in the
+  gate — it is the wrong duration to ask the question in.
+* **A long leg is far better conditioned for it.** `E_abs` accumulates with the pulse while
+  the no-input scatter appears not to, so on the 0.9 ns spine the laser's share of the
+  budget is orders of magnitude larger and the same measurement becomes sharp. G6 should be
+  asked there, not on the ladder rungs — which is, belatedly, exactly why the gate is marked
+  `[POST]`.
