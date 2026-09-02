@@ -7859,3 +7859,73 @@ Tier 3 entry above. That figure was computed from `laser_report`'s 5-significant
 display values (1.7810e5 / 1.7720e5) rather than from the tracer (1.780550e5 / 1.771970e5).
 No conclusion changes — both are well inside the 0.80 % floor and both are negative — but
 the recomputed value is the one the figures carry, and the two should agree.
+
+---
+
+## 2026-09-01 (Groups 2 & 3) — **the oblique "discrepancy" is a stale upstream table, not a regression; and the laser-off energy gain is retracted**
+
+### Group 2: `ACCURACY.md` §3's absorbed-fraction column predates two operator bug fixes
+
+Three checks, and they agree:
+
+* **The registered CI test passes.** `test_2d_laser_deposition_oblique` at 30° gives
+  relative error **0.0078** against a 0.06 tolerance, turning depth exact. The operator's
+  oblique absorption is correct against a closed-form reference on a clean deck.
+* **Geometry reproduces bit-for-bit.** Our `refraction = 1` turning depths are 701.172 /
+  527.344 / 351.562 / 177.734 µm against the documented 701.2 / 527.3 / 351.6 / 177.7.
+  Same deck, same analysis script, both unchanged since 2026-07-27.
+* **`temperature_mode` is not the cause.** Rerunning the sweep in `fixed` mode gives
+  ratios **identical** to `local` (0.64122 / 0.57366 / 0.63048). That hypothesis is dead.
+
+The cause is in the git log. The table dates from `535a563cf` (2026-07-27); the operator
+has changed eight times since, and **two of those changes reduced absorption specifically
+where oblique rays live**:
+
+* **`c817b6342` (07-29)** — "wrap rays at periodic transverse faces instead of clamping".
+  Before it, a ray drifting across a transverse face "kept marching forever with its
+  transverse index pinned to the edge column, unloading all of its remaining absorption
+  into that one column." Oblique rays travel transversely; normal-incidence rays do not.
+* **`ef4500392` (08-03)** — "weight the A interpolation by n_e (**fixes 27 % edge
+  over-absorption**)". The old code averaged an empty cell's floor-built `A` — enormous,
+  since `A ~ T^{-3/2}` — into edge cells, inflating `K` there by hundreds of times.
+
+Both **inflated** the old numbers, and both bite hardest at angle. That is exactly the
+observed pattern: at 0°, where a ray neither travels transversely nor crosses an edge
+obliquely, our ratio still matches the documented one (0.9916 vs 1.0042).
+
+**So this is the opposite of a regression: the operator was fixed and the table was never
+regenerated.** `ACCURACY.md` §3's absorbed-fraction column should be restated from these
+runs. The turning-depth column stands unchanged. Filed as an upstream doc fix, not a code
+defect — and the campaign's oblique open item is closed.
+
+### Group 3: RETRACTION — the laser-off control does not gain +3.53e4 J
+
+The 2026-08-31 Tier 1c entry reported that `P5_raycfl_off` "gains +3.53e4 J from zero
+energy input — 34 % of the 0.05 rung's `E_abs`". **Two more probes show that number is not
+reproducible.** All three are laser-off, zero energy input:
+
+| probe | `ΔKE` | `ΔE_field` | **net** |
+|---|---|---|---|
+| baseline, dz = 0.5 | −5.39e3 | +4.07e4 | **+3.53e4** |
+| different seed, dz = 0.5 | −5.12e4 | +3.85e4 | **−1.27e4** |
+| dz = 0.25 | −7.53e4 | +4.48e4 | **−3.05e4** |
+
+**The net changes sign between seeds.** It is the small difference of two much larger
+numbers, and the kinetic term scatters by an order of magnitude (−5.4e3 to −7.5e4) at fixed
+physics. A single measurement of it means nothing, and the "34 % of `E_abs`" framing is
+withdrawn.
+
+What *is* robust is the field-energy growth: **+3.8e4 to +4.5e4 in all three**, an 8 %
+spread, linear in time. Kinetic energy consistently *falls*. So the picture is
+kinetic → field conversion plus scatter, not a clean creation of energy from nothing.
+
+Note also that halving dz **raised** `ΔE_field` slightly (4.07e4 → 4.48e4) rather than
+lowering it, even though `dz/λ_D` halves from 58 to 29. That is evidence *against* simple
+Debye under-resolution as the mechanism, and it means G2's standing explanation is still
+not established.
+
+**Consequence for Tier 1c.** The corrected closure ratios (1.14–1.74×) subtract a control
+whose own value carries ±3e4 of scatter against a ~1.5e5 signal — so they are uncertain by
+roughly ±20 %, not the three-figure precision implied. The rungs still gain more than the
+tracer reports, but *how much more* is not yet measured. Closing that needs several
+replicates of both the control and a rung, not one of each.
