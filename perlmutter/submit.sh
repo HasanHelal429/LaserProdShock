@@ -110,6 +110,13 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_straight_005 runs/P5/P5_ncr_200)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_t3b"
     ;;
+  gridheat)
+    # GROUP 3 -- characterise the spurious energy gain the laser-off control revealed.
+    # These are NOT G3 controls and are named so: one varies the seed, the other the grid,
+    # which a valid _off control may never do.
+    RUNS=(runs/P5/P5_gridheat_seed runs/P5/P5_gridheat_dz025)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp5_gridheat"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -149,7 +156,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 
