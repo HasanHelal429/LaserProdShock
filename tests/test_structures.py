@@ -359,6 +359,7 @@ def test_checkpoint_is_opt_in():
     writes, so defaulting it on would quietly fill $PSCRATCH. Absent unless asked for."""
     d = lpdeck.parse_inputs_str(lpdeck.render(_ckpt_cfg()))
     assert "chk.diag_type" not in d
+    assert "chk.format" not in d
     assert "warpx.break_signals" not in d
     assert "chk" not in d["diagnostics.diags_names"].split()
 
@@ -370,7 +371,10 @@ def test_checkpoint_emits_diag_and_break_signal():
     c = _ckpt_cfg(**{"diagnostics.checkpoint_intervals": 5000})
     d = lpdeck.parse_inputs_str(lpdeck.render(c))
     assert "chk" in d["diagnostics.diags_names"].split()
-    assert d["chk.diag_type"] == "checkpoint"
+    # `checkpoint` is the FORMAT; diag_type must be Full. Asserting both because the
+    # first implementation set diag_type = checkpoint and WarpX aborted at init.
+    assert d["chk.diag_type"] == "Full"
+    assert d["chk.format"] == "checkpoint"
     assert d["chk.intervals"] == "5000"
     assert d["warpx.break_signals"] == "HUP"
 

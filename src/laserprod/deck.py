@@ -1012,8 +1012,13 @@ def render(cfg: dict) -> str:
         a("# stops cleanly BEFORE the wall; WarpX's own dump_last_timestep = 1 default then")
         a("# writes a checkpoint on the way out, so the pre-wall state is never lost even")
         a("# if the wall lands between two scheduled checkpoints.")
+        # `checkpoint` is a FORMAT, not a diag_type. Getting that wrong aborts at
+        # initialisation with "diag_type must be Full, TimeAveraged, BackTransformed or
+        # BoundaryScraping" -- which is how runs/P5/P5_ckpt earned its keep on the first
+        # attempt. See Examples/Tests/pml/inputs_base_2d for the canonical four lines.
         a(f"chk.intervals  = {chk_int}")
-        a("chk.diag_type  = checkpoint")
+        a("chk.diag_type  = Full")
+        a("chk.format     = checkpoint")
         a("warpx.break_signals = HUP")
     a("")
     return "\n".join(L)
