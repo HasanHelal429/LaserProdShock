@@ -8060,3 +8060,62 @@ cannot fire on the case it was written for reports clean and means nothing. `ove
 tests the density at the **deposit cell**, and `layerfrac` replaced the dead clamp counter.
 Worth stating plainly because the failure mode — an instrument that reads zero because it
 is not connected — is indistinguishable from good news.
+
+---
+
+## 2026-09-04 (Group 1c/1d/1e) — **the near-critical fixes do NOT restore convergence. Criterion failed, reported as such**
+
+Acceptance criterion, fixed in writing before the runs: *the lifted-FLASH ladder's last
+increment must shrink and land within a few times the 0.80 % seed floor; falsified by a
+fine-end increment that still grows.* Both ladders in **one binary**, switched by
+`laser_deposition.near_critical_fix`, so nothing is confounded by a rebuild.
+
+| `ray_cfl` | `E_abs` fix ON | increment | | increment, fix OFF |
+|---|---|---|---|---|
+| 0.25 | 97 736 | — | | — |
+| 0.10 | 99 690 | +2.00 % | | +4.91 % |
+| 0.05 | 102 862 | +3.18 % | | +1.67 % |
+| 0.025 | 106 161 | **+3.21 %** | | **+1.98 %** |
+
+**Total drift is unchanged: +8.62 % ON against +8.78 % OFF.** The fine-end increment still
+grows. **The criterion is failed and 1c/1d/1e are not the fix for the divergence.**
+
+### What the fixes DID achieve, which is not nothing
+
+**`overfrac` = 0 exactly, on every rung with the fix on**, against 0.08 / 0.32 / 0.57 with
+it off. Up to 57 % of absorbed power was being deposited into cells where `n_e > n_cr` —
+where the wave is evanescent and cannot propagate — and that no longer happens. The
+deposit is also now paired with the density measured at the same position, so the deposited
+energy equals `absorbed` rather than being rescaled by a neighbouring cell's density.
+
+So 1c/1d fixed a real defect in **where** energy is deposited. They did not touch **how
+much** is absorbed, and the two turn out to be independent problems.
+
+### Why 1e was insufficient, and what that implies
+
+1e measured the layer's scale length over at least one cell, on the reasoning that `drds`
+was reading the interpolant's slope rather than the plasma's. That reasoning still looks
+right, but it addressed only one of the analytic layer's two free quantities. The layer's
+**extent** is `w = 1 − r_prev`, set by where the turning trigger fires — i.e. by `n_floor`.
+1b already measured that dependence directly: **one decade of `n_floor` moves `E_abs` by
+−30 %/+11 %**. Correcting `L_eff` cannot rescue an integral whose limits are arbitrary.
+
+That is the sharpest statement this campaign can make about the defect:
+
+> Absorption at an unresolved critical layer is dominated by an analytic term whose
+> **width** is set by a numerical constant with no physical meaning. Fixing where that
+> term deposits (1c/1d) and how its gradient is measured (1e) leaves the width untouched,
+> and the width is what the answer depends on.
+
+A fix that would actually work has to make the layer's extent physical — integrate from the
+last resolved sample to the true critical surface located by the profile, with `n_floor`
+serving only as a numerical guard rather than as the integration limit. That is a larger
+change than 1c/1d/1e and should be scoped as its own piece of work, not bolted on.
+
+### Recommendation, unchanged in substance
+
+G8 still governs: use the module where the `1−r < 0.01` layer spans ≳1 cell, and treat
+absorption on a sub-grid layer as unconverged by an amount the campaign has now bounded
+(~9 % over a 10× refinement, and ~30 % per decade of `n_floor`). 1c/1d should be **kept
+regardless** — depositing laser energy into evanescent cells is wrong independently of
+whether it fixes convergence, and the correction is free.
