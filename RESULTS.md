@@ -8119,3 +8119,74 @@ absorption on a sub-grid layer as unconverged by an amount the campaign has now 
 (~9 % over a 10× refinement, and ~30 % per decade of `n_floor`). 1c/1d should be **kept
 regardless** — depositing laser energy into evanescent cells is wrong independently of
 whether it fixes convergence, and the correction is free.
+
+---
+
+## 2026-09-04 — **RETRACTION: the 0.80 % "seed floor" was wrong by 1.7×, and it invalidates every ladder increment below ~3 %**
+
+Four runs of **one identical configuration** — same deck, same binary, same
+`random_seed = 20260829`, `near_critical_fix` off, `ray_cfl` = 0.025:
+
+| run | `E_abs` |
+|---|---|
+| 1 | 105 334 |
+| 2 | 103 562 |
+| 3 | 102 383 |
+| 4 (acceptance) | 102 526 |
+
+**mean 103 451, 1σ = 1.32 %, full spread 2.85 %.** The earlier campaign's run of the same
+configuration gave 104 962, +1.46 % from this mean — consistent, and no longer mysterious.
+
+### What this retracts
+
+**The 0.80 % floor (2026-08-31) is withdrawn.** It came from ONE pair — `P5_ramp_005` vs
+`P5_ramp_005r` — differing only in seed. A single pair estimates a difference, not a
+spread, and it happened to land low: the true 1σ on `E_abs` at this duration is **1.32 %**,
+1.7× larger, and the full spread of four runs is 2.85 %. Every verdict measured against
+0.80 % must be re-read against 1.32 %.
+
+Measured against the correct floor, the increments the 1c/1d/1e verdict rested on are:
+
+| increment | value | significance |
+|---|---|---|
+| OFF 0.10 → 0.05 | +0.91 % | **0.7σ** |
+| OFF 0.05 → 0.025 | +0.37 % | **0.3σ** |
+| ON 0.10 → 0.05 | +3.18 % | 2.4σ |
+| ON 0.05 → 0.025 | +3.21 % | 2.4σ |
+
+**The OFF ladder's apparent convergence is not a measurement — both of its fine increments
+are under 1σ.** So is the claim I made two messages ago that the OFF ladder converges while
+the ON ladder does not: the difference between them is ~2σ on single runs, which is not
+enough to distinguish them.
+
+**Both the "1c/1d/1e fails its criterion" verdict and its predecessor are withdrawn.** The
+A/B cannot be decided at 20 300 steps with one run per point. It would need ~5 runs per
+rung to bring the mean's uncertainty to ~0.6 %, i.e. 40 runs for a two-ladder comparison —
+about 6 GPU-hours, which is affordable and is the right way to settle it.
+
+### What this does NOT retract
+
+* **`overfrac` → 0 with the fix on** (against 0.08 / 0.32 / 0.43 / 0.57 off). Deposition
+  location is not a noisy quantity; it is a code path that either fires or does not.
+* **The underdense control: 200 667 both ways, identical to six figures.** With no turning
+  point the branch never fires, and the two paths are provably equivalent there.
+* **`n_floor` at −30 %/+11 % per decade** — 23× the 1.32 % σ, far outside noise.
+* **The Tier-3 drift curve** (+11.49 / +3.27 / −0.51 % across layer resolution): the large
+  end is ~9σ, and its *sign structure* — monotonic in a physical parameter — is not what
+  noise produces.
+* **Tier 1's +18.3 % total drift** across a 20× refinement, which is ~14σ.
+
+The pattern is that **totals and large effects survive; single small increments do not.**
+That is also why the original ladder was specified to be read as a set.
+
+### The lesson, which is the durable part
+
+A convergence study measures differences between runs, so it is worthless without the
+run-to-run spread measured at the **same duration, from several repeats of one
+configuration** — not from one pair, and not from a different phase. This project already
+knew WarpX on GPU is not reproducible at fixed seed (`ablastr/math/RandomSeed.H`, and
+`CLAUDE.md` records `f_abs(0)` at 10.4 % 1σ across seed alone). The mistake was estimating
+the floor once, cheaply, and then leaning on it for every subsequent verdict.
+
+**`scripts/ladder_report.py` now takes `--floor` and defaults to 1.32 %**, and prints σ
+alongside every increment so a sub-σ step can never again read as convergence.

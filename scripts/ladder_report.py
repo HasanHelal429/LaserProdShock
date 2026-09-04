@@ -38,6 +38,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from laserprod import config as lpconfig   # noqa: E402
 from laserprod import io as lpio           # noqa: E402
+from laserprod import plotting as lpp     # noqa: E402
+
+RUNS = os.path.join(lpp.ROOT, "runs", "P5")
+
+# Run-to-run 1 sigma on E_abs, in %. MEASURED 2026-09-04 from four repeats of ONE identical
+# configuration (same deck, same binary, same seed, ray_cfl = 0.025): mean 103451, sd 1361.
+# The earlier 0.80 % came from a SINGLE seed pair, which estimates a difference rather than
+# a spread and happened to land low; it is retracted. WarpX on GPU is not reproducible at
+# fixed seed (ablastr/math/RandomSeed.H), so this is irreducible at this duration -- the
+# only ways to shrink it are repeats or a longer run.
+FLOOR = 1.32
 
 
 def _ladder_value(cfg, var):
@@ -155,6 +166,8 @@ def main():
     ap.add_argument("--off", help="matched laser-off control, for the energy closure")
     ap.add_argument("--tol", type=float, default=1.0,
                     help="acceptance band on the last increment, %% (default 1)")
+    ap.add_argument("--floor", type=float, default=FLOOR,
+                    help=f"run-to-run 1 sigma on E_abs in %% (default {FLOOR}, measured)")
     args = ap.parse_args()
 
     dirs = list(args.run_dirs)
@@ -188,7 +201,8 @@ def main():
             off_dKE = c["dKE"]
 
     print(f"\nLADDER — variable: {args.var}, {len(rows)} rungs, coarse to fine\n")
-    print(f"  {'rung':<16} {args.var:>8} {'E_abs':>12} {'d vs coarser':>13} "
+    print(f"  (run-to-run 1 sigma on E_abs: {args.floor:.2f} %)")
+    print(f"  {'rung':<16} {args.var:>8} {'E_abs':>12} {'d vs coarser':>16} "
           f"{'(dKE+dEf)/E':>12} {'loss%':>7}")
     prev = None
     incs = []
@@ -197,13 +211,16 @@ def main():
         if prev is not None:
             inc = (r["E"] - prev) / prev * 100.0
             incs.append(inc)
-            dstr = f"{inc:+.2f} %"
+            # Always in units of the measured spread: an increment smaller than the
+            # run-to-run sigma is not a measurement, and printing it bare invites exactly
+            # the reading that had to be retracted on 2026-09-04.
+            dstr = f"{inc:+.2f} % ({abs(inc)/args.floor:.1f}s)"
         cl = closure(r["dir"], r["E"], off_dKE)
         cstr = f"{cl['ratio']:.3f}" if cl else "-"
         if cl and off_dKE is not None:
             cstr = f"{cl['ratio']:.3f}/{cl['ratio_corr']:.3f}"
         lstr = f"{cl['loss_pct']:.2f}" if cl else "-"
-        print(f"  {r['id']:<16} {r['x']:>8g} {r['E']:>12.4e} {dstr:>13} {cstr:>12} {lstr:>7}")
+        print(f"  {r['id']:<16} {r['x']:>8g} {r['E']:>12.4e} {dstr:>16} {cstr:>12} {lstr:>7}")
         prev = r["E"]
 
     if len(rows) >= 2:
@@ -212,7 +229,11 @@ def main():
     if len(incs) >= 2:
         last, prev_inc = abs(incs[-1]), abs(incs[-2])
         print(f"  last increment {incs[-1]:+.2f} % (previous {incs[-2]:+.2f} %)")
-        if last > args.tol and last >= prev_inc:
+        if last < args.floor:
+            print(f"  VERDICT: UNDECIDABLE -- the last increment is {last/args.floor:.1f} "
+                  f"sigma of the {args.floor:.2f} % run-to-run spread. It is not a "
+                  f"measurement.\n           Repeat each rung ~5x, or run longer.")
+        elif last > args.tol and last >= prev_inc:
             print(f"  VERDICT: NOT CONVERGED — the increment is not shrinking. A narrow "
                   f"step here would be a coincidence of a non-monotonic sequence, not an "
                   f"asymptote.")
