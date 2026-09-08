@@ -8190,3 +8190,75 @@ the floor once, cheaply, and then leaning on it for every subsequent verdict.
 
 **`scripts/ladder_report.py` now takes `--floor` and defaults to 1.32 %**, and prints σ
 alongside every increment so a sub-σ step can never again read as convergence.
+
+---
+
+## 2026-09-08 (Fix 2, Stage A) — **the n_floor sensitivity is 95 % the ray TRAJECTORY, not the analytic layer — and straight-ray mode already removes it**
+
+Stage A swept `n_floor` over four decades in both march modes, three repeats each. The
+design separates the constant's three roles without touching code: in straight-ray mode the
+`n_ref` gradient is never computed (guarded on `do_refr`, line 1435), so **role 1 is
+inactive** there.
+
+| mode | `E_abs` slope | `layerfrac` slope |
+|---|---|---|
+| straight-ray (roles 2+3) | **+0.54 %/decade** | +0.48 pts/decade |
+| refracting (roles 1+2+3) | **+11.49 %/decade** | +0.44 pts/decade |
+| **→ role 1 (trajectory)** | **+10.95 %/decade** | — (**95 % of the total**) |
+
+**This refutes the Stage B plan as proposed.** I had argued the defect was role 3, the
+analytic layer's extent, and proposed leaving the trajectory regularisation untouched so
+ray paths would not move. Role 3 is *flat*: `layerfrac` barely moves (0.44–0.48 pts/decade)
+while `E_abs` moves 11.5 %/decade. The layer's share of absorbed power is ~0.70 regardless
+of `n_floor`. **The dominant role is the one I proposed not to touch.**
+
+### What refracting mode actually does at small `n_floor`
+
+Not a gradual inaccuracy — a hard failure, systematic across every repeat:
+
+| `n_floor` | `rmax` | `overfrac` | state |
+|---|---|---|---|
+| 1e-1 | 1.01 | 0.00 | clean |
+| **1e-2 (historical default)** | **1.07 – 1.40** | **0.00 / 0.27 / 0.27** | **marginal, seed-dependent** |
+| 1e-3 | **10.03 – 10.19** | 0.65 – 0.69 | **broken** |
+| 1e-4 | **9.99 – 10.03** | 0.51 – 0.68 | **broken** |
+
+`rmax` ≈ 10 means rays reach the **solid**: the target's flat top is 10 `n_cr`. Below
+`n_floor` ≈ 1e-3 the turning mechanism fails outright and the beam ploughs through the
+critical surface into the overdense target, depositing two thirds of its power there.
+
+**And the historical default sits on the edge of that cliff.** At `n_floor` = 1e-2 the same
+configuration gives `overfrac` = 0.00, 0.27, 0.27 across three seeds, and `rmax` between
+1.07 and 1.40. This also corrects a claim from 2026-09-02: I described `overfrac` as "a code
+path, not a noisy quantity — it fires or it does not." In **refracting** mode it is
+seed-dependent. In straight-ray mode it is exactly 0 in all twelve runs.
+
+### Straight-ray mode is already insensitive
+
+All **twelve** straight-ray runs, spanning four decades of `n_floor`: mean 108 918,
+sd 1.89 %. Run-to-run 1σ from repeats alone is 1.32 %, so essentially the entire `n_floor`
+dependence is gone. `rmax` = 1.034–1.049 throughout, `overfrac` = 0 throughout.
+
+**So the 2026-09-08 decision to default to straight rays for these studies already removes
+the dominant defect** — not as a convenience, but because it bypasses the role carrying
+95 % of the arbitrary-parameter dependence. That decision was made for a different and
+independently good reason (the refraction specifics do not matter to a plane-stratified
+target); this measurement says it also fixes the thing Stage B was being scoped to fix.
+
+### Stage B, re-scoped
+
+1. **For 1D / plane-stratified work — no code change is needed.** Use straight rays, and
+   `n_floor` stops mattering. Gate G8 still governs resolution; that is unchanged.
+2. **Assert the validity range.** `n_floor` below ~1e-3 silently breaks refracting mode.
+   The operator should refuse it, or at minimum warn — an input that quietly turns the
+   laser into a volumetric heater is worse than one that aborts. Cheap and unambiguous.
+3. **The real Stage B, when 2D or oblique work needs it**, is role 1: the refractive-index
+   regularisation used for the trajectory and the bending force `1/(2 n_cr n_ref)`. That is
+   where the sensitivity lives and where the failure mode is. It is a different and larger
+   change than the switch-over fix I proposed, and it should be scoped against the 2D tests
+   (`run_turning_angles`, `run_refraction`, `run_psc_oblique`), not the 1D ladder.
+4. **Role 3 is not worth fixing on this evidence.** `layerfrac` ≈ 0.70 and flat: the
+   analytic layer carries most of the absorption, but its *share* does not respond to the
+   parameter, so it is not the source of the arbitrary dependence.
+
+Stage A cost ~1.5 GPU-hours and redirected a 2–3 day change away from the wrong target.
