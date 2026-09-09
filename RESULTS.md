@@ -8262,3 +8262,67 @@ target); this measurement says it also fixes the thing Stage B was being scoped 
    parameter, so it is not the source of the arbitrary dependence.
 
 Stage A cost ~1.5 GPU-hours and redirected a 2–3 day change away from the wrong target.
+
+---
+
+## 2026-09-08 (Fix 1) — **in straight-ray mode the ladder CONVERGES. The +18.3 % divergence is specific to the refracting RK4 march**
+
+40 runs: 4 rungs × 2 modes of `near_critical_fix` × 5 repeats, straight rays throughout,
+seeds varied. Means with propagated standard errors:
+
+| `ray_cfl` | `E_abs`, fix off | `E_abs`, fix on |
+|---|---|---|
+| 0.25 | 105 114 ± 477 | 108 576 ± 396 |
+| 0.10 | 105 276 ± 428 | 107 487 ± 593 |
+| 0.05 | 105 328 ± 562 | 106 736 ± 259 |
+| 0.025 | 105 348 ± 405 | 106 815 ± 471 |
+
+| increment | fix off | fix on |
+|---|---|---|
+| 0.25 → 0.10 | +0.15 % ± 0.61 (0.3σ) | −1.00 % ± 0.65 (1.5σ) |
+| 0.10 → 0.05 | +0.05 % ± 0.67 (0.1σ) | −0.70 % ± 0.60 (1.2σ) |
+| 0.05 → 0.025 | **+0.02 % ± 0.66 (0.0σ)** | **+0.07 % ± 0.50 (0.1σ)** |
+
+**Both are consistent with converged.** Total drift over the 10× refinement is +0.22 %
+(fix off) and −1.62 % (fix on), against the +18.3 % measured on the *same rungs* in
+refracting mode.
+
+### The open question was ill-posed, and the answer is better than either option
+
+The audit asked whether the near-critical fix helps, hurts, or does nothing to convergence.
+In straight-ray mode: **nothing, because there is nothing to fix — the ladder is already
+converged.** The fix's value is the correctness of *where* energy is deposited
+(`overfrac` 0.320 → 0.000), not convergence. That question only ever had teeth in refracting
+mode.
+
+The fix does shift the absolute answer by **+1.4 % to +3.3 %**, shrinking with refinement.
+That is expected rather than surprising: with `temperature_mode = local`, moving a deposit
+to a different cell changes `T_e` there, which changes `K`, which feeds back on absorption.
+
+### Why straight rays are insensitive, and it is not an accident
+
+In straight-ray mode the turning surface is placed **analytically** at
+`n_m = n_cr cos²θ₀`, so its location does not depend on the arc-length step at all. The
+refracting march instead *integrates its way* to that surface, and the approach is what the
+step size perturbs. Stage A found the same thing from the other direction: 95 % of the
+`n_floor` sensitivity is role 1, the refractive index the RK4 integrates, and refracting
+mode breaks outright below `n_floor` ≈ 1e-3. Two independent measurements now point at the
+same component.
+
+### Consequence that needs one more cheap study
+
+**Gate G8 was calibrated entirely on refracting-mode ladders.** Its threshold — resolve
+`1 − n/n_cr < 0.01`, i.e. dz ≲ 0.01·`L_n` — came from the drift-versus-layer-resolution
+curve, every point of which was refracting. The Tier 3e comparison already hinted at the
+difference: at 0.60 cells across the layer, straight-ray drifted +0.95 % against
+refracting's +3.27 %.
+
+If straight-ray mode is insensitive to layer resolution as well as to `ray_cfl`, then **G8's
+constraint is much weaker in the mode the project has now adopted, and the 145 h cost
+problem for a converged spine largely dissolves** — the spine could run at dz = 0.5 as
+originally planned, at ~36 h.
+
+That is an implication, not a result: it needs the `L_n` sweep redone in straight-ray mode
+(4 scale lengths × 2 `ray_cfl` × 3 repeats ≈ 24 runs, ~2 GPU-hours). **Until it is measured,
+G8 stands as written.** It would be exactly the mistake this campaign has already made
+twice to relax a gate on the strength of a plausible inference.
