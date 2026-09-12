@@ -8326,3 +8326,86 @@ That is an implication, not a result: it needs the `L_n` sweep redone in straigh
 (4 scale lengths × 2 `ray_cfl` × 3 repeats ≈ 24 runs, ~2 GPU-hours). **Until it is measured,
 G8 stands as written.** It would be exactly the mistake this campaign has already made
 twice to relax a gate on the strength of a plausible inference.
+
+---
+
+## 2026-09-12 — Physics validation of the merged operator fixes (job 58221478) — PASS
+
+Binary `warpx.1d` Sep 11 19:43, commit `cbec4a78d` (all three commits: `2a4d36b0b`
+instrumentation → `9d07924ba` near-critical deposit → `cbec4a78d` species mass).
+Raw log: `slurm-58221478.out`; per-case dirs under `tier_fixes/physval/`.
+
+### A. Regression against closed-form theory — all green
+
+| test | relative error | tolerance |
+|---|---|---|
+| `1d_laser_deposition` | 0.0067 | 0.05 |
+| `1d_laser_deposition_ramp` | 0.0082 | 0.06 |
+| `2d_laser_deposition_oblique` | **0.0014** | 0.06 |
+
+Beer–Lambert: `K_fit` ratio 0.998435, absorbed-vs-analytic ratio 1.000190, median
+|residual| vs measured `n_e` **0.000 %**.
+
+Coefficient audit — every exponent in `K` recovered: `ne` 2.0184 (2), `Z` 0.9999 (1),
+`lnL` 0.9999 (1), `th` −1.4999 (−1.5), `lam` 2.0276 (2).
+
+Energy closure: tracer `E_abs` ratio to `I₀·t` = 1.000000 exactly; electron KE gain ratio
+1.023274. **The ~2 % particle excess is PIC self-heating plus the 1.32 % 1σ GPU scatter,
+not a closure failure** — but the baseline for KE/`E_abs` is 1.02, not 1.00, and Group C
+must be read against that.
+
+### B. Near-critical fix — the defect is closed
+
+| leg | `E_abs` | max `overfrac` |
+|---|---|---|
+| `P5_raycfl_025` | 107782 | **0** |
+| `P5_under_025` | 200667 | **0** |
+
+`overfrac` — the fraction of deposition landing in cells above critical, where the wave is
+evanescent — read **0.72 before the fix and is exactly 0 after**, on both legs. Not a
+single deposit into an evanescent cell. The underdense control is unaffected, as designed.
+
+### C. Species electron mass — confirmed, 1.00 vs 3.98
+
+`n_cr` scales **exactly linearly** with the species mass, as `n_cr = ε₀ mₑ ω²/e²` requires:
+
+| case | `n_cr` (m⁻³) | ×real | `E_abs` | KE gain (electrons) | KE/`E_abs` |
+|---|---|---|---|---|---|
+| 1× | 1.005451991e+27 | 0.9999999986 | 4.46124e+06 | 4.45694e+06 | **0.9990** |
+| 2× | 2.010903982e+27 | 1.999999997 | 1.56840e+06 | 1.57986e+06 | **1.0073** |
+| 4× | 4.021807965e+27 | 3.999999995 | 5.43279e+05 | 5.45779e+05 | **1.0046** |
+| 4×, `electron_mass` forced real (the old bug) | 1.005451991e+27 | — | 4.47273e+06 | 1.78223e+07 | **3.9847** |
+
+The prediction stated before the run — 1.0 with the fix, 4.0 with the bug — is met to
+0.5 % and 0.4 %. The control gets no rescale message because an explicit
+`laser_deposition.electron_mass` sets `m_mass_resolved`, so `resolveElectronMass` returns
+early and `n_cr` stays at the real-mass value: exactly the designed precedence.
+
+### Two measurement bugs in the harness, now fixed
+
+Both were in `perlmutter/validate_merged_physics.sbatch`, not in the operator, and both
+made a PASS look like a FAIL on first read. **Recording them because each is a repeat of a
+trap this campaign has already hit.**
+
+1. **KE gain summed `EP.txt[-1,2:]`.** That file's columns are `[2] total(J)`,
+   `[3] electrons(J)`, `[4] total_mean`, `[5] electrons_mean` — so the sum counted the
+   single species twice plus the per-particle means, reporting **2.0 and 7.97** where the
+   truth is 1.00 and 3.98. Fixed to column 3 alone.
+2. **`n_cr` was read with `grep -m1`,** which catches the constructor's print at
+   `LaserDeposition.cpp:763` — emitted *before* `resolveElectronMass` runs at line 881.
+   All three masses therefore reported an identical, pre-resolution `n_cr`. The real value
+   is in the `rescaled to …` line at 864, which `grep -oE 'n_cr [0-9.e+-]+'` cannot match
+   because the next token is a word. **This is the third time `grep -m1` on a run log has
+   returned a step-1 value and been misread as a regression** (see the two `te_error`
+   entries). Fixed to grep the rescale line.
+
+That the operator was right was recoverable from the data before either fix: `E_abs` fell
+4.46e6 → 5.43e5 across the mass ladder while the forced-real-mass control sat at 4.47e6,
+essentially equal to the 1× case. Had the species mass been ignored, all four would have
+agreed.
+
+### Status
+
+Pushed as `fix/species-electron-mass` (`cbec4a78d`). **Not merged** — PR against
+`feature/hybrid-laser` prepared at `.pr/pr_url.txt`, awaiting review. G8 still stands as
+written; the straight-ray `L_n` sweep remains unrun.

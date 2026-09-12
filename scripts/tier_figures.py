@@ -38,7 +38,12 @@ from laserprod import io as lpio              # noqa: E402
 from laserprod import plotting as lpp         # noqa: E402
 
 RUNS = os.path.join(lpp.ROOT, "runs", "P5")
-FLOOR = 0.80          # % -- measured seed-replicate floor on E_abs (P5_ramp_005 vs 005r)
+# Run-to-run 1 sigma on E_abs, in %. MEASURED 2026-09-04 from FOUR repeats of one identical
+# configuration (same deck, same binary, same seed): mean 103451, sd 1361. The earlier 0.80 %
+# came from a single seed PAIR -- which estimates a difference, not a spread -- and is
+# retracted. Every band drawn from this constant therefore moved, and so did which
+# increments count as measurements.
+FLOOR = 1.32
 MEDIA_ID = "P5_tiers"
 
 
@@ -63,7 +68,7 @@ def _floor_band(ax, label_x=None):
     it is not a series: it is the resolution of the measurement itself."""
     ax.axhspan(-FLOOR, FLOOR, color=lpp.GRID, alpha=0.55, zorder=0, lw=0)
     if label_x is not None:
-        ax.annotate(f"seed floor  ±{FLOOR:.2f}%", xy=(label_x, FLOOR), fontsize=7.5,
+        ax.annotate(f"run-to-run 1σ  ±{FLOOR:.2f}%", xy=(label_x, FLOOR), fontsize=7.5,
                     color=lpp.INK_2, va="bottom", ha="right")
 
 
@@ -130,9 +135,9 @@ def fig_drift_vs_resolution():
     ax.legend(loc="upper right", fontsize=7.5)
     fig.text(0.005, -0.055,
              "Physics held exactly fixed: within each pair only the arc-length step changes. "
-             "Below ~1 cell the march\ndiverges and refining it makes matters worse; at ≳1 cell "
-             "it sits in the run-to-run floor. An underdense target,\nwith no critical surface at "
-             "all, gives +0.00% — identical to five significant figures.",
+             "The band is the measured\nrun-to-run 1σ (four repeats of one configuration), not a "
+             "single seed pair. An underdense target, with no\ncritical surface at all, gives "
+             "+0.00% — identical to five significant figures.",
              fontsize=7.2, color=lpp.INK_2, va="top")
     return lpp.savefig(fig, "tier3_drift_vs_layer_resolution.png", run_id=MEDIA_ID)
 
@@ -381,10 +386,116 @@ def fig_energy_closure():
     return lpp.savefig(fig, "tier1_energy_closure_control.png", run_id=MEDIA_ID)
 
 
+# --------------------------------------------------------------------------- #
+def fig_reproducibility():
+    """The measurement that retracted a floor and, with it, several verdicts.
+
+    Four runs of ONE configuration -- same deck, same binary, same seed. Everything the
+    campaign concluded from small increments has to be read against this spread.
+    """
+    reps = [105334.0, 103562.0, 102383.0, 102526.0]
+    old = 104962.0                       # the original campaign's run of the same thing
+    m = float(np.mean(reps)); sd = float(np.std(reps, ddof=1))
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.6),
+                                  gridspec_kw={"width_ratios": [1.05, 1.35], "wspace": 0.33})
+    lpp.style_axes(ax, grid_axis="y")
+    ax.axhspan(m - sd, m + sd, color=lpp.GRID, alpha=0.6, zorder=0, lw=0)
+    ax.axhline(m, color=lpp.INK_MUTED, lw=1.2, zorder=1)
+    ax.plot(range(1, 5), reps, "o", color=lpp.C_TARGET, markersize=9, zorder=3,
+            markeredgecolor=lpp.SURFACE, markeredgewidth=2)
+    ax.plot([5], [old], "D", color=lpp.C_AMBIENT, markersize=9, zorder=3,
+            markeredgecolor=lpp.SURFACE, markeredgewidth=2)
+    ax.annotate(f"1σ = {100*sd/m:.2f} %", xy=(1.15, m + sd), fontsize=8,
+                color=lpp.INK_2, va="bottom")
+    ax.annotate("earlier\ncampaign", xy=(5, old), xytext=(4.55, old + 900), fontsize=7.5,
+                color=lpp.C_AMBIENT, ha="center", fontweight="bold")
+    ax.set_xticks(range(1, 6)); ax.set_xticklabels(["1", "2", "3", "4", "prev"])
+    ax.set_xlim(0.4, 5.6)
+    ax.set_xlabel("repeat of the IDENTICAL configuration")
+    ax.set_ylabel("E$_{abs}$  [J per absent dim]")
+    ax.set_title("Same deck, same binary,\nsame seed", loc="left",
+                 fontweight="bold", color=lpp.INK, fontsize=10)
+
+    # What that spread does to the increments the verdicts rested on
+    lpp.style_axes(ax2, grid_axis="x")
+    rows = [("OFF  0.05→0.025", 0.37), ("OFF  0.10→0.05", 0.91),
+            ("ON   0.05→0.025", 3.21), ("ON   0.10→0.05", 3.18),
+            ("ladder 0.25→0.10", 6.35), ("ladder total 0.50→0.025", 18.30)]
+    y = np.arange(len(rows))
+    sig = [r[1] / (100 * sd / m) for r in rows]
+    for yy, (lab, v), sg in zip(y, rows, sig):
+        real = sg >= 3.0
+        col = lpp.C_LASER if real else lpp.C_TARGET
+        ax2.barh(yy, sg, height=0.55, color=col, zorder=3)
+        ax2.annotate(f" {v:+.2f}%  =  {sg:.1f}σ", xy=(sg, yy), fontsize=7.5,
+                     color=lpp.INK_2, va="center")
+    ax2.axvline(1.0, color=lpp.INK_MUTED, lw=1.3, ls=(0, (4, 3)), zorder=2)
+    ax2.annotate("1σ", xy=(1.0, len(rows) - 0.35), fontsize=7.5, color=lpp.INK_2, ha="center")
+    ax2.set_yticks(y); ax2.set_yticklabels([r[0] for r in rows], fontsize=8)
+    ax2.set_xlim(0, 19); ax2.set_xlabel("increment, in units of the measured 1σ")
+    ax2.set_title("Which of the campaign's steps\nwere ever measurements", loc="left",
+                  fontweight="bold", color=lpp.INK, fontsize=10)
+    fig.text(0.005, -0.02,
+             "Four repeats give 1σ = 1.32 %, not the 0.80 % estimated from a single seed pair. "
+             "Every increment under ~3 %\nis therefore noise — including both fine steps of "
+             "the ladder whose convergence was being judged. Totals and large\nsteps (green) "
+             "survive; the fine structure never existed.",
+             fontsize=7.2, color=lpp.INK_2, va="top")
+    return lpp.savefig(fig, "audit_reproducibility.png", run_id=MEDIA_ID)
+
+
+# --------------------------------------------------------------------------- #
+def fig_fix_results():
+    """What the near-critical fixes did and did not achieve."""
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.5),
+                                  gridspec_kw={"width_ratios": [1, 1], "wspace": 0.35})
+    # (a) overfrac -- a code path, not a noisy quantity
+    lpp.style_axes(ax, grid_axis="y")
+    cfl = ["0.50", "0.25", "0.10", "0.05", "0.025"]
+    off = [0.567, 0.317, 0.082, 0.117, 0.063]
+    on = [0.429, 0.0, 0.0, 0.0, 0.0]
+    x = np.arange(len(cfl)); w = 0.38
+    ax.bar(x - w/2, off, w, color=lpp.C_TARGET, zorder=3, label="before")
+    ax.bar(x + w/2, on, w, color=lpp.C_LASER, zorder=3, label="after")
+    for xi, v in zip(x + w/2, on):
+        if v == 0:
+            ax.annotate("0", xy=(xi, 0.012), fontsize=8, ha="center",
+                        color=lpp.C_LASER, fontweight="bold")
+    ax.set_xticks(x); ax.set_xticklabels(cfl)
+    ax.set_xlabel("ray_cfl"); ax.set_ylabel("fraction of absorbed power\ninto evanescent cells")
+    ax.set_title("(a) Fixed: energy no longer lands\nwhere the wave cannot go", loc="left",
+                 fontweight="bold", color=lpp.INK, fontsize=10)
+    ax.legend(fontsize=7.5, loc="upper right")
+
+    # (b) n_floor -- an arbitrary constant that sets the answer
+    lpp.style_axes(ax2)
+    nf = [1e-1, 1e-2, 1e-3]; E = [981.843, 883.898, 615.85]
+    ax2.plot(nf, E, "-o", color=lpp.C_FOURTH, markersize=8, zorder=3,
+             markeredgecolor=lpp.SURFACE, markeredgewidth=2)
+    ax2.annotate("hardcoded\ndefault", xy=(1e-2, 883.9), xytext=(1.9e-2, 700),
+                 fontsize=7.5, color=lpp.INK_2, ha="left",
+                 arrowprops=dict(arrowstyle="-", color=lpp.INK_MUTED, lw=0.9))
+    ax2.set_xscale("log"); ax2.invert_xaxis()
+    ax2.set_xlabel("n_floor  (a numerical constant)")
+    ax2.set_ylabel("E$_{abs}$")
+    ax2.set_title("(b) NOT fixed: absorption still set\nby an arbitrary parameter", loc="left",
+                  fontweight="bold", color=lpp.INK, fontsize=10)
+    ax2.annotate("−30 %", xy=(3e-3, 750), fontsize=9, color=lpp.C_FOURTH, fontweight="bold")
+    fig.text(0.005, -0.03,
+             "(a) A code path, so it is exact and not subject to run-to-run scatter: "
+             "up to 57 % of absorbed power was\ndeposited into cells with n_e > n_cr. "
+             "(b) The analytic near-critical layer's WIDTH is set by n_floor, so one decade\n"
+             "moves absorbed energy by 30 %. Correcting the gradient cannot rescue an integral "
+             "whose limits are arbitrary.",
+             fontsize=7.2, color=lpp.INK_2, va="top")
+    return lpp.savefig(fig, "audit_fix_results.png", run_id=MEDIA_ID)
+
+
 def main():
     print("campaign figures -> media/P5/P5_tiers/")
     for fn in (fig_drift_vs_resolution, fig_ladders, fig_admissibility,
-               fig_upstream_agreement, fig_where_it_breaks, fig_energy_closure):
+               fig_upstream_agreement, fig_where_it_breaks, fig_energy_closure,
+               fig_reproducibility, fig_fix_results):
         try:
             if fn() is None:
                 print(f"  (skipped {fn.__name__}: inputs missing)")
