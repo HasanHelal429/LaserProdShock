@@ -308,6 +308,21 @@ Read before starting anything. Several of these are destructive if ignored.
 
 How to get a number out of a run without it being silently the wrong number.
 
+- **Never read a converged or resolved quantity with `grep -m1`.** It returns the FIRST
+  print, which for most operator quantities is the constructor's value, emitted before the
+  run resolves anything. This has now produced three separate false regressions: `te_error`
+  twice (step-1 `Pabs` instead of the documented ΔT-based number), and `n_cr` in the
+  species-mass validation, where `LaserDeposition.cpp:763` prints at construction and
+  `resolveElectronMass` does not run until line 881 — so every mass reported an identical
+  pre-resolution `n_cr` and the fix looked dead. Grep the line that reports the *resolved*
+  value (`rescaled to …`) and prefer `tail -1` to `-m1`. If a sweep reports the same number
+  for every point of a swept parameter, suspect the meter before the physics.
+- **Reduced-diagnostic columns are not all independent — check the header before summing.**
+  `EP.txt` is `step, time, total(J), electrons(J), total_mean, electrons_mean`, so a
+  `[:,2:].sum()` counts a single species twice plus its per-particle means. That reported
+  KE/`E_abs` as 2.0 and 7.97 where the truth was 1.00 and 3.98 — a PASS that read as a
+  FAIL. Name the column you want.
+
 - **`diag1` has only the total `rho`; per-species densities are on `diag_fields`.** And yt
   refuses a `covering_grid` flush against a non-periodic domain edge on some domain sizes —
   call `ds.force_periodicity()` first (the analysis scripts do).
