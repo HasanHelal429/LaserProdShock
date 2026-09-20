@@ -72,7 +72,11 @@ run_warpx() {
     local restart=""
     if compgen -G "$work/diags/chk*" > /dev/null; then
         # highest step wins; the names are zero-padded so a lexical sort is numeric
-        restart="$(ls -d "$work"/diags/chk* 2>/dev/null | sort | tail -1)"
+        # `sort -V`, NOT `sort`: checkpoint names carry a bare step number, so a
+        # lexicographic sort puts chk948000 AFTER chk1151103 and silently resumes from
+        # the stale one. That happened on P6_mr_heavy_off, which redid 203103 steps
+        # (~21 min). It bites whenever the step count crosses a digit-width boundary.
+        restart="$(ls -d "$work"/diags/chk* 2>/dev/null | sort -V | tail -1)"
         echo "run_warpx: RESTARTING from $(basename "$restart")"
     elif compgen -G "$work/diags/*" > /dev/null; then
         echo "run_warpx: $work/diags already has output and no checkpoint to resume from" >&2
