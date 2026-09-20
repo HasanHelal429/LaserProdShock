@@ -136,6 +136,27 @@ case "$WHAT" in
     RUNS=(runs/P5/P5_ckpt)
     TIME="00:20:00"; QOS="debug"; JOBNAME="lp5_ckpt"
     ;;
+  p6)
+    # THE MASS-CONVENTION EXPERIMENT. Three legs plus a G3 laser-off control each.
+    # Order matters: the two CHEAP legs and their controls go first (~0.5 h each), so a
+    # setup mistake surfaces before the ~8-13 h reference leg burns a night. The heavy and
+    # light legs share m_i/m_e = 2698 exactly and differ only in WHICH mass moved, which
+    # is what makes the comparison mean anything.
+    # Each leg needs ITS OWN control: the legs do not share a grid-heating background
+    # (dz/lambda_D is 58.1 on full/light, 249.0 on heavy), so a shared subtraction would
+    # read that difference as physics.
+    RUNS=(runs/P6/P6_mr_light runs/P6/P6_mr_light_off
+          runs/P6/P6_mr_heavy runs/P6/P6_mr_heavy_off
+          runs/P6/P6_mr_full  runs/P6/P6_mr_full_off)
+    JOBNAME="lp6_massconv"
+    ;;
+  p6cheap)
+    # The two reduced-mass-ratio legs and their controls only -- the whole experiment
+    # EXCEPT the expensive reference. ~2 GPU-h total. Run this first.
+    RUNS=(runs/P6/P6_mr_light runs/P6/P6_mr_light_off
+          runs/P6/P6_mr_heavy runs/P6/P6_mr_heavy_off)
+    JOBNAME="lp6_cheap"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -175,7 +196,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p6|p6cheap|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

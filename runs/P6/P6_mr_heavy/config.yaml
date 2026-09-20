@@ -1,0 +1,121 @@
+meta:
+  run_id: P6_mr_heavy
+  phase: 6
+  deck: inputs_P6_mr_heavy
+  description: "P6 LEG C -- THE SAME REDUCED MASS RATIO, BOUGHT THE OTHER WAY. m_i/m_e = 2698,\n\
+    \    identical to leg B, but reached by RAISING the electron to 18.362 m_e instead of\n    lightening\
+    \ the ion. The ion is therefore real aluminium and mu = 1, exactly as in\n    leg A, while the\
+    \ computational mass ratio is exactly B's. This is PSC's convention\n    (GOTCHAS: \"PSC's ion\
+    \ is REAL aluminium at every ReducedMassRatio\").\n    THE HYPOTHESIS: C reproduces A's physics\
+    \ at B's cost. omega_pe falls as 1/sqrt(m_e)\n    by precisely the factor dt rises with dz ~\
+    \ d_e ~ sqrt(m_e), so omega_pe*dt is\n    INVARIANT at 0.553 and the 4.285x coarser grid is free\
+    \ -- 18.4x cheaper than A in\n    cells x steps, while covering the same 1.0 ns of FLASH's flat\
+    \ top.\n    WHAT IT COSTS, and it is not nothing: lambda_D is mass-INDEPENDENT while dz grows\n\
+    \    as sqrt(m_e), so dz/lambda_D degrades 58.1 -> 249.0. Grid heating therefore rises,\n   \
+    \ which is why the G3 laser-off control is mandatory on this leg rather than merely\n    good\
+    \ practice. If C fails, the first suspect is the grid, not the convention, and\n    the discriminator\
+    \ is a finer-dz repeat -- deliberately NOT run up front."
+  reference: runs/P6/README.md (the mass-convention experiment)
+  parent: runs/P5/P5_flashic
+reference:
+  length_scale: critical
+  mass_ratio: 2698.0
+  charge_state: 13
+  electron_mass_scale: 18.362490733876946
+laser:
+  wavelength_um: 1.064
+  intensity: 1.0e+17
+  direction: z
+  inject_side: hi
+  incidence_angle_deg: 0.0
+  Z_eff: 13.0
+  coulomb_log: 6.3
+  temperature_mode: local
+  temperature_floor_theta: 1.9569e-06
+  min_macroparticles_per_cell: 1
+  coulomb_log_mode: nrl
+  intervals: 10
+  ray_cfl: 0.05
+  profile_intervals: 213300
+  beam:
+    profile: uniform
+    rays_per_cell: 1
+  refraction: 0
+plasma:
+  target:
+    density_over_ncr: 10.0
+    thickness_de: 116.6821
+    center_de: -58.341
+    corona_profile: flash_table
+    ic_table: ic_flash.yaml
+    shape: planar
+    theta_e_solid: 2.466e-06
+    theta_i_solid: 3.914e-06
+  ambient: null
+field:
+  orientation: none
+  vA_over_c: 0.0
+geometry:
+  dims: 1
+  normal_axis: z
+  dz_over_de: 0.5
+  axis:
+    lo_de: -121.6819
+    hi_de: 2446.3181
+  boundary:
+    axis:
+      lo: reflecting
+      hi: open
+numerics:
+  density_min_frac: 1e-06
+  arena_init_size_mb: 4096
+  cfl: 0.35
+  particle_shape: 2
+  random_seed: 20260829
+  max_grid_size: 5136
+  max_step: 2133000
+  ppc:
+    target: 500
+    ambient: 0
+collisions:
+  enabled: true
+  type: coulomb
+  intervals: 10
+  coulomb_log: 6.3
+  pairs:
+  - - targ_electrons
+    - targ_electrons
+  - - targ_electrons
+    - targ_ions
+  - - targ_ions
+    - targ_ions
+diagnostics:
+  plotfile_intervals: 47400
+  field_intervals: 23700
+  phase_intervals: 71100
+  reduced_intervals: 4300
+  checkpoint_intervals: 237000
+gates:
+  omega_pe_dt_max: 1.2
+  dz_over_lambdaD_max: 8.0
+  ppc_target_min: 500
+  compression_factor: 2.0
+controls:
+  laser_off: P6_mr_heavy_off
+  mass_convention_group:
+  - P6_mr_full
+  - P6_mr_light
+  - P6_mr_heavy
+targets:
+  T_e_SS_eV: 823.0
+  C_S_km_s: 195.0
+  d_i0_real_um: 7.256
+  ion_response_time_ps: 37.2
+  pulse_in_response_times: 26.9
+  tol_n_e: 0.2
+  tol_T_e: 0.2
+  tol_T_i: 0.2
+  tol_V_z: 0.1
+  critical_surface_speed_over_Cs: 0.8
+  flash_Te_max_eV_at_1ns: 953.5
+  flash_f_abs_asserted: 0.8704
