@@ -1,0 +1,9 @@
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P6/P6_mr_light_off
+# logging_started 2026-09-19T20:00:12  total_steps=497700  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+# WarpX progress — /pscratch/sd/h/hhelal/LaserProdShock/runs/P6/P6_mr_light_off
+# logging_started 2026-09-19T20:06:29  total_steps=497700  every=10%  poll=30s
+# wall_time | step/total (pct) | wall_elapsed | wall_rate | warpx_rate | ETA_wall | contention | load [| laser Pabs/Pmax, Eabs]
+2026-09-19T20:07:00 | 2089/497700 ( 0.4%) | 0h00m | 0.0144 s/step(wall) | 0.0119 s/step(warpx) | ETA ~1h58m | x1.20 | load 4.2 | laser OFF (I0 = 0)
+2026-09-19T20:17:30 | 50668/497700 (10.2%) | 0h11m | 0.0130 s/step(wall) | 0.0129 s/step(warpx) | ETA ~1h36m | x1.00 | load 3.6 | laser OFF (I0 = 0)
+2026-09-19T20:29:33 | 100932/497700 (20.3%) | 0h23m | 0.0144 s/step(wall) | 0.0136 s/step(warpx) | ETA ~1h35m | x1.05 | load 8.3 | laser OFF (I0 = 0)

@@ -30,8 +30,13 @@ G8 0.215 — the critical layer is sub-grid, as on every lifted-IC leg. G9 **pas
 
 ## Cost
 
-≈ 8–13 h single-GPU, from `P5_flashic`'s measured rate at the same cell count and step count.
-**1.00×** — the reference cost.
+**≈ 73 h**, MEASURED — `P5_flashic/progress.log` reports 0.0321 s/step at this exact grid and
+step count, i.e. `ETA ~73h20m`. Submitted as **4 chained 24 h segments**; checkpointing plus
+`--signal=1@600` carries the state across the walls.
+
+CORRECTION: this section first said 8–13 h, taken from `P5_flashic`'s README rather than from
+its own telemetry. That README estimate is wrong by 6–9× and the run's `progress.log` said so
+from its first 10% mark. **1.00×** — the reference cost.
 
 ## The findings this leg is built on
 

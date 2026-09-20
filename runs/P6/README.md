@@ -21,9 +21,9 @@ optical/dynamical split).
 
 | leg | convention | `m_i/m_e` | `mu` | `d_e` | cells | steps | `dz/λ_D` | cost |
 |---|---|---|---|---|---|---|---|---|
-| `P6_mr_full`  | real e⁻, real ion  | 49542 | **1.000** | 0.1693 µm | 22040 | 9139500 | 58.1 | 1.00× |
-| `P6_mr_light` | real e⁻, light ion | 2698  | **0.0545** | 0.1693 µm | 22040 | 497700 | 58.1 | 0.054× |
-| `P6_mr_heavy` | **heavy e⁻**, real ion | 2698 | **1.000** | 0.7257 µm | 5136 | 2133000 | **249.0** | 0.054× |
+| `P6_mr_full`  | real e⁻, real ion  | 49542 | **1.000** | 0.1693 µm | 22040 | 9139500 | 58.1 | 1.00× (**~73 h**, measured) |
+| `P6_mr_light` | real e⁻, light ion | 2698  | **0.0545** | 0.1693 µm | 22040 | 497700 | 58.1 | ~0.036× (**~2.6 h**) |
+| `P6_mr_heavy` | **heavy e⁻**, real ion | 2698 | **1.000** | 0.7257 µm | 5136 | 2133000 | **249.0** | ~0.06× (**~4.5 h**) |
 
 Plus one G3 laser-off control each — six runs.
 
@@ -32,6 +32,10 @@ So if C matches A, that cannot be explained away as 2698 being a generous mass r
 proves it is not.
 
 **The prediction.** A and C agree; B is low by the measured exponents. C costs what B costs.
+
+**First result, before any physics.** Measured in flight: C runs in ~4.5 h against A's ~73 h —
+a **16× speedup** against the predicted 18.4×. Throughput does not scale perfectly with cell
+count, so the saving is 16× rather than 18.4×; the cost half of the hypothesis holds.
 
 ## Why `ω_pe·dt` does not degrade, and `dz/λ_D` does
 

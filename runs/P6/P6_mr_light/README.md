@@ -35,7 +35,8 @@ G9 **warn**, `mu` = 0.0545 — expected and intended.
 
 ## Cost
 
-≈ 0.5 h. **0.054×** leg A.
+**≈ 2.6 h**, measured in flight (93181 steps in 28.9 min). First submitted at a 2 h wall on a
+wrong ≈0.5 h estimate; a 6 h continuation is chained behind it. **~0.036×** leg A.
 
 ## The findings this leg is built on
 

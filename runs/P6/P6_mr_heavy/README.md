@@ -41,7 +41,12 @@ G8 0.215. G9 **pass**, `mu` = 1.
 
 ## Cost
 
-≈ 0.5 h. **0.054×** leg A — 4.2851× fewer cells × 4.2851× bigger steps.
+**≈ 4.5 h**, measured in flight (228284 steps in 28.9 min). First submitted at a 2 h wall on a
+wrong ≈0.5 h estimate; a 6 h continuation is chained behind it.
+
+**~16× cheaper than leg A** (4.5 h against 73 h) against a predicted 18.4×. Throughput does not
+scale perfectly with cell count, which is why the saving is 16× and not 18.4× — but the cost
+half of the hypothesis is already substantially confirmed, before any physics is compared.
 
 ## The findings this leg is built on
 
