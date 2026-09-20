@@ -498,8 +498,13 @@ def derive(cfg: dict) -> Scales:
 
     # --- gates G1/G2 ---
     compression = float((cfg.get("gates") or {}).get("compression_factor", 2.0))
-    wpe_dt_targ = omega_pe(n_targ) * dt
-    wpe_dt_peak = omega_pe(n_targ * compression) * dt
+    # G1 is a stability limit on the SIMULATED plasma oscillation, so it takes the
+    # simulated electron mass. This is the whole reason the heavy-electron convention
+    # buys anything: omega_pe falls as 1/sqrt(m_e) by exactly the factor dt rises with
+    # dz ~ d_e ~ sqrt(m_e), so omega_pe*dt is INVARIANT and the coarser grid is free.
+    # Using the real mass here would report a violation that does not exist.
+    wpe_dt_targ = omega_pe(n_targ, me_scale) * dt
+    wpe_dt_peak = omega_pe(n_targ * compression, me_scale) * dt
     # omega_pe ~ sqrt(n), so the density at which omega_pe*dt = 2:
     n_at_2 = n_targ * (2.0 / wpe_dt_targ) ** 2 / n_cr
     dz_over_lD_targ = dz / debye_length(n_targ, theta_e_targ)
