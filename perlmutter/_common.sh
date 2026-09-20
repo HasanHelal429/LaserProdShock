@@ -87,6 +87,36 @@ run_warpx() {
     export OMP_NUM_THREADS=16          # 16 physical cores per GPU; avoids hyperthreading
 
     cd "$work"                          # THE POINT: diags/ lands here
+    # THE KEY GUARD. WarpX does not error on an input it never queries, so a binary that
+    # predates a deck's flag IGNORES it silently -- which is how a P6 heavy leg was nearly
+    # run against a binary with no `electron_mass` support at all (site.conf still pinned
+    # a pre-campaign build). build_warpx.sh checks keys at BUILD time; this checks the
+    # binary actually about to run, against the deck actually about to be fed to it.
+    #
+    # ParmParse stores prefix and key separately, so the dotted form is NOT in the
+    # constant pool -- match the BARE key. SUBSTRING, never `grep -x`: the pool packs
+    # literals back-to-back with no NUL between them, so a whole-line match never succeeds
+    # and every key reads as missing (build_warpx.sh records the same trap). Substring can
+    # in principle miss a key whose name is a substring of another literal -- that costs
+    # protection, not a false refusal, which is the right way round for a guard that ABORTS.
+    # And grep a saved dump, never a pipe: `strings | grep -q` under `set -o pipefail`
+    # returns 141 on SIGPIPE and reports every key missing.
+    local _kd; _kd="$(mktemp "${TMPDIR:-/tmp}/wxkeys.XXXXXX")"
+    strings -a "$bin" > "$_kd" 2>/dev/null || true
+    local _missing=""
+    local _k
+    for _k in $(grep -oE '^[[:space:]]*laser_deposition\.[a-z_]+' "$deck" 2>/dev/null \
+                | sed 's/.*laser_deposition\.//' | sort -u); do
+        grep -qF "$_k" "$_kd" || _missing="$_missing $_k"
+    done
+    rm -f "$_kd"
+    if [[ -n "$_missing" ]]; then
+        echo "run_warpx: REFUSING -- $bin does not implement laser_deposition key(s):$_missing" >&2
+        echo "run_warpx: the deck sets them and WarpX would ignore them SILENTLY." >&2
+        echo "run_warpx: check WARPX_BUILD/WARPX_COMMIT in perlmutter/site.conf." >&2
+        return 1
+    fi
+
     echo "run_warpx: $(basename "$work")  bin=$bin"
     echo "run_warpx: cwd=$PWD"
 
