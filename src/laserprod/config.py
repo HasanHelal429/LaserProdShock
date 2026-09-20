@@ -135,6 +135,27 @@ def validate(cfg: dict) -> list[str]:
     geo, las, num = cfg["geometry"], cfg["laser"], cfg["numerics"]
     dims = int(geo["dims"])
 
+    # --- reference.electron_mass_scale -------------------------------------------
+    # The SIMULATED electron mass in units of the real one. 1.0 is this project's
+    # historical convention (real electron, lightened ion). Raising it is the OTHER way
+    # to reach a reduced mass ratio -- PSC's -- and keeps the ion real, which is what
+    # restores the T_ss ceiling and the absorbing path length. See HANDOFF.md 7.4.
+    _ms = cfg["reference"].get("electron_mass_scale", 1.0)
+    try:
+        _ms = float(_ms if _ms is not None else 1.0)
+    except (TypeError, ValueError):
+        raise ValueError("reference.electron_mass_scale must be a number "
+                         f"(got {cfg['reference'].get('electron_mass_scale')!r})")
+    if _ms <= 0.0:
+        raise ValueError(f"reference.electron_mass_scale must be > 0 (got {_ms})")
+    if _ms != 1.0:
+        warns.append(
+            f"reference.electron_mass_scale = {_ms:g}: the electron is {_ms:g}x the real "
+            "mass, so m_i = mass_ratio * electron_mass_scale * m_e. n_cr stays on the REAL "
+            "mass (the laser is ray-traced, not field-solved) and the deck pins "
+            "laser_deposition.electron_mass to it. theta stays a REAL-electron temperature "
+            "unit. Check gate G9 and dz/lambda_D (G2), which worsens as sqrt(m_e).")
+
     if dims not in (1, 2, 3):
         raise ValueError(f"geometry.dims must be 1, 2 or 3 (got {dims})")
 
@@ -641,6 +662,42 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
                    f"table configures 10.8 d_e here but the runs measured 8.1 / 4.2 / 3.6 "
                    f"d_e at dz = 0.5 / 0.25 / 0.125, i.e. the physical layer sharpens as "
                    f"it is resolved. Threshold calibrated on three ladders, not derived.")))
+
+    # --- G9: the mass convention, and what it costs -----------------------------
+    # mu = m_i / m_i,real is the single number that governs the ablation scalings, and
+    # the campaign measured both exponents against it: T_ss ~ mu^(1/3) (fitted 0.322)
+    # and optical depth ~ mu^(1/2) (fitted 0.490). Two repairs that leave the ion light
+    # were tried and refuted -- scaling the handoff temperature by mu^(1/3) made
+    # absorption WORSE (predicted f_abs 0.856, measured 0.2735), and raising intensity
+    # by mu^(-1/2) gave T_e 322.7 eV against a predicted 416 because f_abs fell. Only
+    # more ion mass fixes it, and raising the ELECTRON mass at fixed mass_ratio is the
+    # cheap way to buy it. See HANDOFF.md 7.4.
+    if sc is not None:
+        me_scale = float(getattr(sc, "me_scale", 1.0))
+        mi_over_me_real = sc.mass_ratio * me_scale
+        mu = mi_over_me_real / units.MI_OVER_ME_REAL_AL
+        conv = ("real electron, ion set by mass_ratio" if me_scale == 1.0
+                else f"electron {me_scale:g}x real (PSC convention), ion follows")
+        det = (f"m_i/m_e,sim = {sc.mass_ratio:g}, m_e,sim = {me_scale:g} m_e -> "
+               f"m_i/m_e,real = {mi_over_me_real:.0f}, mu = m_i/m_i,real = {mu:.4g}. "
+               f"Convention: {conv}. ")
+        if mu >= 0.9:
+            out.append(Gate("G9", "ion mass is physical", "pass", round(mu, 4),
+                            det + "The ion is real: T_ss sits at its full ceiling and the "
+                            "absorbing path d_i0 is the real one, so absorption is not "
+                            "broken by construction. This is the only regime in which a "
+                            "cross-code number may be quoted without a mu correction."))
+        else:
+            out.append(Gate("G9", "ion mass is physical", "warn", round(mu, 4),
+                            det + f"REDUCED ion. Expect T_ss down by mu^(1/3) = "
+                            f"{mu ** (1.0 / 3.0):.3g}x and optical depth down by "
+                            f"mu^0.490 = {mu ** 0.490:.3g}x, both MEASURED, not assumed. "
+                            "Neither a rescaled handoff temperature nor a raised intensity "
+                            "buys these back (both tried and refuted, HANDOFF.md 7.4). If "
+                            "you need physical temperatures, raise "
+                            "reference.electron_mass_scale rather than mass_ratio: it "
+                            "keeps the ion real at ~1x the cost, and also grows d_e as "
+                            "sqrt(m_e), which closes the length mapping against PSC."))
     return out
 
 

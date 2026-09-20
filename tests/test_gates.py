@@ -16,6 +16,8 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from laserprod import config as lpconfig   # noqa: E402
+from laserprod import deck as lpdeck       # noqa: E402
+from laserprod import units               # noqa: E402
 
 
 BASE = {
@@ -60,7 +62,7 @@ def gate(c, key):
 def test_baseline_has_no_failing_gate():
     gs = lpconfig.gates(cfg())
     assert not [g for g in gs if g.status == "fail"]
-    assert {g.key for g in gs} == {"G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"}
+    assert {g.key for g in gs} == {"G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"}
 
 
 def test_G1_reproduces_the_upstream_failure():
@@ -315,3 +317,76 @@ def test_G8_scales_with_dz_not_with_ray_cfl():
     g_grid = gate(cfg(**{**base, "geometry.dz_over_de": 0.125}), "G8")
     assert g_march.value == g0.value          # ray_cfl buys nothing here
     assert g_grid.value > g0.value            # dz does
+
+
+# --------------------------------------------------------------------------- #
+# reference.electron_mass_scale -- the heavy-electron (PSC) mass convention
+# --------------------------------------------------------------------------- #
+MR_AL = units.MI_OVER_ME_REAL_AL
+
+
+def test_G9_passes_on_a_real_ion_and_warns_on_a_reduced_one():
+    """mu = m_i/m_i,real governs T_ss and the optical depth -- not m_i/m_e."""
+    assert gate(cfg(**{"reference.mass_ratio": MR_AL}), "G9").status == "pass"
+    assert gate(cfg(**{"reference.mass_ratio": MR_AL}), "G9").value == 1.0
+    light = gate(cfg(**{"reference.mass_ratio": 2698.0}), "G9")
+    assert light.status == "warn"
+    assert light.value < 0.06
+
+
+def test_G9_a_heavy_electron_keeps_the_ion_real():
+    """Raising m_e at fixed m_i/m_e keeps mu = 1: mass_ratio is m_i/m_e,SIM."""
+    g = gate(cfg(**{"reference.mass_ratio": MR_AL / 18.362,
+                    "reference.electron_mass_scale": 18.362}), "G9")
+    assert g.status == "pass"
+    assert abs(g.value - 1.0) < 1e-3
+
+
+def test_electron_mass_scale_grows_de_as_sqrt_me_and_leaves_lambda_D_alone():
+    """d_e ~ sqrt(m_e) puts d_i0 on PSC's value; lambda_D is mass-INDEPENDENT.
+
+    If debye_length() ever picked up me_scale, lambda_D would come out sqrt(me_scale)
+    too large and G2 would silently pass grids it should reject.
+    """
+    base = units.derive(cfg())
+    heavy = units.derive(cfg(**{"reference.electron_mass_scale": 18.362}))
+    assert abs(heavy.de_ref / base.de_ref - 18.362 ** 0.5) < 1e-9
+    assert abs(heavy.dz_over_lD_targ / base.dz_over_lD_targ - 18.362 ** 0.5) < 1e-6
+
+
+def test_electron_mass_scale_scales_the_ion_with_the_electron():
+    base = units.derive(cfg(**{"reference.mass_ratio": MR_AL}))
+    heavy = units.derive(cfg(**{"reference.mass_ratio": MR_AL / 18.362,
+                                "reference.electron_mass_scale": 18.362}))
+    assert abs(heavy.mi / base.mi - 1.0) < 1e-9, "the ion must stay real"
+    assert abs(heavy.Cs_targ / base.Cs_targ - 1.0) < 1e-9, "sound speed must not move"
+
+
+def test_electron_mass_scale_is_inert_at_1_and_rejected_when_nonpositive():
+    assert lpdeck.render(cfg()) == lpdeck.render(
+        cfg(**{"reference.electron_mass_scale": 1.0})), \
+        "me_scale = 1 must render byte-identically to omitting it"
+    with pytest.raises(ValueError):
+        lpconfig.validate(cfg(**{"reference.electron_mass_scale": 0.0}))
+
+
+def test_heavy_electron_divides_every_thermal_spread_by_its_own_mass():
+    """theta is a REAL-electron temperature unit, so u_std divides by m/m_e,real.
+
+    Emitting sqrt(theta) for a heavy electron starts the corona me_scale times too hot
+    -- the same trap that once gave ions 40.57 keV against the 15 eV configured.
+    """
+    txt = lpdeck.render(cfg(**{"reference.electron_mass_scale": 18.362}))
+    std = [l for l in txt.split("\n")
+           if "_std" in l and "distribution_type" not in l]
+    assert std, "no thermal spread emitted at all"
+    for line in std:
+        assert "me_scale" in line, f"thermal spread missing me_scale: {line.strip()}"
+
+
+def test_heavy_electron_pins_the_operator_optics_to_the_real_mass():
+    """n_cr must NOT move with the species, or a 10 n_cr target goes underdense."""
+    txt = lpdeck.render(cfg(**{"reference.electron_mass_scale": 18.362}))
+    assert "my_constants.ncr    = epsilon0*m_e*omega0*omega0/(q_e*q_e)" in txt
+    assert "laser_deposition.electron_mass        = m_e" in txt
+    assert "my_constants.wpe    = sqrt(ncr*q_e^2/(epsilon0*me_scale*m_e))" in txt

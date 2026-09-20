@@ -26,6 +26,9 @@ from dataclasses import dataclass, field, asdict
 
 # --- physical constants (SI, CODATA-ish; match WarpX's PhysConst) ---
 ME = 9.1093837015e-31      # electron mass [kg]
+# Real aluminium: 26.9815 amu x 1836.15 (m_p/m_e). The reference for mu = m_i/m_i,real,
+# the scaling parameter of every ablation result in HANDOFF.md 7.
+MI_OVER_ME_REAL_AL = 26.9815 * 1836.15
 QE = 1.602176634e-19       # elementary charge [C]
 C = 299792458.0            # speed of light [m/s]
 EPS0 = 8.8541878128e-12    # vacuum permittivity [F/m]
@@ -50,24 +53,45 @@ def critical_density(lam0: float) -> float:
     return EPS0 * ME * w * w / (QE * QE)
 
 
-def omega_pe(n_e: float) -> float:
-    """Electron plasma frequency [rad/s] at density ``n_e`` [m^-3]."""
-    return math.sqrt(n_e * QE * QE / (EPS0 * ME))
+def omega_pe(n_e: float, me_scale: float = 1.0) -> float:
+    """Electron plasma frequency [rad/s] at density ``n_e`` [m^-3].
+
+    ``me_scale`` is the SIMULATED electron mass in units of the real one (see
+    ``reference.electron_mass_scale``). omega_pe ~ 1/sqrt(m_e), so a heavy electron
+    lowers it and raises the skin depth.
+    """
+    return math.sqrt(n_e * QE * QE / (EPS0 * ME * me_scale))
 
 
-def skin_depth(n_e: float) -> float:
-    """Electron skin depth c/omega_pe [m] at density ``n_e`` [m^-3]."""
-    return C / omega_pe(n_e)
+def skin_depth(n_e: float, me_scale: float = 1.0) -> float:
+    """Electron skin depth c/omega_pe [m] at density ``n_e`` [m^-3].
+
+    Scales as sqrt(m_e): this is what decouples d_e from lam0/(2 pi) in the
+    heavy-electron convention (PSC's 0.7256 um against WarpX's 0.1693 um).
+    """
+    return C / omega_pe(n_e, me_scale)
 
 
 def debye_length(n_e: float, theta: float) -> float:
-    """Electron Debye length [m] = sqrt(theta) * d_e, theta = k_B T_e/(m_e c^2)."""
+    """Electron Debye length [m], sqrt(eps0 kT/(n e^2)).
+
+    Deliberately takes NO ``me_scale``. lambda_D is mass-INDEPENDENT, and it is only
+    expressible as sqrt(theta)*d_e when both sides use the same mass. theta stays
+    referenced to the REAL electron rest energy, so d_e here must be the real-mass one
+    too, or lambda_D comes out sqrt(me_scale) too large and gate G2 silently passes a
+    grid it should reject.
+    """
     return math.sqrt(max(theta, 0.0)) * skin_depth(n_e)
 
 
-def sound_speed(theta_e: float, mass_ratio: float, Z: float = 1.0) -> float:
-    """Ion-acoustic speed sqrt(Z k_B T_e/m_i) [m/s] from theta_e and m_i/m_e."""
-    return math.sqrt(Z * theta_e / mass_ratio) * C
+def sound_speed(theta_e: float, mass_ratio: float, Z: float = 1.0,
+                me_scale: float = 1.0) -> float:
+    """Ion-acoustic speed sqrt(Z k_B T_e/m_i) [m/s].
+
+    ``mass_ratio`` is m_i/m_e,SIM while theta is referenced to the REAL electron, so
+    the conversion needs m_i/m_e,real = mass_ratio * me_scale.
+    """
+    return math.sqrt(Z * theta_e / (mass_ratio * me_scale)) * C
 
 
 # lnLambda modes the operator accepts (`laser_deposition.coulomb_log_mode`), in its
@@ -215,8 +239,9 @@ class Scales:
     n_cr: float               # critical density [m^-3]
     de_cr: float              # skin depth at n_cr = lam0/(2 pi) [m]
     intensity: float          # incident intensity [W/m^2]
-    mass_ratio: float
+    mass_ratio: float         # m_i / m_e,SIM
     mi: float                 # ion mass [kg]
+    me_scale: float           # simulated electron mass / real electron mass
 
     # --- length reference (which d_e the config's lengths are quoted in) ---
     length_scale: str         # 'critical' | 'target' | 'ambient'
@@ -428,20 +453,28 @@ def derive(cfg: dict) -> Scales:
 
     lam0 = float(las["wavelength_um"]) * 1e-6
     w0 = omega_of_lambda(lam0)
+    # n_cr stays on the REAL electron mass. It is the laser's optical parameter, not a
+    # property of the simulated plasma -- the deposition operator ray-traces it rather
+    # than solving a field, so pinning it is what lets the electron mass move at all.
     n_cr = critical_density(lam0)
-    de_cr = C / w0                                   # == lam0/(2 pi)
+    # d_e at n_cr is lam0/(2 pi) ONLY at the real mass; it grows as sqrt(m_e), which is
+    # exactly how PSC decouples the skin depth from the wavelength.
+    me_scale = float(ref.get("electron_mass_scale", 1.0) or 1.0)
+    de_cr = C / w0 * math.sqrt(me_scale)
     intensity = float(las["intensity"])
 
     mass_ratio = float(ref["mass_ratio"])
-    mi = mass_ratio * ME
+    # mass_ratio is m_i/m_e,SIM, so a heavy electron raises the ION mass with it. That is
+    # the point: at mass_ratio 2698 and me_scale 18.362 the ion is real aluminium.
+    mi = mass_ratio * ME * me_scale
     Z = float(ref.get("charge_state", 1))
 
     n_targ = float(tgt["density_over_ncr"]) * n_cr
-    de_targ = skin_depth(n_targ)
+    de_targ = skin_depth(n_targ, me_scale)
     theta_e_targ = float(tgt["theta_e_init"])
 
     n_amb = float(amb["density_over_ncr"]) * n_cr if amb else None
-    de_amb = skin_depth(n_amb) if n_amb else None
+    de_amb = skin_depth(n_amb, me_scale) if n_amb else None
     theta_e_amb = float(amb["theta_e"]) if amb else None
 
     # --- which d_e the config's lengths mean (the project's most confusable
@@ -496,8 +529,8 @@ def derive(cfg: dict) -> Scales:
         tau_amb = K_ib(n_amb, theta_e_amb, n_cr, Z_eff, lnL, lnL_mode) * path
         f_abs_amb = 1.0 - math.exp(-min(tau_amb, 500.0))
 
-    Cs_targ = sound_speed(theta_e_targ, mass_ratio, Z)
-    Cs_amb = sound_speed(theta_e_amb, mass_ratio, Z) if amb else None
+    Cs_targ = sound_speed(theta_e_targ, mass_ratio, Z, me_scale)
+    Cs_amb = sound_speed(theta_e_amb, mass_ratio, Z, me_scale) if amb else None
 
     # --- background field ---
     B0 = vA = wci0 = wci0_inv = v_ms = beta_amb = None
@@ -526,7 +559,7 @@ def derive(cfg: dict) -> Scales:
 
     return Scales(
         lam0=lam0, omega0=w0, n_cr=n_cr, de_cr=de_cr, intensity=intensity,
-        mass_ratio=mass_ratio, mi=mi,
+        mass_ratio=mass_ratio, mi=mi, me_scale=me_scale,
         length_scale=length_scale, de_ref=de_ref,
         n_targ=n_targ, n_targ_over_ncr=n_targ / n_cr, de_targ=de_targ,
         theta_e_targ=theta_e_targ, theta_e_group=th_grp_targ, Cs_targ=Cs_targ,

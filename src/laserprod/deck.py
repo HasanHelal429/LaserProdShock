@@ -326,6 +326,31 @@ def _diag_intervals(cfg: dict):
 # --------------------------------------------------------------------------- #
 # forward direction: config -> deck
 # --------------------------------------------------------------------------- #
+def _u_std_expr(theta: str, kind: str, sc) -> str:
+    """WarpX ``u_std`` -- the spread in u = gamma v/c -- for one species.
+
+    u_std = sqrt(kT/(m c^2)) for a species of mass ``m``. This project's ``theta`` is
+    kT/(m_e,REAL c^2): a temperature UNIT, not the simulated electron's rest energy. So
+    every species divides theta by its OWN mass expressed in real electron masses:
+
+        electron : m/m_e,real = me_scale
+        ion      : m/m_e,real = mass_ratio * me_scale
+
+    Emitting ``sqrt(theta)`` for both made the ion thermal momentum too large by
+    sqrt(m_i/m_e) and its ENERGY by m_i/m_e -- 40.57 keV measured against the 15 eV the
+    config asked for. The identical trap reappears for a HEAVY ELECTRON: ``sqrt(theta)``
+    is then too large by sqrt(me_scale), which starts the corona 18.4x too hot at
+    me_scale = 18.362 and looks like a plausible run rather than an error.
+
+    At me_scale == 1 this returns the historical strings byte-for-byte, so committed
+    decks and ``make_inputs.py --verify`` are unaffected.
+    """
+    if kind == "electron":
+        return f"sqrt({theta})" if sc.me_scale == 1.0 else f"sqrt(({theta})/me_scale)"
+    denom = "mass_ratio" if sc.me_scale == 1.0 else "(mass_ratio*me_scale)"
+    return f"sqrt(({theta})/{denom})"
+
+
 def render(cfg: dict) -> str:
     """Build a WarpX input deck (as a string) from a loaded config."""
     las, ref = cfg["laser"], cfg["reference"]
@@ -384,9 +409,19 @@ def render(cfg: dict) -> str:
     a("#     absorption is measured against n_cr, so lam0 fixes densities in m^-3) ---")
     a(f"my_constants.lam0   = {_num(sc.lam0)}")
     a("my_constants.omega0 = 2.*pi*clight/lam0")
+    # ncr keeps the REAL m_e even when the simulated electron is heavier: it is the
+    # laser's OPTICAL parameter, ray-traced rather than field-solved, so holding it fixed
+    # is what keeps density_over_ncr meaning the same plasma. The operator is pinned to
+    # match, below.
     a("my_constants.ncr    = epsilon0*m_e*omega0*omega0/(q_e*q_e)")
     a(f"my_constants.mass_ratio = {_num(sc.mass_ratio)}")
-    a("my_constants.Mi     = mass_ratio*m_e")
+    if sc.me_scale != 1.0:
+        a(f"my_constants.me_scale = {_num(sc.me_scale)}"
+          f"      # simulated electron / real electron")
+        a("my_constants.Mi     = mass_ratio*me_scale*m_e"
+          "   # mass_ratio is m_i/m_e,SIM")
+    else:
+        a("my_constants.Mi     = mass_ratio*m_e")
     a("")
     a("# --- densities (in n_cr) and the reference skin depth ---")
     # Floor for a FLASH-lifted temperature profile: the cold solid is Debye-unresolvable
@@ -400,7 +435,10 @@ def render(cfg: dict) -> str:
     a(f"my_constants.nt     = {_num(tgt['density_over_ncr'])}*ncr")
     if amb:
         a(f"my_constants.namb   = {_num(amb['density_over_ncr'])}*ncr")
-    a(f"my_constants.wpe    = sqrt({_nref_name(cfg)}*q_e^2/(epsilon0*m_e))")
+    # wpe takes the SIMULATED mass, so de = c/wpe grows as sqrt(m_e). That is deliberate:
+    # it is what decouples the skin depth from lam0/(2 pi) and puts d_i0 on PSC's value.
+    _me_sym = "me_scale*m_e" if sc.me_scale != 1.0 else "m_e"
+    a(f"my_constants.wpe    = sqrt({_nref_name(cfg)}*q_e^2/(epsilon0*{_me_sym}))")
     a(f"my_constants.de     = clight/wpe          # d_e,{sc.length_scale} "
       f"= {sc.de_ref*1e6:.4f} um")
     a("my_constants.di     = de*sqrt(mass_ratio)")
@@ -623,9 +661,12 @@ def render(cfg: dict) -> str:
         # Injected particles are COLD -- they stand for undisturbed solid, so they carry
         # the SOLID temperatures, not the corona's. The ion u_std divides by mass_ratio
         # exactly as the species blocks above do.
-        a(f"target_injector.{sp}.u_std = sqrt(th_ts)")
+        a(f"target_injector.{sp}.u_std = "
+          + ("sqrt(th_ts)" if sc.me_scale == 1.0 else "sqrt(th_ts/me_scale)"))
         if neut:
-            a(f"target_injector.{neut}.u_std = sqrt(th_tis/mass_ratio)")
+            a(f"target_injector.{neut}.u_std = "
+              + ("sqrt(th_tis/mass_ratio)" if sc.me_scale == 1.0
+                 else "sqrt(th_tis/(mass_ratio*me_scale))"))
         a("")
 
     solver = (cfg.get("solver") or {})
@@ -701,6 +742,10 @@ def render(cfg: dict) -> str:
         a(f"# --- {role} {kind}s ---")
         if kind == "electron":
             a(f"{name}.species_type = electron")
+            if sc.me_scale != 1.0:
+                # Overrides the mass species_type just set. theta stays referenced to the
+                # REAL electron, so u_std below divides by me_scale.
+                a(f"{name}.mass   = me_scale*m_e")
         else:
             Z = int(spec.get("charge_state", 1))
             a(f"{name}.charge = {'' if Z == 1 else f'{Z}*'}q_e")
@@ -759,8 +804,7 @@ def render(cfg: dict) -> str:
         # the config asked for, a ratio of 2704.6 against mass_ratio = 2698. That is every
         # ion in every run this project has produced (factor 100 at the Z=1 decks,
         # 2698 here), and it is what made the Phase-4 ions look numerically heated.
-        u_std = f"sqrt({theta})" if kind == "electron" else \
-            f"sqrt(({theta})/mass_ratio)"
+        u_std = _u_std_expr(theta, kind, sc)
 
         # --- position-dependent temperature -------------------------------------
         # A real ablation snapshot is NOT isothermal across the target: FLASH's 0.1 ns
@@ -776,8 +820,7 @@ def render(cfg: dict) -> str:
         if _tab is not None:
             key = "Te_eV" if kind == "electron" else "Ti_eV"
             th = f"max(({_flash_profile_expr(_tab, key)})/{_num(511000.0)},thmin)"
-            u_std = f"sqrt({th})" if kind == "electron" else \
-                f"sqrt(({th})/mass_ratio)"
+            u_std = _u_std_expr(th, kind, sc)
             a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
@@ -791,8 +834,7 @@ def render(cfg: dict) -> str:
             th_s = "th_ts" if kind == "electron" else "th_tis"
             gate = f"(z>{_face_expr(cfg)})" if inject_hi_side else f"(z<{_face_expr(cfg)})"
             mix = f"({th_s}+({th_c}-{th_s})*{gate})"
-            u_std = f"sqrt({mix})" if kind == "electron" else \
-                f"sqrt(({mix})/mass_ratio)"
+            u_std = _u_std_expr(mix, kind, sc)
             a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
@@ -852,6 +894,14 @@ def render(cfg: dict) -> str:
     if heated:
         a(f"laser_deposition.species              = {' '.join(heated)}")
     a(f"laser_deposition.wavelength           = lam0")
+    if sc.me_scale != 1.0:
+        # Pin the operator's OPTICAL mass to the real electron so n_cr matches the `ncr`
+        # this deck built its densities from. Without this the operator would resolve the
+        # mass from the heated species, n_cr would rise by me_scale, and a 10 n_cr target
+        # would go underdense. The operator still takes the KICK mass from the species --
+        # that one has no override, because the energy must land in the real particles.
+        a("laser_deposition.electron_mass        = m_e"
+          "   # optics on the REAL mass; kick uses the species")
     a(f"laser_deposition.intensity            = {_num(las['intensity'])}")
     a(f"laser_deposition.direction            = {str(las.get('direction', 'z'))}")
     a(f"laser_deposition.inject_side          = {'hi' if inject_hi else 'lo'}")
