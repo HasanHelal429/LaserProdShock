@@ -150,6 +150,12 @@ case "$WHAT" in
           runs/P6/P6_mr_full  runs/P6/P6_mr_full_off)
     JOBNAME="lp6_massconv"
     ;;
+  p6full)
+    # The EXPENSIVE reference leg and its control, split out so `p6cheap` can be run and
+    # inspected first. mu = 1 at a real electron: 22040 cells x 9.14e6 steps, ~8-13 h.
+    RUNS=(runs/P6/P6_mr_full runs/P6/P6_mr_full_off)
+    JOBNAME="lp6_full"
+    ;;
   p6cheap)
     # The two reduced-mass-ratio legs and their controls only -- the whole experiment
     # EXCEPT the expensive reference. ~2 GPU-h total. Run this first.
