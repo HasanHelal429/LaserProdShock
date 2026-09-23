@@ -230,7 +230,7 @@ def warpx_fields(run_dir, sc=None):
     return out
 
 
-def warpx_particles(run_dir, species, nbin=400, sc=None):
+def warpx_particles(run_dir, species, nbin=400, sc=None, zeta_range=None):
     sc = sc or SC_W
     """Binned particle moments on a common zeta grid.
 
@@ -244,7 +244,15 @@ def warpx_particles(run_dir, species, nbin=400, sc=None):
     """
     import yt
     from laserprod import io as lpio
-    edges = np.linspace(-50.0 * DE_CR / sc["di0"], 2450.0 * DE_CR / sc["di0"], nbin + 1)
+    # Default window: -50..2450 x DE_CR, i.e. a FIXED PHYSICAL span of -8.5..415 um. That is
+    # the mr100 domain, and on its d_i0 = 1.69 um it reaches zeta = 245 -- but on a mu = 1
+    # leg (d_i0 = 7.26 um) the same 415 um stops at zeta = 57, cutting the late plume off
+    # while FLASH's runs to zeta ~ 100. `zeta_range` bins in the leg's OWN zeta instead, so
+    # every leg covers the same normalised span. None keeps the historical edges exactly.
+    if zeta_range is not None:
+        edges = np.linspace(float(zeta_range[0]), float(zeta_range[1]), nbin + 1)
+    else:
+        edges = np.linspace(-50.0 * DE_CR / sc["di0"], 2450.0 * DE_CR / sc["di0"], nbin + 1)
     mid = 0.5 * (edges[1:] + edges[:-1])
     dz = (edges[1] - edges[0]) * sc["di0"]      # bin width in metres
     out = []
@@ -502,7 +510,7 @@ def absorbed(run_dir, i0=1.0e17):
                 f_end=P[-1] / i0, f_0=P[0] / i0)
 
 
-def load_leg(label, path, colour):
+def load_leg(label, path, colour, zeta_range=None):
     """One WarpX leg, with its species map and T_e source chosen from its own config.
 
     A hybrid run has no electron macroparticles at all, so its T_e is the `Te` FIELD and its
@@ -518,7 +526,8 @@ def load_leg(label, path, colour):
     sc = warpx_scales_for(cfg)
     return dict(label=label, path=path, colour=colour, hybrid=hybrid, sc=sc,
                 rid=lpconfig.run_id(cfg),
-                S=warpx_particles(path, SP_HYB if hybrid else SP_KIN, sc=sc),
+                S=warpx_particles(path, SP_HYB if hybrid else SP_KIN, sc=sc,
+                                  zeta_range=zeta_range),
                 F=warpx_fields(path, sc=sc) if hybrid else None)
 
 

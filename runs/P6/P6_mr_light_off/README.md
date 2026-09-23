@@ -41,4 +41,4 @@ NOT YET RUN.
 
 ## Retracted
 
-Nothing yet.
+**2026-09-23** — inherits the defect recorded in `P6_mr_light/README.md`: this control's initial condition is the same unscaled one, so it is a valid G3 control for P6_mr_light AS BUILT but not for a similarity-scaled light leg. It must be rerun alongside the corrected leg.

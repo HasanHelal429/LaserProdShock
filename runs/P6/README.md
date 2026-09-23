@@ -75,6 +75,15 @@ differences below ~3% are not measurements (1σ of GPU scatter at fixed seed is 
   and the finer-`dz` repeat is the discriminator — but running it now would pre-empt a
   disagreement rather than test one.
 
+## Correction — leg B is not what this table says (2026-09-23)
+
+`P6_mr_light`'s initial condition was never similarity-scaled: only the time family was
+applied, and its lengths and velocities are the mu = 1 leg's. In its own normalised units it
+starts 4.285x too wide and 4.285x too slow (uza/C_S0 ~0.128, not 0.548). It therefore does
+NOT test the reduced-mass convention, and the mu-exponent predictions in the table above do
+not apply to it as built. Full account and the fix in `P6_mr_light/README.md`, Retracted.
+Legs A and C are unaffected -- both are mu = 1 and need no similarity map.
+
 ## Status
 
 All six configured, decks rendered, gates checked. **Not yet launched** — GPU submission

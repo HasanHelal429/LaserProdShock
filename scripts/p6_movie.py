@@ -60,7 +60,10 @@ def main():
         if not os.path.isdir(path):
             print(f"  skip {name}: no {path}"); continue
         try:
-            leg = load_leg(name, path, col)
+            # Bin every leg over the SAME normalised span, wide enough for FLASH's plume
+            # (~zeta 100). The historical default is a fixed 415 um, which truncates the
+            # mu = 1 legs at zeta 57.
+            leg = load_leg(name, path, col, zeta_range=(-5.0, 115.0))
         except Exception as e:
             print(f"  skip {name}: {e}"); continue
         if not leg["S"]:
@@ -119,6 +122,11 @@ def main():
                 st = leg_state(leg, t)
                 if st is None: continue
                 lab = f"{leg['label']} (mu={leg['sc']['mu']:.3g})"
+                if leg["label"] == "light":
+                    # P6_mr_light's IC was NOT similarity-scaled (lengths and velocities
+                    # held at the mu = 1 values), so its offset from FLASH is partly a
+                    # setup artifact -- see runs/P6/P6_mr_light/README.md, Retracted.
+                    lab += " - IC NOT similarity-scaled"
                 if st["stale"]: lab += " [stale]"
                 al = 0.35 if st["stale"] else 1.0
                 ax[0].semilogy(st["zeta"], np.maximum(st["ne"], nlo), color=leg["colour"],
