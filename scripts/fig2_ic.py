@@ -117,7 +117,7 @@ def main():
             cfg = lpconfig.load(path)
         except Exception as exc:
             print(f"  {lab}: {exc}"); continue
-        sc = X.warpx_scales(float(cfg["reference"]["mass_ratio"]))
+        sc = X.warpx_scales_for(cfg)
         dep = pic_deposition(path, sc)
         if dep is None:
             print(f"  {lab}: no step-0 laserdep_profile"); continue

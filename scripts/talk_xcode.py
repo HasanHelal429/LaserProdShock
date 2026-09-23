@@ -103,7 +103,7 @@ def series(kin, hyb, want=LEGS):
     # tau unit. Using the module default for every leg mislabels one of them.
     def _sc(run_dir):
         from laserprod import config as lpconfig
-        return X.warpx_scales(float(lpconfig.load(run_dir)["reference"]["mass_ratio"]))
+        return X.warpx_scales_for(lpconfig.load(run_dir))
 
     raw, scs = {}, {}
     if "FLASH" in want:

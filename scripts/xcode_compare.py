@@ -98,8 +98,27 @@ CS0_W = cs0(MASS_RATIO_SIM * ME)
 TAU_W = DI0_W / CS0_W
 
 
-def warpx_scales(mass_ratio=MASS_RATIO_SIM):
+def warpx_scales_for(cfg):
+    """`warpx_scales` for a loaded config, reading BOTH mass keys.
+
+    `reference.mass_ratio` is m_i/m_e,SIM, so it does NOT fix the ion mass on its own once
+    `reference.electron_mass_scale` can move the electron. A P6 heavy leg runs mass_ratio
+    2698 at me_scale 18.36 and has a REAL aluminium ion -- reading mass_ratio alone calls
+    that ion 18.36x too light and reports mu = 18.36 where the truth is 1, which
+    mis-scales d_i0 by 4.29, tau by 18.36, and every normalised axis with them.
+    """
+    ref = cfg["reference"]
+    return warpx_scales(float(ref["mass_ratio"]),
+                        float(ref.get("electron_mass_scale", 1.0) or 1.0))
+
+
+def warpx_scales(mass_ratio=MASS_RATIO_SIM, me_scale=1.0):
     """(d_i0, C_S0, tau_unit, T_e,SS, mu) for a WarpX leg of the given m_ion/m_e.
+
+    `me_scale` is the SIMULATED electron mass in real electron masses
+    (`reference.electron_mass_scale`, default 1.0 -- every pre-P6 leg). The ion mass is
+    mass_ratio * me_scale * m_e, so a heavy electron carries the ion up with it: at
+    mass_ratio 2698 and me_scale 18.36 the ion is real aluminium and mu = 1.
 
     NOT a constant. `P4_lez_kin_flashic_ct` runs the ION at 100 m_e where every earlier
     Phase-4 leg ran aluminium at 26.98 x 100 = 2698, and the two differ by 5.2x in the tau
@@ -113,11 +132,12 @@ def warpx_scales(mass_ratio=MASS_RATIO_SIM):
     restate every result in RESULTS.md by a factor 5.19. C_S0 keeps the ION mass. That
     mixed pairing is the paper's own (TEST_PLAN 12.2) and is preserved deliberately.
     """
-    mi = float(mass_ratio) * ME
+    mi = float(mass_ratio) * float(me_scale) * ME
     d = C / np.sqrt(N_CR * QE ** 2 / (EPS0 * mi / A_AL))
     c_s = np.sqrt(Z_AL * TE_REF * QE / mi)
-    mu = MASS_RATIO_REAL / float(mass_ratio)
-    return dict(mass_ratio=float(mass_ratio), di0=d, cs0=c_s, tau=d / c_s,
+    mu = MASS_RATIO_REAL / (float(mass_ratio) * float(me_scale))
+    return dict(mass_ratio=float(mass_ratio), me_scale=float(me_scale),
+                di0=d, cs0=c_s, tau=d / c_s,
                 tss=TE_REF / mu ** (1.0 / 3.0), mu=mu)
 
 
@@ -487,7 +507,7 @@ def load_leg(label, path, colour):
     hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
     # The ion mass is a per-run primary, not a project constant: flashic_ct runs it at
     # 100 m_e where the others run 2698, which is 5.2x in the tau unit.
-    sc = warpx_scales(float(cfg["reference"]["mass_ratio"]))
+    sc = warpx_scales_for(cfg)
     return dict(label=label, path=path, colour=colour, hybrid=hybrid, sc=sc,
                 rid=lpconfig.run_id(cfg),
                 S=warpx_particles(path, SP_HYB if hybrid else SP_KIN, sc=sc),

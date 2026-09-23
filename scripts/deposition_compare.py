@@ -94,7 +94,7 @@ def main():
 
     from laserprod import config as lpconfig
     cfg = lpconfig.load(a.kin)
-    sc = X.warpx_scales(float(cfg["reference"]["mass_ratio"]))
+    sc = X.warpx_scales_for(cfg)
     K = kin_profiles(a.kin, sc)
     if not K:
         print("  no laserdep_profile dumps"); return 1

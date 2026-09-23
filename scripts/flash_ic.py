@@ -97,7 +97,7 @@ def main():
     if a.overlay:
         from laserprod import config as lpconfig
         cfg = lpconfig.load(a.overlay)
-        sc = xc.warpx_scales(float(cfg["reference"]["mass_ratio"]))
+        sc = xc.warpx_scales_for(cfg)
         W = warpx_ic(cfg, sc, a.zlim)
         print(f"overlay: {os.path.basename(os.path.normpath(a.overlay))}  "
               f"mass_ratio {cfg['reference']['mass_ratio']}  d_i0 {sc['di0']*1e6:.3f} um")
