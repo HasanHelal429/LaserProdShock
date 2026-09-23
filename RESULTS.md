@@ -8465,3 +8465,53 @@ disagrees with A, the first suspect is the grid" — is now met, and it is the o
 separates "the convention is wrong" from "this grid is too coarse for this profile".
 Also still owed before any agreement claim: 3 seeds each on A and C (D5), and `P6_mr_full`
 finishing so tau > 17.48 exists.
+
+### Follow-up, same day — two qualifications, and the geometry against FLASH
+
+**The mu^(1/3) confirmation above rests on a mis-built leg.** `P6_mr_light`'s initial
+condition was never similarity-scaled (retracted in `9a35c3f`, 12:21, before the entry above
+was written): only the time family was applied, so in its own normalised units the corona
+starts 4.285x too wide and 4.285x too slow (uza/C_S0 ~0.128, not 0.548). Plume `T_e` may be
+robust to that -- the plume largely forgets its IC (`d ln T_plume/d ln T_IC` = 0.156,
+HANDOFF 7.4) -- but `T_ss` also carries `f_abs^(2/3)`, and absorption is exactly what the
+wrong geometry perturbs. **Treat light/full = 0.381 as provisional** until a correctly
+scaled light leg reruns; a 1 % match on a leg with a known 4.3x IC error could be partly luck.
+
+**Acceptance geometry against FLASH** (`p6_movie` scalars, plume band 0.01-1 n_cr, raw --
+no G3 subtraction; FLASH matched at `tau_own` + 2.696). At `tau_own` 17.48, the latest
+time all three legs share:
+
+| | FLASH | full | heavy | light* |
+|---|---|---|---|---|
+| `zeta_cr` | 3.083 | 2.859 (0.93) | 0.907 (**0.29**) | 0.445 |
+| `zeta_front` | 65.46 | 54.06 (0.83) | 42.31 (0.65) | 42.04 |
+| `L_n` | 14.82 | 12.76 (0.86) | 9.651 (0.65) | 9.881 |
+| `Te_mean_plume` [eV] | 792.8 | 655.6 (0.83) | 866.6 (1.09) | 293.8 |
+| `v_band_max` / C_S0 | 4.875 | 4.024 (0.83) | 3.127 (0.64) | 2.741 |
+
+(ratios to FLASH; *light is the unscaled leg.) **`P6_mr_full` tracks FLASH at 0.83-0.93 on
+every quantity** -- the reference is sound. heavy gets `T_e` right-to-high but the geometry
+wrong, and its `zeta_cr` barely leaves the target: 0.35 -> 0.25 -> 0.26 -> 0.51 -> 0.91 over
+`tau_own` 1-17.5 while full's runs 0.52 -> 2.86. The divergence is already visible by
+`tau_own` 5.
+
+**A second candidate for the heavy offset, which the finer-`dz` leg also discriminates.**
+Raising `m_e` is not physically neutral for the electrons: Spitzer conductivity goes as
+`T^(5/2)/sqrt(m_e)`, so at `me_scale` 18.36 electron heat conduction is **4.285x weaker**.
+Laser ablation is conduction-limited -- heat deposited near `n_cr` must be conducted into the
+dense target to ablate it -- so suppressed conduction predicts all three observations at once:
+a HOTTER corona (heat is not carried away; `T_e` heavy/full 1.14-1.32), LESS ablated mass
+(lower-density plume, `L_n` and `zeta_front` short), and a critical surface that does not
+advance (`zeta_cr` stalled). Under-resolution explains the geometry but not obviously the
+temperature OVERSHOOT, and grid heating points the other way (it would heat and expand the
+target, advancing `zeta_cr`).
+
+The two hypotheses make opposite predictions for the finer-`dz` heavy leg: **under-resolution
+predicts it converges toward full; suppressed conduction predicts it does not.** Either
+outcome is therefore informative. If it does not converge, the heavy-electron convention has a
+physical limit here -- the same m_e that fixes the ion mass slows the electron transport the
+ablation depends on -- and that would bound where PSC's convention can be trusted.
+
+Artifact note: `media/P6/movie_massconv.mp4` (11:56) predates `f75169c` and carries the
+337x `T_e` artefact. The current movies are `movie_flash_heavy_light.mp4` and
+`movie_flash_all3.mp4`, with `*_scalars.txt` beside each.

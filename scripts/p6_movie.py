@@ -36,7 +36,7 @@ import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegWriter
-from xcode_compare import load_leg, leg_state, flash_series, pick, FLASH_DIR, TAU_HANDOFF
+from xcode_compare import load_leg, leg_state, flash_series, pick, FLASH_DIR, TAU_HANDOFF, scalars, BAND
 from laserprod import plotting as lpp
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -132,7 +132,8 @@ def main():
                 ax[0].semilogy(st["zeta"], np.maximum(st["ne"], nlo), color=leg["colour"],
                                lw=1.6, alpha=al, label=lab)
                 if st["Te"] is not None:
-                    ax[1].plot(st["zeta"], st["Te"], color=leg["colour"], lw=1.6, alpha=al)
+                    ax[1].semilogy(st["zeta"], np.maximum(st["Te"], 10.0),
+                                   color=leg["colour"], lw=1.6, alpha=al)
                 if st["v"] is not None:
                     ax[2].plot(st["zeta"], st["v"], color=leg["colour"], lw=1.6, alpha=al)
             if F is not None:
@@ -140,11 +141,14 @@ def main():
                 if f is not None:
                     ax[0].semilogy(f["zeta"], np.maximum(f["ne"], nlo), color="k",
                                    lw=2.0, ls="--", label=f"FLASH (tau={f['tau']:.2f})")
-                    ax[1].plot(f["zeta"], f["Te"], color="k", lw=2.0, ls="--")
+                    ax[1].semilogy(f["zeta"], np.maximum(f["Te"], 10.0),
+                                   color="k", lw=2.0, ls="--")
                     ax[2].plot(f["zeta"], f["v"], color="k", lw=2.0, ls="--")
             ax[0].axhline(1.0, color="0.55", lw=0.8, ls=":")
             ax[0].set_ylabel(r"$n_e/n_{cr}$"); ax[0].set_ylim(nlo, nhi * 1.5)
-            ax[1].set_ylabel(r"$T_e$  [eV]");  ax[1].set_ylim(0, thi * 1.05)
+            # LOG: the n_e < 1e-2 tail reaches tens of keV and on a linear axis it flattens
+            # the ~1 keV plume -- where the comparison actually lives -- into the baseline.
+            ax[1].set_ylabel(r"$T_e$  [eV]");  ax[1].set_ylim(10.0, thi * 1.5)
             ax[2].set_ylabel(r"$v_z/C_{S0}$"); ax[2].set_ylim(vlo, vhi)
             ax[2].set_xlabel(r"$\zeta = z/d_{i0}$  (each leg on its OWN $d_{i0}$)")
             ax[0].set_xlim(zlo, zhi)
@@ -158,7 +162,40 @@ def main():
             writer.grab_frame()
     plt.close(fig)
     print(f"wrote {a.out}")
+    write_table(legs, F, taus, os.path.splitext(a.out)[0] + "_scalars.txt")
     return 0
+
+
+def write_table(legs, F, taus, out):
+    """The acceptance quantities at matched tau: geometry first, temperature last.
+
+    zeta_cr / zeta_front / L_n are what P6 is judged on (the broken real-mass leg's T_e was
+    off 5% while its scale length was off 4x). Te_mean_plume is density-weighted over the
+    plume band only, so the hot tenuous tail below 1e-2 n_cr does not enter it.
+    """
+    want = [1.0, 5.0, 10.0, 15.0, taus[-1]]
+    keys = ["zeta_cr", "zeta_front", "L_n", "Te_mean_plume", "v_band_max"]
+    lines = [f"P6 acceptance scalars at matched tau_own (FLASH at tau_own + {TAU_HANDOFF})",
+             f"plume band {BAND[0]:g}..{BAND[1]:g} n_cr; '*' = leg's nearest dump is > 0.25 tau away",
+             f"{'tau_own':>7} {'leg':<7}" + "".join(f"{k:>15}" for k in keys)]
+    for t in want:
+        rows = []
+        if F is not None:
+            f = pick(F, t + TAU_HANDOFF)
+            if f is not None:
+                rows.append(("FLASH", scalars(f["zeta"], f["ne"], f["Te"], f["v"]), False))
+        for leg in legs:
+            st = leg_state(leg, t)
+            if st is not None:
+                rows.append((leg["label"], scalars(st["zeta"], st["ne"], st["Te"], st["v"]),
+                             st["stale"]))
+        for name, d, stale in rows:
+            lines.append(f"{t:7.2f} {name + ('*' if stale else ''):<7}"
+                         + "".join(f"{d.get(k, np.nan):15.4g}" for k in keys))
+        lines.append("")
+    open(out, "w").write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    print(f"wrote {out}")
 
 
 if __name__ == "__main__":
