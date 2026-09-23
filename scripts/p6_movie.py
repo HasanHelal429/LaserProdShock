@@ -108,6 +108,7 @@ def main():
 
     fig, ax = plt.subplots(3, 1, figsize=(9.5, 10), sharex=True)
     for x in ax: lpp.style_axes(x)
+    lpp.use_ffmpeg()
     writer = FFMpegWriter(fps=a.fps, bitrate=2400)
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
 

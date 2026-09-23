@@ -137,6 +137,10 @@ def warpx_scales(mass_ratio=MASS_RATIO_SIM, me_scale=1.0):
     c_s = np.sqrt(Z_AL * TE_REF * QE / mi)
     mu = MASS_RATIO_REAL / (float(mass_ratio) * float(me_scale))
     return dict(mass_ratio=float(mass_ratio), me_scale=float(me_scale),
+                # ABSOLUTE masses, so a consumer cannot reconstruct them from
+                # mass_ratio alone and silently drop me_scale -- which is exactly how a
+                # heavy-electron leg reported T_e 337x too hot and v_z 18.4x too fast.
+                me=float(me_scale) * ME, mi=mi,
                 di0=d, cs0=c_s, tau=d / c_s,
                 tss=TE_REF / mu ** (1.0 / 3.0), mu=mu)
 
@@ -268,7 +272,7 @@ def warpx_particles(run_dir, species, nbin=400, sc=None):
             ok = sw > 0
             dens = sw / dz / N_CR               # 1D: weight is a per-area count
             if kind == "ion":
-                m = sc["mass_ratio"] * ME
+                m = sc.get("mi", sc["mass_ratio"] * ME)
                 # NB: in 1D WarpX the geometry axis is z. yt exposes the single spatial
                 # coordinate as particle_position_x, but the momentum keeps its three
                 # PHYSICAL components, so the longitudinal one is momentum_z, not _x.
@@ -291,9 +295,10 @@ def warpx_particles(run_dir, species, nbin=400, sc=None):
                     ski, _ = np.histogram(z, bins=edges, weights=w * un[:, k])
                     mki = np.where(ok, ski / np.where(ok, sw, 1), 0.0)
                     dri += mki * mki
-                acc["Ti"] = (mu2i - dri) / 3.0 * (sc["mass_ratio"] * 511e3)
+                acc["Ti"] = (mu2i - dri) / 3.0 * (sc.get("mi", sc["mass_ratio"] * ME) / ME * 511e3)
             else:
-                un = u / (ME * C)
+                me_sim = sc.get("me", ME)
+                un = u / (me_sim * C)
                 u2 = (un * un).sum(axis=1)
                 s2, _ = np.histogram(z, bins=edges, weights=w * u2)
                 mu2 = np.where(ok, s2 / np.where(ok, sw, 1), np.nan)
@@ -302,7 +307,10 @@ def warpx_particles(run_dir, species, nbin=400, sc=None):
                     sk, _ = np.histogram(z, bins=edges, weights=w * un[:, k])
                     mk = np.where(ok, sk / np.where(ok, sw, 1), 0.0)
                     dr += mk * mk
-                acc["Te"] = (mu2 - dr) / 3.0 * 511e3     # kT/(m_e c^2) -> eV
+                # kT/(m_e,SIM c^2) -> eV. The rest energy must be the SIMULATED
+                # electron's: u was normalised by that mass, so pairing it with the real
+                # 511 keV scales T_e by me_scale^2 -- 337x at me_scale 18.36.
+                acc["Te"] = (mu2 - dr) / 3.0 * (me_sim / ME * 511e3)
                 acc["ne"] = dens                          # real electrons: use them
         out.append(acc)
     return out

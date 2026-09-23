@@ -80,6 +80,48 @@ plt.rcParams.update({
 })
 
 
+def use_ffmpeg():
+    """Point matplotlib at an ffmpeg that can actually encode h264, and return its path.
+
+    Perlmutter's /usr/bin/ffmpeg is 3.4.2 built with NO h264 encoder at all, so every
+    movie script here dies with a bare `returned non-zero exit status 1` from inside
+    matplotlib's writer -- the real cause (no encoder) never surfaces. The venv already
+    ships a static ffmpeg 7.0.2 with libx264 via imageio-ffmpeg; prefer it.
+
+    Returns the chosen path, or None if matplotlib's default is left alone. Safe to call
+    on a machine whose system ffmpeg is fine: the probe only overrides when h264 is
+    missing, so chablis keeps using /usr/bin/ffmpeg and movies stay byte-comparable.
+    """
+    import shutil, subprocess
+    import matplotlib
+
+    def has_h264(exe):
+        if not exe:
+            return False
+        try:
+            out = subprocess.run([exe, "-hide_banner", "-encoders"],
+                                 capture_output=True, text=True, timeout=30).stdout
+        except Exception:
+            return False
+        return "libx264" in out or "libopenh264" in out
+
+    cur = matplotlib.rcParams.get("animation.ffmpeg_path") or "ffmpeg"
+    if has_h264(shutil.which(cur) or cur):
+        return None
+    try:
+        import imageio_ffmpeg
+        cand = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        cand = None
+    if has_h264(cand):
+        matplotlib.rcParams["animation.ffmpeg_path"] = cand
+        return cand
+    raise RuntimeError(
+        "no ffmpeg with an h264 encoder found. System ffmpeg lacks it and imageio-ffmpeg "
+        "is unavailable; `pip install imageio-ffmpeg` into the venv, or write frames "
+        "instead of a movie.")
+
+
 def media_dir(run_id=None, testing=False):
     """Path under media/: ``media/testing`` (bring-up) or ``media/<phase>/<run_id>``.
 
@@ -444,8 +486,12 @@ def encode(framedir, out, fps=10, cleanup=True):
     import shutil
     import subprocess
 
+    # FFMPEG may be a build with no h264 encoder at all -- Perlmutter's /usr/bin/ffmpeg
+    # 3.4.2 is exactly that, and libx264 then fails with a bare non-zero exit whose cause
+    # never surfaces. use_ffmpeg() prefers a working binary and leaves a good one alone.
+    exe = use_ffmpeg() or FFMPEG
     subprocess.run(
-        [FFMPEG, "-y", "-loglevel", "error", "-framerate", str(fps),
+        [exe, "-y", "-loglevel", "error", "-framerate", str(fps),
          "-i", os.path.join(framedir, "frame_%04d.png"),
          "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
          "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", out],
