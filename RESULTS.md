@@ -8409,3 +8409,59 @@ agreed.
 Pushed as `fix/species-electron-mass` (`cbec4a78d`). **Not merged** — PR against
 `feature/hybrid-laser` prepared at `.pr/pr_url.txt`, awaiting review. G8 still stands as
 written; the straight-ray `L_n` sweep remains unrun.
+
+---
+
+## 2026-09-23 (P6) — **the mu^(1/3) law confirmed to ~1%; the heavy-electron convention recovers most of the penalty but overshoots by 14–27% and diverges**
+
+**Environment.** Perlmutter, `warpx-fix/build_fix` @ `26ebfcca5` (optical/dynamical electron-mass
+split). Five of six P6 legs complete; `P6_mr_full` at 72 % (`tau_own` 17.48 of 24.26), so
+nothing beyond `tau` 16 is quoted. Straight rays, `ray_cfl` 0.05, `near_critical_fix` on.
+
+### Plume `T_e` with the grid-heating background subtracted (G3)
+
+| `tau_own` | full | heavy | light | heavy/full | light/full |
+|---|---|---|---|---|---|
+| 4  | 369.2 | 420.1 | 138.0 | 1.138 | 0.374 |
+| 8  | 496.7 | 570.8 | 204.6 | 1.149 | 0.412 |
+| 12 | 566.0 | 687.5 | 213.5 | 1.215 | 0.377 |
+| 16 | 622.8 | 792.7 | 224.8 | **1.273** | 0.361 |
+
+**`light/full` averages 0.381 against the predicted `mu^(1/3)` = 0.379.** The reduced-mass
+penalty law is confirmed to about 1 % — the first direct test of it at fixed everything else.
+
+**It is only visible after the subtraction.** The laser-off background is 24–55 % of light's
+raw signal, 5.5–13.8 % of heavy's, 2.5–8.6 % of full's. A shared control would have been
+useless: the three legs do NOT share a grid-heating background, which is why P6 gave each leg
+its own. The background DECAYS with tau in all three (light 169.8 -> 71.5 eV), so it is
+initial-condition relaxation, not accumulating grid heating.
+
+### The heavy convention: better, but not the hypothesis
+
+`heavy/full` runs 1.138 -> 1.273. Subtracting the background moved it only from 21–31 % to
+14–27 %, so **grid heating does not explain it**. The geometric tell is worse still:
+`zeta_cr` heavy/full = 0.46 / 0.17 / 0.18 / 0.32, a factor 2–6. Against a 1.32 % noise floor
+none of this is scatter.
+
+**Leading explanation, not yet tested: physical under-resolution.** The IC table was rescaled
+so heavy carries the same PHYSICAL profile, while `dz_over_de` stayed 0.5 — so heavy resolves
+that profile with `dz` = 0.363 um against full's 0.0847 um, 4.29x coarser. G8 reads 0.215 for
+both because it is quoted in `d_e`, which hides it. A steepening critical layer being
+progressively under-resolved predicts an offset that GROWS with tau, which is what is seen.
+
+### Retracted from the first look
+
+The first `p6_movie` render showed heavy at 120 keV and 90 `C_S0` and read as catastrophic
+grid heating — the conclusion `dz/lambda_D` = 249 primes you to accept. **Both were diagnostic
+artefacts**: `warpx_particles` normalised electron momentum by the real `m_e` and paired it
+with the real 511 keV, inflating `T_e` by `me_scale^2` = 337x and ion `v_z` by 18.36x. Fixed
+at four sites (`f75169c`); `warpx_scales` now carries absolute `me`/`mi` so a consumer cannot
+rebuild a mass from `mass_ratio` and silently drop the scale.
+
+### Next
+
+The finer-`dz` heavy leg that decision D6 deliberately withheld. Its condition — "if C
+disagrees with A, the first suspect is the grid" — is now met, and it is the only thing that
+separates "the convention is wrong" from "this grid is too coarse for this profile".
+Also still owed before any agreement claim: 3 seeds each on A and C (D5), and `P6_mr_full`
+finishing so tau > 17.48 exists.
