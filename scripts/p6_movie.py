@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Animated mass-convention comparison: the P6 legs on FLASH-normalised axes.
+
+    python3 scripts/p6_movie.py                      # every completed P6 leg
+    python3 scripts/p6_movie.py --legs heavy full    # a subset
+    LP_FLASH_DIR=/path/to/Ablation_prod_08-17 python3 scripts/p6_movie.py   # + FLASH
+
+Writes ``media/P6/movie_massconv.mp4``.
+
+WHY NOT compare_movie.py. That one overlays two WarpX runs on a SHARED axis, which is only
+valid when they share a unit system. The P6 legs deliberately do not: `light` runs
+d_i0 = 1.6934 um and tau = 2.028 ps against `heavy`/`full` at 7.2563 um and 37.232 ps. A
+shared micron axis would be a 4.29x rescaling error -- exactly the mistake the normalised
+axes exist to prevent. Every leg here is drawn on its OWN zeta = z/d_i0 and sampled at its
+OWN tau, which is the only map on which the three describe the same experiment.
+
+WHY THE LEGS ARE NOT INTERCHANGEABLE. `heavy` and `full` come out identical in every
+derived scale (d_i0 7.2563 um, tau 37.232 ps, mu 1.000, T_ss 823 eV) because they are the
+same physical system reached two ways -- a real ion via a heavy electron, and a real ion
+via a real electron. `light` has mu = 0.0545 and is the leg predicted to fail. If heavy
+tracks full and light does not, the convention works.
+
+FLASH IS OPTIONAL AND ITS ABSENCE IS STATED ON THE FIGURE. The delivery is not on
+Perlmutter; xcode_compare's own comment records that it needs only the 51 plotfiles plus
+lez1d_LaserEnergyProfile.dat, 7.6 MB. Set $LP_FLASH_DIR and the FLASH curve appears in
+every panel. Without it the movie still answers the convention question -- heavy vs full
+vs light -- and says plainly in the title that the FLASH reference is missing, rather than
+quietly drawing two curves and letting a reader assume the third was checked.
+"""
+from __future__ import annotations
+import argparse, os, sys, warnings
+warnings.filterwarnings("ignore")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import numpy as np
+import matplotlib; matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.animation import FFMpegWriter
+from xcode_compare import load_leg, leg_state, flash_series, pick, FLASH_DIR, TAU_HANDOFF
+from laserprod import plotting as lpp
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+LEGS = [("full",  "P6_mr_full",  lpp.C_TARGET),
+        ("heavy", "P6_mr_heavy", lpp.C_LASER),
+        ("light", "P6_mr_light", lpp.C_AMBIENT)]
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--legs", nargs="*", default=[n for n, _, _ in LEGS])
+    ap.add_argument("--fps", type=int, default=5)
+    ap.add_argument("--out", default=os.path.join(ROOT, "media/P6/movie_massconv.mp4"))
+    a = ap.parse_args()
+
+    legs = []
+    for name, rid, col in LEGS:
+        if name not in a.legs:
+            continue
+        path = os.path.join(ROOT, "runs/P6", rid)
+        if not os.path.isdir(path):
+            print(f"  skip {name}: no {path}"); continue
+        try:
+            leg = load_leg(name, path, col)
+        except Exception as e:
+            print(f"  skip {name}: {e}"); continue
+        if not leg["S"]:
+            print(f"  skip {name}: no particle dumps yet"); continue
+        sc = leg["sc"]
+        print(f"  {name:<6} d_i0={sc['di0']*1e6:.4f}um tau={sc['tau']*1e12:.3f}ps "
+              f"mu={sc['mu']:.4f} dumps={len(leg['S'])} tau_own_max={leg['S'][-1]['tau']:.2f}")
+        legs.append(leg)
+    if not legs:
+        print("no legs with data"); return 1
+
+    # FLASH counts as present only if plotfiles were actually READ. An existing but empty
+    # directory -- which is exactly what a failed copy leaves behind -- must not flip the
+    # title to "FLASH overlaid" over a figure with no FLASH curve in it.
+    F = None
+    if os.path.isdir(FLASH_DIR):
+        try:
+            F = flash_series(FLASH_DIR, "lez1d") or None
+        except Exception as e:
+            print(f"  FLASH unreadable ({e})")
+        print(f"  FLASH: {len(F) if F else 0} plotfiles in {FLASH_DIR}")
+    if F is None:
+        print(f"  FLASH: NOT AVAILABLE ({FLASH_DIR} absent) -- set $LP_FLASH_DIR")
+
+    # Frame grid: every leg's own tau, capped at the SHORTEST leg so no frame silently
+    # repeats a finished leg's last dump (the failure `stale` exists to catch).
+    tau_end = min(l["S"][-1]["tau"] for l in legs)
+    taus = [s["tau"] for s in legs[0]["S"] if s["tau"] <= tau_end + 1e-9]
+    print(f"  frames: {len(taus)}  tau_own 0 -> {tau_end:.2f}")
+
+    # Fixed limits across all frames, computed first (per make_movies.py's rule).
+    zlo, zhi, nlo, nhi, tlo, thi, vlo, vhi = 1e9, -1e9, 1e9, -1e9, 1e9, -1e9, 1e9, -1e9
+    for t in taus:
+        for leg in legs:
+            st = leg_state(leg, t)
+            if st is None: continue
+            zlo, zhi = min(zlo, st["zeta"].min()), max(zhi, st["zeta"].max())
+            g = st["ne"][st["ne"] > 0]
+            if g.size: nlo, nhi = min(nlo, g.min()), max(nhi, g.max())
+            if st["Te"] is not None and np.isfinite(st["Te"]).any():
+                tlo, thi = min(tlo, np.nanmin(st["Te"])), max(thi, np.nanmax(st["Te"]))
+            if st["v"] is not None and np.isfinite(st["v"]).any():
+                vlo, vhi = min(vlo, np.nanmin(st["v"])), max(vhi, np.nanmax(st["v"]))
+    nlo = max(nlo, 1e-5)
+
+    fig, ax = plt.subplots(3, 1, figsize=(9.5, 10), sharex=True)
+    for x in ax: lpp.style_axes(x)
+    writer = FFMpegWriter(fps=a.fps, bitrate=2400)
+    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+
+    with writer.saving(fig, a.out, dpi=120):
+        for t in taus:
+            for x in ax: x.clear(); lpp.style_axes(x)
+            for leg in legs:
+                st = leg_state(leg, t)
+                if st is None: continue
+                lab = f"{leg['label']} (mu={leg['sc']['mu']:.3g})"
+                if st["stale"]: lab += " [stale]"
+                al = 0.35 if st["stale"] else 1.0
+                ax[0].semilogy(st["zeta"], np.maximum(st["ne"], nlo), color=leg["colour"],
+                               lw=1.6, alpha=al, label=lab)
+                if st["Te"] is not None:
+                    ax[1].plot(st["zeta"], st["Te"], color=leg["colour"], lw=1.6, alpha=al)
+                if st["v"] is not None:
+                    ax[2].plot(st["zeta"], st["v"], color=leg["colour"], lw=1.6, alpha=al)
+            if F is not None:
+                f = pick(F, t + TAU_HANDOFF)
+                if f is not None:
+                    ax[0].semilogy(f["zeta"], np.maximum(f["ne"], nlo), color="k",
+                                   lw=2.0, ls="--", label=f"FLASH (tau={f['tau']:.2f})")
+                    ax[1].plot(f["zeta"], f["Te"], color="k", lw=2.0, ls="--")
+                    ax[2].plot(f["zeta"], f["v"], color="k", lw=2.0, ls="--")
+            ax[0].axhline(1.0, color="0.55", lw=0.8, ls=":")
+            ax[0].set_ylabel(r"$n_e/n_{cr}$"); ax[0].set_ylim(nlo, nhi * 1.5)
+            ax[1].set_ylabel(r"$T_e$  [eV]");  ax[1].set_ylim(0, thi * 1.05)
+            ax[2].set_ylabel(r"$v_z/C_{S0}$"); ax[2].set_ylim(vlo, vhi)
+            ax[2].set_xlabel(r"$\zeta = z/d_{i0}$  (each leg on its OWN $d_{i0}$)")
+            ax[0].set_xlim(zlo, zhi)
+            ax[0].legend(loc="upper right", fontsize=8, framealpha=0.9)
+            sub = "FLASH overlaid" if F is not None else \
+                  "FLASH REFERENCE NOT AVAILABLE — set $LP_FLASH_DIR (7.6 MB delivery)"
+            fig.suptitle(f"P6 mass conventions — $\\tau_{{own}}$ = {t:.2f}   "
+                         f"(FLASH clock $\\tau$ = {t + TAU_HANDOFF:.2f})\n{sub}",
+                         fontsize=11)
+            fig.tight_layout(rect=(0, 0, 1, 0.94))
+            writer.grab_frame()
+    plt.close(fig)
+    print(f"wrote {a.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
