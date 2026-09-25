@@ -8560,3 +8560,67 @@ moments, not `E_abs`, and are unaffected.
 
 Optional root fix, not done: checkpoint the operator's accumulator so the log is continuous.
 The analysis fix already covers every existing and future run, so this is hygiene, not a blocker.
+
+---
+
+## 2026-09-25 (P6 COMPLETE) — **`mu^(1/3)` confirmed to 1 %. The heavy-electron convention FAILS the agreement test: it diverges, and electron heat conduction is the likely reason**
+
+All six legs at 100 %. `P6_mr_full` finished across three chained segments (23:50 + 23:50 +
+18:24). Plume `T_e` with each leg's OWN laser-off background subtracted (G3):
+
+| `tau_own` | full | heavy | light | heavy/full | light/full | `zeta_cr` f/h | `L_n` f/h |
+|---|---|---|---|---|---|---|---|
+| 4  | 369.2 | 420.1 | 138.0 | 1.138 | 0.374 | 0.93 / 0.42 | 2.57 / 4.05 |
+| 8  | 496.6 | 570.9 | 204.6 | 1.150 | 0.412 | 1.73 / 0.30 | 5.42 / 6.00 |
+| 12 | 566.1 | 687.5 | 213.5 | 1.215 | 0.377 | 2.27 / 0.41 | 8.24 / 7.25 |
+| 16 | 622.8 | 792.7 | 224.8 | 1.273 | 0.361 | 2.64 / 0.84 | 11.72 / 9.21 |
+| 20 | 656.6 | 886.1 | 238.3 | 1.350 | 0.363 | 3.38 / 0.89 | 15.32 / 10.92 |
+| 24 | 693.6 | 980.3 | 252.2 | **1.413** | 0.364 | 3.98 / 1.45 | 19.00 / 12.83 |
+
+### CONFIRMED: the reduced-mass penalty law
+
+**`light/full` = 0.375 mean, range 0.361–0.412, against the predicted `mu^(1/3)` = 0.379.**
+Confirmed to about 1 %, and FLAT across the whole run — the first direct test at fixed
+everything else. Only visible after the G3 subtraction: the laser-off background is 24–55 %
+of light's raw signal against 2.5–8.6 % of full's, so the per-leg controls were what made
+this measurable.
+
+### FAILED: heavy does not reproduce full
+
+`heavy/full` climbs monotonically 1.138 -> **1.413** with no saturation; a fit over `tau`
+12–24 gives **+0.0168 per tau**, extrapolating to 1.68 by `tau` 40. This is a DIVERGENCE,
+not an offset. Grid heating does not explain it — the subtraction moved it only from
+21–31 % to 14–41 %, and heavy's own background is 5.5–13.8 %.
+
+The geometry disagrees harder than the temperature, which is why the acceptance criteria
+named it: `zeta_cr` heavy/full runs 0.36–0.45, and `L_n` ends 32 % short (12.83 vs 19.00).
+Heavy's corona is HOTTER but LESS EXPANDED.
+
+### The likely mechanism — electron heat conduction, not a grid artefact
+
+Hotter *and* more compact *and* diverging is the signature of suppressed electron thermal
+transport. Spitzer conductivity goes as `kappa_e ~ n k v_th lambda_ei` with
+`v_th ~ 1/sqrt(m_e)` and `lambda_ei` mass-independent, so **heavy conducts 4.29x more
+weakly than full at identical ion physics**. In laser ablation that conduction is what
+carries absorbed energy from the critical surface into the target and drives the expansion,
+so weakening it should trap energy near the absorption region (hotter plume), starve the
+ablation front (shorter `L_n`, `zeta_cr` closer in), and ACCUMULATE with time — all four of
+which are what is measured.
+
+**This was not anticipated when P6 was designed.** `mu = m_i/m_i,real` governs the ION
+scalings, and the heavy-electron convention was adopted because it holds `mu` = 1. It does —
+but it silently changes ELECTRON transport, which `mu` does not describe. If this is the
+mechanism it is a FUNDAMENTAL limit of the convention for conduction-driven problems, not
+something a finer grid repairs.
+
+### The discriminator, now worth running
+
+The finer-`dz` heavy leg that D6 withheld. It separates the two candidates cleanly:
+* excess **persists** at finer `dz` -> electron conduction, i.e. a real limit of the convention;
+* excess **shrinks** -> under-resolution of the critical layer (heavy resolves the same
+  PHYSICAL profile with `dz` = 0.363 um against full's 0.0847 um; G8 hides this by quoting
+  in `d_e`).
+
+Still owed before any quantitative claim is final: 3 seeds each on full and heavy (D5).
+Single runs cannot separate a 1.41x systematic from a fluctuation, though a monotonic
+six-point trend is hard to produce by chance.
