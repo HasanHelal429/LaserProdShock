@@ -8515,3 +8515,48 @@ ablation depends on -- and that would bound where PSC's convention can be truste
 Artifact note: `media/P6/movie_massconv.mp4` (11:56) predates `f75169c` and carries the
 337x `T_e` artefact. The current movies are `movie_flash_heavy_light.mp4` and
 `movie_flash_all3.mp4`, with `*_scalars.txt` beside each.
+
+## 2026-09-25 (P6) — all six legs complete; **every restarted run's E_abs was wrong**, and the absorbed fractions are corrected
+
+**All six P6 legs finished.** `P6_mr_full` reached 9139500/9139500 across three chained
+segments (18h24m for the last), step sequence monotonic, 48 particle dumps; `P6_mr_full_off`
+likewise. Segment 4 was never needed.
+
+**The bug.** The operator's cumulative `E_abs` is NOT carried through a checkpoint. On every
+restart it begins again at zero -- measured on `P6_mr_full`: 2.89129e7 -> 94.58 at step
+3359930, and 3.10303e7 -> 95.15 at 6584565 -- while `run_warpx` APPENDS to `run.log`. The
+series is a sawtooth, so its last value is one segment's energy. `xcode_compare.absorbed()`
+read exactly that (`E[-1]`), as did anything taking the tail of `io.laserdep_history()`.
+The deposited energy itself is in the particles and is unaffected; only the diagnostic total.
+
+**Corrected time-integrated absorbed fraction** (I0 = 1e17 W/m^2; FLASH asserted 0.8704):
+
+| leg | segments | E_abs [J/m^2] | <f_abs> | vs FLASH |
+|---|---|---|---|---|
+| full (mu=1)  | 3 | 8.4916e7 | **0.940** | 1.08 |
+| heavy (mu=1) | 2 | 7.1013e7 | **0.786** | 0.90 |
+| light*       | 2 | 4.1011e6 | **0.834** | 0.96 |
+
+*light is the unscaled leg retracted in `9a35c3f`.
+
+**Retracted: the absorbed fractions quoted in session on 2026-09-20** -- heavy 0.565,
+light 0.339, "heavy moves toward FLASH, light does not, the direction mu^0.490 predicts".
+Each was ONE segment's energy divided by the whole pulse. Even the ORDERING was wrong: light
+absorbs slightly more than heavy, not far less. What survives is **heavy/full = 0.84** --
+heavy absorbs 16 % less than the reference, consistent with its thinner plume (IB ~ n^2) and
+with both open explanations for the heavy geometry offset (under-resolution; suppressed
+conduction).
+
+**Fixed** in `io.stitch_restarts()`, now applied inside `io.laserdep_history()` and
+`xcode_compare.absorbed()`, so every consumer is corrected at once. It sums the reset
+segments and handles REPLAY -- a restart from an earlier checkpoint than the last step
+reached re-runs steps, and summing segment totals would double-count them; the later segment
+wins. A run that never restarted comes back unchanged (P5_flashic: 0.836 before and after).
+`tests/test_restart_stitch.py` pins the no-restart, reset and replay cases.
+
+Scope of the damage: pre-P6 legs essentially never restarted (checkpointing was new with
+P5_ckpt), so earlier `absorbed()` numbers stand. The `T_e`/geometry P6 results use particle
+moments, not `E_abs`, and are unaffected.
+
+Optional root fix, not done: checkpoint the operator's accumulator so the log is continuous.
+The analysis fix already covers every existing and future run, so this is hygiene, not a blocker.

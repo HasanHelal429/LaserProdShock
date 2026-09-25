@@ -505,6 +505,16 @@ def absorbed(run_dir, i0=1.0e17):
             pass
     if not t:
         return None
+    # E_abs resets to zero at every checkpoint restart and run.log is appended across
+    # segments, so E[-1] is ONE SEGMENT's energy. Stitch first (P6_mr_full: 0.28 -> 0.94).
+    from laserprod.io import stitch_restarts
+    steps = list(range(len(t)))                 # log order; step numbers are not parsed here
+    try:
+        steps = [int(ln.split()[2]) for ln in open(path, errors="ignore")
+                 if ln.startswith("LASERDEP step")][:len(t)]
+    except Exception:
+        pass
+    _, t, P, E = stitch_restarts(steps, list(t), list(P), list(E))
     t = np.array(t); P = np.array(P); E = np.array(E)
     return dict(t_end=t[-1], E_abs=E[-1], f_mean=E[-1] / (i0 * t[-1]),
                 f_end=P[-1] / i0, f_0=P[0] / i0)

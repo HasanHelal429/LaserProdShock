@@ -83,8 +83,62 @@ class LaserHistory:
         return None
 
 
+def stitch_restarts(step, t, P, E):
+    """Merge checkpoint-restart segments of a LASERDEP history into ONE cumulative record.
+
+    The operator's cumulative E_abs is NOT carried through a checkpoint: on restart it starts
+    again from zero (P6_mr_full: 2.89e7 -> 94.6 at step 3359930, 3.10e7 -> 95.2 at 6584565).
+    run_warpx APPENDS to run.log across segments, so the raw series is a sawtooth and its last
+    value is ONE SEGMENT's energy -- reading E[-1] made the reference leg's <f_abs> 0.28 when
+    the truth is 0.94.
+
+    Two things are handled:
+      * the reset -- a segment's first line carries its whole accumulated energy as its
+        increment, since the accumulator restarted at zero at the checkpoint step;
+      * REPLAY -- a restart from an EARLIER checkpoint than the last step reached (as
+        P6_mr_heavy_off did under the lexicographic-sort bug) re-runs steps; the later
+        segment wins and the earlier segment's lines at or beyond its first step are
+        dropped, so that interval is not counted twice.
+    A segment starts where the step goes backwards or E drops by more than half. A run
+    that never restarted comes back unchanged.
+    """
+    n = len(E)
+    if n == 0:
+        return list(step), list(t), list(P), list(E)
+    segs, cur = [], [0]
+    for i in range(1, n):
+        if step[i] <= step[i - 1] or E[i] < 0.5 * E[i - 1]:
+            segs.append(cur); cur = [i]
+        else:
+            cur.append(i)
+    segs.append(cur)
+    if len(segs) == 1:
+        return list(step), list(t), list(P), list(E)
+    # per-line energy increment within each segment
+    rows = []                                   # (segment, step, t, P, dE)
+    for k, sg in enumerate(segs):
+        for j, i in enumerate(sg):
+            dE = E[i] if j == 0 else E[i] - E[sg[j - 1]]
+            rows.append((k, step[i], t[i], P[i], dE))
+    # later segments override earlier ones from their first step onward (replay)
+    keep = []
+    for k, sg in enumerate(segs):
+        first = step[sg[0]]
+        keep = [r for r in keep if r[1] < first]
+        keep += [r for r in rows if r[0] == k]
+    keep.sort(key=lambda r: r[1])
+    cum, Ec = 0.0, []
+    for r in keep:
+        cum += r[4]; Ec.append(cum)
+    return [r[1] for r in keep], [r[2] for r in keep], [r[3] for r in keep], Ec
+
+
 def laserdep_history(run_dir: str, log: str = "run.log") -> LaserHistory:
-    """Parse ``<run_dir>/run.log`` for the operator's LASERDEP lines."""
+    """Parse ``<run_dir>/run.log`` for the operator's LASERDEP lines.
+
+    E is returned as the TRUE cumulative absorbed energy, stitched across checkpoint
+    restarts by :func:`stitch_restarts` -- the raw log resets it to zero at every restart.
+    """
     path = log if os.path.isabs(log) else os.path.join(run_dir, log)
     step, t, P, E, Tf, Vs = [], [], [], [], [], []
     if not os.path.isfile(path):
@@ -102,6 +156,13 @@ def laserdep_history(run_dir: str, log: str = "run.log") -> LaserHistory:
             E.append(float(m.group(4)))
             Tf.append(float(m.group(5)) if m.group(5) else float("nan"))
             Vs.append(float(m.group(6)) if m.group(6) else float("nan"))
+    if len(set(len(x) for x in (step, t, P, E))) == 1:
+        s2, t2, P2, E2 = stitch_restarts(step, t, P, E)
+        if len(s2) != len(step):
+            # replayed lines were dropped; realign the per-line extras by step
+            ix = {st: i for i, st in enumerate(step)}
+            Tf = [Tf[ix[st]] for st in s2]; Vs = [Vs[ix[st]] for st in s2]
+        step, t, P, E = s2, t2, P2, E2
     return LaserHistory(step, t, P, E, Tf, Vs)
 
 

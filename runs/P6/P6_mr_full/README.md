@@ -63,7 +63,12 @@ differences below ~3% are not measurements: 1σ of GPU scatter at fixed seed is 
 
 ## Result
 
-NOT YET RUN.
+**2026-09-25 — complete.** 9139500/9139500 across three chained segments; step sequence
+monotonic, 48 particle dumps. Against FLASH at `tau_own` 17.48 it tracks at **0.83–0.93 on
+every acceptance quantity** (`zeta_cr` 0.93, `L_n` 0.86, plume `T_e` 0.83) — the reference is
+sound. Time-integrated `<f_abs>` **0.940** (1.08× FLASH's asserted 0.8704), computed by
+summing across the restarts: the raw log's last `E_abs` is one segment's and reads 0.28.
+Full account in RESULTS 2026-09-25.
 
 ## Retracted
 
