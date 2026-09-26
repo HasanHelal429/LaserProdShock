@@ -8624,3 +8624,24 @@ The finer-`dz` heavy leg that D6 withheld. It separates the two candidates clean
 Still owed before any quantitative claim is final: 3 seeds each on full and heavy (D5).
 Single runs cannot separate a 1.41x systematic from a fluctuation, though a monotonic
 six-point trend is hard to produce by chance.
+
+### End of pulse — the geometry table extended to tau_own 23.73 (FLASH tau 26.42)
+
+With `P6_mr_full` complete, the three-way comparison now covers the whole 1 ns flat top
+(`media/P6/movie_flash_all3.mp4`, table in `movie_flash_all3_scalars.txt`):
+
+| tau_own 23.73 | FLASH | full | heavy |
+|---|---|---|---|
+| `zeta_cr` | 4.144 | 3.553 (0.86) | 1.495 (0.36) |
+| `zeta_front` | 92.29 | 77.28 (0.84) | 53.2 (0.58) |
+| `L_n` | 20.95 | 17.95 (0.86) | 12.48 (0.60) |
+| plume `T_e` [eV] | 838.9 | 709.3 (0.85) | 1023 (1.22) |
+| `v_band_max`/C_S0 | 5.045 | 4.508 (0.89) | 3.155 (0.63) |
+
+**The reference holds to the end: full tracks FLASH at 0.84–0.89 on every quantity**, the
+same band it sat in at tau 17.48 (0.83–0.93) — a steady ~15 % shortfall, not a drift.
+**heavy's offset does not close.** Relative to full, its `zeta_front` falls 0.78 -> 0.69 and
+`L_n` 0.76 -> 0.70 between tau 17.48 and 23.73; only `zeta_cr` recovers slightly (0.32 ->
+0.42) as its critical surface finally leaves the target. Its `T_e` overshoot persists (1.22 of
+FLASH, 1.44 of full). A widening geometry gap with a persistent hot corona is what both open
+explanations predict; the finer-`dz` heavy leg still separates them.
