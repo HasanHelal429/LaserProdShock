@@ -42,12 +42,14 @@ from laserprod import plotting as lpp
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 LEGS = [("full",  "P6_mr_full",  lpp.C_TARGET),
         ("heavy", "P6_mr_heavy", lpp.C_LASER),
-        ("light", "P6_mr_light", lpp.C_AMBIENT)]
+        ("light_sim", "P6_mr_light_sim", lpp.C_AMBIENT),
+        ("heavy_dz025", "P6_mr_heavy_dz025", lpp.C_FOURTH),
+        ("light", "P6_mr_light", "0.6")]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--legs", nargs="*", default=[n for n, _, _ in LEGS])
+    ap.add_argument("--legs", nargs="*", default=["full", "heavy", "light_sim"])
     ap.add_argument("--fps", type=int, default=5)
     ap.add_argument("--out", default=os.path.join(ROOT, "media/P6/movie_massconv.mp4"))
     a = ap.parse_args()
