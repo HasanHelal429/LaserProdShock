@@ -1005,11 +1005,45 @@ def render(cfg: dict) -> str:
     a("# --- diagnostics ---")
     a("# EP/FE close gate G6: the tracer's own LASERDEP Eabs is immune to grid heating,")
     a("# the particle energy is not, so their difference IS the grid-heating budget.")
-    a("warpx.reduced_diags_names = EP FE PN")
+    # Binned phase space (ParticleHistogram2D), z-u_z and z-u_x per species, at a cadence much
+    # FINER than the particle dumps -- standing rule since 2026-10-01: it is read like a
+    # particle dump but compressed, so it buys time resolution the dumps cannot. Opt-in via
+    # `diagnostics.phase_hist_intervals` so every already-committed deck renders unchanged.
+    _dg = cfg.get("diagnostics", {}) or {}
+    _ph_int = _dg.get("phase_hist_intervals")
+    _ph = []
+    if _ph_int:
+        _nab, _nor = (int(x) for x in _dg.get("phase_hist_bins", [1024, 256]))
+        # u = gamma*beta. Ions: +/-12 C_S0 at the 823 eV reference, which spans the
+        # ablation flow (<~8 C_S0) with margin. Electrons: +/-0.8/sqrt(me_scale) -- six
+        # thermal spreads at ~10 keV for THIS species' mass, so a heavy electron is not
+        # squashed into a few central bins.
+        _Z = float(cfg["reference"].get("charge_state", 1))
+        _cs0 = math.sqrt(_Z * 823.0 * units.QE / sc.mi) / units.C
+        for sp in species:
+            ele = "electron" in sp
+            umax = 0.8 / math.sqrt(sc.me_scale) if ele else 12.0 * _cs0
+            for comp in ("uz", "ux"):
+                _ph.append((f"PH_{sp}_z{comp}", sp, comp, umax))
+    a("warpx.reduced_diags_names = EP FE PN" + "".join(" " + q[0] for q in _ph))
     for nm, typ in (("EP", "ParticleEnergy"), ("FE", "FieldEnergy"),
                     ("PN", "ParticleNumber")):
         a(f"{nm}.type      = {typ}")
         a(f"{nm}.intervals = {red_int}")
+    for nm, sp, comp, umax in _ph:
+        a(f"{nm}.type            = ParticleHistogram2D")
+        a(f"{nm}.intervals       = {int(_ph_int)}")
+        a(f"{nm}.species         = {sp}")
+        a(f"{nm}.openpmd_backend = h5")
+        a(f"{nm}.bin_number_abs  = {_nab}")
+        a(f"{nm}.bin_min_abs     = zlo")
+        a(f"{nm}.bin_max_abs     = zhi")
+        a(f"{nm}.bin_number_ord  = {_nor}")
+        a(f"{nm}.bin_min_ord     = {_num(-umax)}")
+        a(f"{nm}.bin_max_ord     = {_num(umax)}")
+        a(f'{nm}.histogram_function_abs(t,x,y,z,ux,uy,uz,w) = "z"')
+        a(f'{nm}.histogram_function_ord(t,x,y,z,ux,uy,uz,w) = "{comp}"')
+        a(f'{nm}.value_function(t,x,y,z,ux,uy,uz,w)         = "w"')
     a("")
     diags = ["diag1"] + (["diag_fields"] if field_int else []) \
                       + (["diag_phase"] if phase_int else []) \

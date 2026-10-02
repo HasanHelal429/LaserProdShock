@@ -150,6 +150,17 @@ case "$WHAT" in
           runs/P6/P6_mr_full  runs/P6/P6_mr_full_off)
     JOBNAME="lp6_massconv"
     ;;
+  p6light)
+    # Leg B REBUILT with all three similarity families (replaces the retracted
+    # P6_mr_light). Same 5136-cell geometry as P6_mr_heavy; ~1.2 h. Run with --time 03:00:00.
+    RUNS=(runs/P6/P6_mr_light_sim runs/P6/P6_mr_light_sim_off)
+    JOBNAME="lp6_light_sim"
+    ;;
+  p6dz)
+    # D6's discriminator: P6_mr_heavy at dz_over_de 0.25. ~20 h; run with --chain 2.
+    RUNS=(runs/P6/P6_mr_heavy_dz025 runs/P6/P6_mr_heavy_dz025_off)
+    JOBNAME="lp6_heavy_dz025"
+    ;;
   p6full)
     # The EXPENSIVE reference leg and its control, split out so `p6cheap` can be run and
     # inspected first. mu = 1 at a real electron: 22040 cells x 9.14e6 steps, ~8-13 h.
@@ -202,7 +213,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p6|p6cheap|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

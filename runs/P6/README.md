@@ -84,6 +84,22 @@ NOT test the reduced-mass convention, and the mu-exponent predictions in the tab
 not apply to it as built. Full account and the fix in `P6_mr_light/README.md`, Retracted.
 Legs A and C are unaffected -- both are mu = 1 and need no similarity map.
 
+## Second round (2026-10-01): the two runs the first round called for
+
+| run | what it is | grid | status |
+|---|---|---|---|
+| `P6_mr_light_sim` (+`_off`) | leg B rebuilt with ALL THREE similarity families; IC verified against FLASH's handoff on zeta and v/C_S0 before launch (v/C_S0 1.733 vs 1.726 at zeta 2) | 5136 cells, identical to heavy | submitted |
+| `P6_mr_heavy_dz025` (+`_off`) | D6's discriminator: heavy at `dz_over_de` 0.25. Under-resolution predicts it moves toward full; suppressed conduction predicts it does not | 10272 cells | submitted, 2 chained segments |
+
+**light_sim and heavy are now an exactly matched pair** -- same cell count, same resolution on
+the normalised axes (G8 0.05 for both, against full's 0.215), differing only in WHICH mass
+moved. G8 also shows the 4.3x coarser physical resolution is shared by ANY similarity-scaled
+reduced-mass leg, not peculiar to the heavy convention.
+
+All four carry the new `ParticleHistogram2D` phase-space diagnostic (z-u_z, z-u_x per species,
+1024 x 256 bins, every diag1/5 steps). Smoke-tested first: written at the exact cadence, and the
+electron/ion weight ratio comes out 13.0 = Z for fully ionised Al.
+
 ## Status
 
 All six configured, decks rendered, gates checked. **Not yet launched** — GPU submission
