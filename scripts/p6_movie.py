@@ -43,7 +43,7 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 LEGS = [("full",  "P6_mr_full",  lpp.C_TARGET),
         ("heavy", "P6_mr_heavy", lpp.C_LASER),
         ("light_sim", "P6_mr_light_sim", lpp.C_AMBIENT),
-        ("heavy_dz025", "P6_mr_heavy_dz025", lpp.C_FOURTH),
+        ("heavy_dz025", "P6_mr_heavy_dz025", lpp.C_LASER),
         ("light", "P6_mr_light", "0.6")]
 
 
@@ -51,6 +51,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--legs", nargs="*", default=["full", "heavy", "light_sim"])
     ap.add_argument("--fps", type=int, default=5)
+    ap.add_argument("--psc", metavar="DATADIR", default=os.environ.get("LP_PSC_DIR"),
+                    help="PSC (Fortran psc-raytrace) data dir; its run.log sets the units")
+    ap.add_argument("--psc-code", default=os.environ.get("LP_PSC_CODE", "/home/hhelal/psc-raytrace"),
+                    help="directory holding read_pmt.py")
     ap.add_argument("--out", default=os.path.join(ROOT, "media/P6/movie_massconv.mp4"))
     a = ap.parse_args()
 
@@ -89,6 +93,26 @@ def main():
         print(f"  FLASH: {len(F) if F else 0} plotfiles in {FLASH_DIR}")
     if F is None:
         print(f"  FLASH: NOT AVAILABLE ({FLASH_DIR} absent) -- set $LP_FLASH_DIR")
+
+    # PSC, on the same normalised axes, exactly as paper_fig3.py reads it: units from the run's
+    # OWN log (psc_norm), zeta = zi*0.02, T_e from the electron stress trace, v in FLASH's C_S0.
+    # Its clock is FLASH's (t starts at the 0.1 ns handoff), so it is matched to FLASH's tau.
+    P = None
+    if a.psc:
+        from xcode_compare import psc_norm, TAU_F, CS0_F
+        sys.path.insert(0, a.psc_code)
+        from read_pmt import assemble
+        N_ = psc_norm(a.psc)
+        P = []
+        for st, zi, Q in assemble(a.psc, want=("NNe", "Sxxe", "Syye", "Szze", "NVze")):
+            zi = np.asarray(zi, float)[1:-1]; Q = {k: np.asarray(v, float)[1:-1] for k, v in Q.items()}
+            ne_ = Q["NNe"]; d = np.maximum(ne_, 1e-30)
+            te_ = np.where(ne_ > 0, (Q["Sxxe"] + Q["Syye"] + Q["Szze"]) / (3 * d) * N_["K_temperature"], np.nan)
+            v_ = np.where(ne_ > 0, Q["NVze"] / d, np.nan) * N_["K_vel"] / CS0_F
+            tF = 0.1e-9 + st * N_["dt"]
+            P.append(dict(tau=tF / TAU_F, zeta=zi * 0.02, ne=ne_, Te=te_, v=v_))
+        print(f"  PSC: {len(P)} dumps, FLASH-clock tau {P[0]['tau']:.2f} -> {P[-1]['tau']:.2f}, "
+              f"m_e c^2 = {N_['mec2_keV']:.1f} keV")
 
     # Frame grid: every leg's own tau, capped at the SHORTEST leg so no frame silently
     # repeats a finished leg's last dump (the failure `stale` exists to catch).
@@ -146,6 +170,13 @@ def main():
                     ax[1].semilogy(f["zeta"], np.maximum(f["Te"], 10.0),
                                    color="k", lw=2.0, ls="--")
                     ax[2].plot(f["zeta"], f["v"], color="k", lw=2.0, ls="--")
+            if P is not None:
+                q = min(P, key=lambda r: abs(r["tau"] - (t + TAU_HANDOFF)))
+                if abs(q["tau"] - (t + TAU_HANDOFF)) < 0.5:
+                    ax[0].semilogy(q["zeta"], np.maximum(q["ne"], nlo), color=lpp.C_FOURTH,
+                                   lw=1.6, label="PSC (m_p/m_e=100, heavy e-)")
+                    ax[1].semilogy(q["zeta"], np.maximum(q["Te"], 10.0), color=lpp.C_FOURTH, lw=1.6)
+                    ax[2].plot(q["zeta"], q["v"], color=lpp.C_FOURTH, lw=1.6)
             ax[0].axhline(1.0, color="0.55", lw=0.8, ls=":")
             ax[0].set_ylabel(r"$n_e/n_{cr}$"); ax[0].set_ylim(nlo, nhi * 1.5)
             # LOG: the n_e < 1e-2 tail reaches tens of keV and on a linear axis it flattens
