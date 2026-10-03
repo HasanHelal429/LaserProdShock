@@ -8682,3 +8682,37 @@ corona ~45-50 % too hot that refinement does not cure; and resolving it costs ba
 **Wider implication, flagged not acted on:** any similarity-scaled reduced-mass leg at
 dz_over_de 0.5 has G8 ~0.05 vs the mu = 1 leg's 0.215 and shows the same geometry shortfall.
 Earlier reduced-mass phases ran at that resolution and their geometry may share the deficit.
+
+---
+
+## 2026-10-03 — PSC 511 keV extended to 1 ns on Perlmutter (`/pscratch/sd/h/hhelal/psc_ablation/run_long`)
+
+**Why `run_ourflash_511keV` stopped at 100 ps:** on purpose. The 60 keV run died at step 36 499
+with a glibc abort at `PIC_move_part_z.F:303`, which is `deallocate(s0z)`, so the heap was
+already corrupt. One NaN particle reaching `nint()` indexes `ne/ni`, the field arrays and
+`s1z(-2:2)` out of bounds. Its source is still unknown (the kick's `dI` is `abs()`ed; the
+collision boost `1/sqrt(1-β²)` is a candidate), so the mover is **guarded** instead: a
+non-finite z or p on entry, a non-finite z after the push, or a move of more than 1 cell now
+`MPI_ABORT`s and prints the particle. The original file is kept as `PIC_move_part_z.F.orig`.
+
+**Build:** `build_long/` (copy of the chablis tree), PrgEnv-gnu + `cray-hdf5-parallel/1.14.3.9`
+via `psc_env.sh`, `ftn`. `INIT_param.f` = `INIT_param.f.511keV_backup` plus:
+`nmax` 642 183 (FLASH 0.1 → 1.1 ns), `i3x` 9749 / `LLz` 2000 / `targets%z2` 1950 (box doubled
+to ζ 195, same dz), ICs `ic_long/` (the 5000-cell files plus 5000 copies of their vacuum
+tail, so the first 5000 cells are bit-identical), and `cpum` overridable by `PSC_CPUM_HOURS`.
+
+**Smoke (job 59282683):** VLI stopped itself at step 4167 with a final checkpoint, and VLA
+resumed at 4168. Zero NaN, zero guard trips. `fabs` window means against the old run: −0.022,
+−0.017, −0.005, +0.027, against a per-step σ of 0.04–0.09. Plume `T_e` (n-weighted over
+1e-2–1 n_cr) at steps 0/2000/4000/6000: 378.2/390.6/397.8/408.0 vs 377.4/390.0/401.3/407.9 eV.
+**0.13–0.15 s/step** on Milan (chablis: 0.09).
+
+**Boundaries:** z is periodic (`boundary_part_z = 1`; its inline comment saying "reflecting" is
+wrong). The last cell holds the target rear's wrapped deposit (≈1.25 n_cr) in both runs, and
+the readers trim it (`[1:-1]`). Over 1 ns the rear wraps toward ζ ≈ 195, about 100 d_i0
+beyond the plume. Check the far-edge density when reading the run.
+
+**Chain:** `run_long/chain.sbatch`, shared QOS, 10 ranks, 24 h segments with
+`PSC_CPUM_HOURS` = 23.4. It resubmits only on a clean partial stop, and logs to `chain.log`
+and `run_seg<N>.log`. Expect ~2 segments. Movie:
+`p6_movie.py --psc run_long/data --psc-code psc_ablation`.
