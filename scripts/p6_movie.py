@@ -51,6 +51,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--legs", nargs="*", default=["full", "heavy", "light_sim"])
     ap.add_argument("--fps", type=int, default=5)
+    ap.add_argument("--zlim", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                    help="fixed zeta range (default: span of all legs)")
+    ap.add_argument("--psc-nfloor", type=float, default=1e-2, metavar="N_CR",
+                    help="mask PSC T_e and v below this n_e/n_cr (thin-cell noise), as paper_fig3")
+    ap.add_argument("--tau-max", type=float, default=None,
+                    help="end the movie at this tau_own (e.g. PSC's 100 ps window, ~2.7)")
     ap.add_argument("--psc", metavar="DATADIR", default=os.environ.get("LP_PSC_DIR"),
                     help="PSC (Fortran psc-raytrace) data dir; its run.log sets the units")
     ap.add_argument("--psc-code", default=os.environ.get("LP_PSC_CODE", "/home/hhelal/psc-raytrace"),
@@ -110,6 +116,8 @@ def main():
             te_ = np.where(ne_ > 0, (Q["Sxxe"] + Q["Syye"] + Q["Szze"]) / (3 * d) * N_["K_temperature"], np.nan)
             v_ = np.where(ne_ > 0, Q["NVze"] / d, np.nan) * N_["K_vel"] / CS0_F
             tF = 0.1e-9 + st * N_["dt"]
+            thin = ne_ < a.psc_nfloor
+            te_[thin] = np.nan; v_[thin] = np.nan
             P.append(dict(tau=tF / TAU_F, zeta=zi * 0.02, ne=ne_, Te=te_, v=v_))
         print(f"  PSC: {len(P)} dumps, FLASH-clock tau {P[0]['tau']:.2f} -> {P[-1]['tau']:.2f}, "
               f"m_e c^2 = {N_['mec2_keV']:.1f} keV")
@@ -117,6 +125,8 @@ def main():
     # Frame grid: every leg's own tau, capped at the SHORTEST leg so no frame silently
     # repeats a finished leg's last dump (the failure `stale` exists to catch).
     tau_end = min(l["S"][-1]["tau"] for l in legs)
+    if a.tau_max is not None:
+        tau_end = min(tau_end, a.tau_max)
     taus = [s["tau"] for s in legs[0]["S"] if s["tau"] <= tau_end + 1e-9]
     print(f"  frames: {len(taus)}  tau_own 0 -> {tau_end:.2f}")
 
@@ -134,6 +144,8 @@ def main():
             if st["v"] is not None and np.isfinite(st["v"]).any():
                 vlo, vhi = min(vlo, np.nanmin(st["v"])), max(vhi, np.nanmax(st["v"]))
     nlo = max(nlo, 1e-5)
+    if a.zlim is not None:
+        zlo, zhi = a.zlim
 
     fig, ax = plt.subplots(3, 1, figsize=(9.5, 10), sharex=True)
     for x in ax: lpp.style_axes(x)
@@ -173,10 +185,10 @@ def main():
             if P is not None:
                 q = min(P, key=lambda r: abs(r["tau"] - (t + TAU_HANDOFF)))
                 if abs(q["tau"] - (t + TAU_HANDOFF)) < 0.5:
-                    ax[0].semilogy(q["zeta"], np.maximum(q["ne"], nlo), color=lpp.C_FOURTH,
-                                   lw=1.6, label="PSC (m_p/m_e=100, heavy e-)")
-                    ax[1].semilogy(q["zeta"], np.maximum(q["Te"], 10.0), color=lpp.C_FOURTH, lw=1.6)
-                    ax[2].plot(q["zeta"], q["v"], color=lpp.C_FOURTH, lw=1.6)
+                    ax[0].semilogy(q["zeta"], np.maximum(q["ne"], nlo), color=lpp.C_AMBIENT,
+                                   lw=1.6, label="PSC 511 keV (m_p/m_e=100)")
+                    ax[1].semilogy(q["zeta"], np.maximum(q["Te"], 10.0), color=lpp.C_AMBIENT, lw=1.6)
+                    ax[2].plot(q["zeta"], q["v"], color=lpp.C_AMBIENT, lw=1.6)
             ax[0].axhline(1.0, color="0.55", lw=0.8, ls=":")
             ax[0].set_ylabel(r"$n_e/n_{cr}$"); ax[0].set_ylim(nlo, nhi * 1.5)
             # LOG: the n_e < 1e-2 tail reaches tens of keV and on a linear axis it flattens
