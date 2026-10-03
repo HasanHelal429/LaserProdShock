@@ -244,7 +244,10 @@ def warpx_particles(run_dir, species, nbin=400, sc=None, zeta_range=None):
     dumps = [(os.path.basename(p), os.path.getsize(os.path.join(p, "Header"))
               if os.path.exists(os.path.join(p, "Header")) else 0, int(os.path.getmtime(p)))
              for p in lpio.plotfiles(run_dir, "diag1")]
-    key = hashlib.sha1(json.dumps([dumps, species, nbin, zeta_range,
+    # Normalise before hashing: (-5, 115) and (-5.0, 115.0) bin identically but serialise
+    # differently, and that mismatch made the movie re-bin everything the table had cached.
+    zr = None if zeta_range is None else [float(zeta_range[0]), float(zeta_range[1])]
+    key = hashlib.sha1(json.dumps([dumps, species, int(nbin), zr,
                                    {k: float(v) for k, v in sc.items()
                                     if isinstance(v, (int, float))}],
                                   sort_keys=True, default=str).encode()).hexdigest()[:16]
