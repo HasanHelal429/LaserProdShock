@@ -231,6 +231,38 @@ def warpx_fields(run_dir, sc=None):
 
 
 def warpx_particles(run_dir, species, nbin=400, sc=None, zeta_range=None):
+    """Cached wrapper: see _warpx_particles_uncached for the physics.
+
+    Binning ~47 particle dumps of 240-570 MB each through yt costs ~5 min per leg, and the
+    table and the movie each did it from scratch. The binned result -- a few MB -- is cached
+    beside the run in diags/.binned_*.pkl, keyed on every input that changes it (dump list
+    with sizes and mtimes, species, nbin, zeta_range, and the scales). Any change re-bins.
+    """
+    import pickle, hashlib, json
+    from laserprod import io as lpio
+    sc = sc or SC_W
+    dumps = [(os.path.basename(p), os.path.getsize(os.path.join(p, "Header"))
+              if os.path.exists(os.path.join(p, "Header")) else 0, int(os.path.getmtime(p)))
+             for p in lpio.plotfiles(run_dir, "diag1")]
+    key = hashlib.sha1(json.dumps([dumps, species, nbin, zeta_range,
+                                   {k: float(v) for k, v in sc.items()
+                                    if isinstance(v, (int, float))}],
+                                  sort_keys=True, default=str).encode()).hexdigest()[:16]
+    cache = os.path.join(run_dir, "diags", f".binned_{key}.pkl")
+    if os.path.exists(cache):
+        try:
+            return pickle.load(open(cache, "rb"))
+        except Exception:
+            pass
+    out = _warpx_particles_uncached(run_dir, species, nbin, sc, zeta_range)
+    try:
+        pickle.dump(out, open(cache + ".tmp", "wb")); os.replace(cache + ".tmp", cache)
+    except Exception:
+        pass
+    return out
+
+
+def _warpx_particles_uncached(run_dir, species, nbin=400, sc=None, zeta_range=None):
     sc = sc or SC_W
     """Binned particle moments on a common zeta grid.
 
