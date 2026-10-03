@@ -8645,3 +8645,40 @@ same band it sat in at tau 17.48 (0.83–0.93) — a steady ~15 % shortfall, not
 0.42) as its critical surface finally leaves the target. Its `T_e` overshoot persists (1.22 of
 FLASH, 1.44 of full). A widening geometry gap with a persistent hot corona is what both open
 explanations predict; the finer-`dz` heavy leg still separates them.
+
+## 2026-10-03 (P6 round 2) — **heavy's geometry gap is resolution; its T_e overshoot is not.** mu^(1/3) confirmed on a correctly built leg
+
+All four round-2 runs complete. G3-subtracted plume T_e and raw geometry, ratios to `P6_mr_full`
+(`scripts/p6_g3.py`, table `media/P6/g3_table.txt`):
+
+| tau 23.7 | heavy dz 0.5 | heavy dz 0.25 | light_sim |
+|---|---|---|---|
+| plume T_e (G3) | 1.433 | **1.473** | **0.394** |
+| `L_n` | 0.70 | **0.86** | 0.65 |
+| `zeta_front` | 0.69 | **0.82** | 0.62 |
+| `zeta_cr` | 0.42 | 0.32 | -0.11 |
+
+**1. mu^(1/3) holds on the correctly similarity-scaled leg.** light_sim/full = 0.370 / 0.358 /
+0.370 / 0.376 / 0.383 / 0.394 over tau 4-23.7, mean **0.375 vs predicted 0.379**. The 0.381 from
+the retracted leg was not luck. Its laser-off background is 17-44 eV against the retracted leg's
+50-170 eV: the retracted leg's large "grid heating" was its wrong IC relaxing.
+
+**2. The heavy geometry gap is under-resolution (D6 answered).** Halving dz halves the deficit --
+`L_n` 0.70 -> 0.86, `zeta_front` 0.69 -> 0.82 at tau 23.7; 0.73 -> 0.88 and 0.76 -> 0.84 at tau 20.
+First-order Richardson to dz -> 0 gives `L_n` ~1.02 and `zeta_front` ~0.95 of full: heavy's
+geometry converges TO the reference. Two rungs, order assumed -- an estimate, not a measurement.
+The matched pair agrees: light_sim, at heavy's exact normalised resolution, shows the same
+shortfall (`L_n` 0.65), so it tracks the grid, not which mass moved.
+
+**3. The T_e overshoot is NOT resolution.** 1.433 -> 1.473 under refinement (Richardson ~1.51). It
+is a property of the heavy electron, consistent with Spitzer conduction weakened by sqrt(me_scale)
+= 4.285x leaving deposited heat in the corona. Not proven -- a conduction diagnostic (heat flux
+into the target) would test it directly.
+
+**Verdict on the heavy-electron convention:** real ion, correct geometry once resolved, but a
+corona ~45-50 % too hot that refinement does not cure; and resolving it costs back part of the
+18x saving. `zeta_cr` (outermost-crossing) is too noisy to support either way.
+
+**Wider implication, flagged not acted on:** any similarity-scaled reduced-mass leg at
+dz_over_de 0.5 has G8 ~0.05 vs the mu = 1 leg's 0.215 and shows the same geometry shortfall.
+Earlier reduced-mass phases ran at that resolution and their geometry may share the deficit.
