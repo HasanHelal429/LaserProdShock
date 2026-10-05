@@ -8716,3 +8716,33 @@ beyond the plume. Check the far-edge density when reading the run.
 `PSC_CPUM_HOURS` = 23.4. It resubmits only on a clean partial stop, and logs to `chain.log`
 and `run_seg<N>.log`. Expect ~2 segments. Movie:
 `p6_movie.py --psc run_long/data --psc-code psc_ablation`.
+
+### 2026-10-04 — first long attempt crashed at 150 ps; cause: periodic z, twice over. Fixed, relaunched (job 59343237)
+
+**Crash** (job 59283164, `psc_ablation/run_long_periodic_crashed`): step 96 429 (150 ps).
+`fabs` went NaN, then `!!laser_heating NaN`, then the mover guard caught an electron at
+z = 1949.7, the last cell, with p = NaN. The guard worked as intended (a clean abort, no
+heap corruption). The target rear, heated to ~50 eV, expanded through the **periodic** z
+boundary and came out at the laser's entrance end. By step 96 000 there was ~0.1 n_cr at
+~110 eV over the last ~45 d_i0, plus a 3 n_cr cell at the entrance, and the march NaN-ed on
+it. This is very likely also the 60 keV run's death at 166 ps. The 100 ps run ended just
+before it.
+
+**Fix 1:** `boundary_part_z = 0` (reflecting at both ends; WarpX is reflecting at the rear).
+**Not enough on its own** (smoke2, job 59341402): `PIC_faz`, the ghost-deposit fold, wraps
+**periodically whatever the boundary setting**. So the target rear's deposit has always sat
+on the laser's entrance cell, at 1.25 n_cr from step 0 in **every** PSC run including
+`run_ourflash_511keV`. Above critical the march treats it as zero absorption (harmless). With
+reflecting particles it decays below critical, and from step ~2000 `fabs` → 1.0, absorbed in
+that one cold cell.
+
+**Fix 2:** with `boundary_part_z = 0`, `PIC_faz` mirror-folds ghost `i3n−k` → `i3n+k` (and
+`i3x+k` → `i3x−k`), with parity −1 for the z-odd arrays (`jzi`, `NVz`, `NPz`, `Sxz`, `Syz`,
+`Qz`; flag `faz_parity` in `VLA_variables`). It runs locally on the end ranks, with no
+messages. The originals are kept as `*.orig`.
+
+**smoke3** (job 59342103, 10 386 steps): far-edge n_e = 0 at every dump. `fabs` window means
+0.393/0.409/0.387 vs old 0.407/0.403/0.380. Plume T_e within 1 % at every shared dump
+(419.1 vs 417.1 eV at step 10 000). Zero NaN. Residual: the rear wall's reflected deposit
+sits in the target's 2nd cell (11.25 n_cr, 1st cell 8.75; the sum is conserved) at ζ = −5.
+The field boundary is still periodic, which only affects the cold rear wall.
