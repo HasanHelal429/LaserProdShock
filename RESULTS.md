@@ -8746,3 +8746,18 @@ messages. The originals are kept as `*.orig`.
 (419.1 vs 417.1 eV at step 10 000). Zero NaN. Residual: the rear wall's reflected deposit
 sits in the target's 2nd cell (11.25 n_cr, 1st cell 8.75; the sum is conserved) at ζ = −5.
 The field boundary is still periodic, which only affects the cold rear wall.
+
+### 2026-10-07 — PSC 1.1 ns run COMPLETE; PSC sits on FLASH across the whole pulse
+
+Jobs 59343237 (23.4 h, VLI → step 516 170) + 59401900 (6.5 h, VLA → 642 183). `endfile`
+written; zero NaN, zero guard trips. 322 dumps every 2000 steps, no gaps or duplicates
+across the restart. Far edge n_e = 0 throughout; max n_e beyond ζ 150 is 3e-3 n_cr at the end.
+`fabs` climbs smoothly 0.43 → 0.97 as the corona lengthens. At FLASH 1.1 ns: n_cr surface
+ζ 4.26, 1e-2 front **ζ 103.7** (FLASH ≈ 103), plume T_e **1039 eV** (FLASH ≈ 1 keV).
+`run_long/run.log` → `run_seg0.log` (symlink, for `psc_norm`).
+
+Movie `media/P6/movie_flash_psc1ns_resolved_heavy.mp4` (full, heavy_dz025, PSC, FLASH): PSC
+tracks FLASH in n_e, T_e and v at every frame. WarpX's corona runs hotter beyond ζ ≈ 60 and
+heavy_dz025 sits low in n_e. **The PSC velocity is now the ION flow** `NVzi/NNi`. The
+electron flow `NVze/NNe` (what `paper_fig3` uses) has the same mean (n_e/n_i = 13.0 = Z) but
+5–12× the per-cell scatter at keV T_e, and it drowned the panel.

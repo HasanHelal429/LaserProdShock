@@ -110,11 +110,14 @@ def main():
         from read_pmt import assemble
         N_ = psc_norm(a.psc)
         P = []
-        for st, zi, Q in assemble(a.psc, want=("NNe", "Sxxe", "Syye", "Szze", "NVze")):
+        for st, zi, Q in assemble(a.psc, want=("NNe", "NNi", "Sxxe", "Syye", "Szze", "NVzi")):
             zi = np.asarray(zi, float)[1:-1]; Q = {k: np.asarray(v, float)[1:-1] for k, v in Q.items()}
             ne_ = Q["NNe"]; d = np.maximum(ne_, 1e-30)
             te_ = np.where(ne_ > 0, (Q["Sxxe"] + Q["Syye"] + Q["Szze"]) / (3 * d) * N_["K_temperature"], np.nan)
-            v_ = np.where(ne_ > 0, Q["NVze"] / d, np.nan) * N_["K_vel"] / CS0_F
+            # ION flow: FLASH's v is the fluid (ion) velocity, and the electron flow NVze/NNe
+            # is buried under ~keV thermal noise per cell (RESULTS 2026-10-07).
+            ni_ = Q["NNi"]
+            v_ = np.where(ni_ > 0, Q["NVzi"] / np.maximum(ni_, 1e-30), np.nan) * N_["K_vel"] / CS0_F
             tF = 0.1e-9 + st * N_["dt"]
             thin = ne_ < a.psc_nfloor
             te_[thin] = np.nan; v_[thin] = np.nan
