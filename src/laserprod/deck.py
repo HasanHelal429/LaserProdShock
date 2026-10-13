@@ -762,6 +762,13 @@ def render(cfg: dict) -> str:
             a(f"hybrid_pic_model.n_floor = {_num(float(hyb['n_floor_over_ncr']) * sc.n_cr)}")
         if hyb.get("substeps") is not None:
             a(f"hybrid_pic_model.substeps = {int(hyb['substeps'])}")
+        # Vacuum-region treatment for cells at the density floor. Without it a true
+        # vacuum gap (plume ahead of the swept ambient) leaves Ohm's law at B/n_floor and
+        # the whistler substep requirement runs away with B there: P8_hyb_laser_CH opened
+        # an n_e = 0 cell at 85 um, B grew 10 -> 2e4 T in 74 steps, then E went non-finite.
+        if hyb.get("holmstrom_vacuum_region") is not None:
+            a(f"hybrid_pic_model.holmstrom_vacuum_region = "
+              f"{1 if hyb['holmstrom_vacuum_region'] else 0}")
         # The two bounded alternatives to aborting on the electron-energy advection CFL.
         # Both change what the solver DOES, so both belong in --verify: a stale binary that
         # silently ignored one would run the unbounded scheme while the deck claimed
@@ -1441,6 +1448,7 @@ def key_params(path: str) -> dict:
             out[k] = str(d[k]).strip().lower()
     for k in ("hybrid_pic_model.elec_temp", "hybrid_pic_model.n0_ref",
               "hybrid_pic_model.n_floor", "hybrid_pic_model.substeps",
+              "hybrid_pic_model.holmstrom_vacuum_region",
               "hybrid_pic_model.ue_cfl_max", "hybrid_pic_model.n_trust",
               "hybrid_pic_model.plasma_resistivity(rho,J,t)"):
         if k in d:

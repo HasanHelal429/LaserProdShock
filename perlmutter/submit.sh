@@ -193,6 +193,13 @@ case "$WHAT" in
           runs/P8/P8_hyb_heater_CH runs/P8/P8_hyb_heater_CpH)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_hybrid"
     ;;
+  p8hv)
+    # P8 rerun with the Holmstrom vacuum treatment (hybrid_pic_model.holmstrom_vacuum_region):
+    # the first pass aborted in all four runs once a vacuum gap opened and B ran away there.
+    RUNS=(runs/P8/P8_hyb_laser_CH_hv runs/P8/P8_hyb_laser_CpH_hv
+          runs/P8/P8_hyb_heater_CH_hv runs/P8/P8_hyb_heater_CpH_hv)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_hybrid_hv"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -232,7 +239,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p7|p8|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p8|p8hv|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

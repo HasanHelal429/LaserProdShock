@@ -8790,3 +8790,16 @@ restricted to the target. In 1D the beam therefore also heats the ambient column
 at 40 eV), which P7 avoids with `heat_species: target`. Measure the upstream T_e before using
 it. The heater variants do not have this problem; their H (3.2e23 m²/s³, the laser's absorbed
 flux in a 10 µm window) is a first guess to be calibrated to v_sh ≈ 750 km/s.
+
+**P8 first pass ABORTED in all four runs (debug array 59724252, 2026-10-12).** Each hit
+`Non-finite value detected in E-field`: laser_CH at step 466 (0.19 ns), laser_CpH at 1346,
+heater_CH at 1584 and heater_CpH at 1465 (~0.6 ns). The mechanism was the same every time. A
+true vacuum gap (n_e = 0) opened at z ≈ 85–120 µm between the expanding plume and the swept
+ambient, and B ran away inside it, from 10 T to 10⁴–6×10⁴ T within ~40–70 steps, while the
+B substeps were still all accepted. The density floor (0.1 n_amb) keeps Ohm's law finite,
+but the whistler requirement scales as B/n_floor and there was no vacuum treatment, so the
+Hall term blew up. H-PICShock HB7 predicted this: the hybrid cannot do vacuum. Neither the
+drive nor the ion model avoids it; C⁶⁺ + H⁺ only delays it in the laser case.
+**Rerun as `P8_hyb_*_hv`** with `hybrid_pic_model.holmstrom_vacuum_region = 1` (the
+generator now emits it, and `--verify` checks it) and nothing else changed; launch with
+`submit.sh p8hv`. The first-pass READMEs record each abort.

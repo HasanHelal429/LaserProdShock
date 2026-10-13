@@ -54,7 +54,7 @@ laser swaps and the electron-fluid heater). Branch `hybrid-omega`, generator cha
 profiled B goes on the grid when hybrid; `operators.heater` (electron fluid) is new.
 
 ## Result
-Pending.
+**ABORTED** at step 1465 (t = 586 ps; debug array 59724252, 2026-10-12): `Non-finite value detected in E-field` (WarpXPushFieldsHybridPIC.cpp:227). A true vacuum gap (n_e = 0) opened at z ≈ 116-120 µm between the expanding plume and the swept ambient, and B ran away there (6.2e4 T). The density floor keeps Ohm's law finite, but the whistler requirement scales as B/n_floor, and with no vacuum treatment the Hall term blew up. All four first-pass runs failed this way; the matrix is rerun as `*_hv` with `holmstrom_vacuum_region = 1`.
 
 ## Retracted
 Nothing yet.
