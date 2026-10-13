@@ -16,7 +16,7 @@
 # Derived scales (1D, lengths in d_e,critical = 0.2394 um):
 #   n_cr = 9.049e+27 m^-3   d_e,cr = lam0/2pi = 0.2394 um
 #   target 10 n_cr (d_e = 0.0757 um)   ambient 9.944e-05 n_cr (d_e = 24.0044 um, d_i = 240.044 um)
-#   dt = 0.2502 fs   t_end = 4500.1294 ps   n_cell = 33900
+#   dt = 0.2502 fs   t_end = 4500.1294 ps   n_cell = 33920
 #   GATE G1 omega_pe*dt: 0.991 initial, 1.401 at compression; hits 2 at 40.75 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 1919, ambient 3.0
 #   predicted absorption: tau(flat top) = 3.7e+04, f_abs ~ 1.000; ambient traverse eats 0.000%
@@ -60,7 +60,7 @@ my_constants.B0     = 3.006993006993007      # B at 3 mm, the reference [T]
 
 # --- domain ---
 my_constants.zlo = -355.0891*de
-my_constants.zhi = 20887.59*de
+my_constants.zhi = 20900.2005*de
 
 # --- time / solver ---
 #
@@ -77,9 +77,9 @@ warpx.cfl     = 0.5
 warpx.verbose = 1          # REQUIRED: the LASERDEP diagnostic lines
 
 # --- grid (dz = 0.62663 d_e; z = propagation axis) ---
-amr.n_cell        = 33900
+amr.n_cell        = 33920
 amr.max_level     = 0      # the operator asserts finestLevel() == 0 (no AMR)
-amr.max_grid_size = 33856
+amr.max_grid_size = 33920
 amrex.the_arena_init_size = 8589934592  # 8192 MiB -- see numerics.arena_init_size_mb
 geometry.dims     = 1
 geometry.prob_lo  = zlo

@@ -72,7 +72,7 @@ geometry:
   dz_over_de: 0.62663          # 0.15 um
   axis:
     lo_de: -355.0891           # 5 um behind the 80 um target
-    hi_de: 20887.59            # 5 mm
+    hi_de: 20900.2005          # 5.003 mm: 33920 cells, a multiple of the blocking factor (8) and of 4 boxes
   boundary:
     axis:
       lo: reflecting
@@ -84,7 +84,7 @@ numerics:
   particle_shape: 3
   filter_npass: 4
   random_seed: 20261012
-  max_grid_size: 33856
+  max_grid_size: 33920         # one box per GPU (1 GPU); 8480 x 4 for the multi-GPU check
   max_step: 17988000           # t0 + 4.5 ns: covers TS at 3 mm, t0 + 3..4.5 ns
   ppc:
     target: 100

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import math
 import os
+import warnings
 
 from . import units
 from .config import boundary_faces, has_background_field, is_vacuum
@@ -380,6 +381,17 @@ def render(cfg: dict) -> str:
     dims = int(geo["dims"])
     ax_names = units.axis_names(dims)
     n_cell, lo, hi, dz, dx = units.cells_and_extent(geo, sc.de_ref)
+    # AMReX aborts at init ("domain size not divisible by blocking_factor") unless every
+    # axis is a multiple of the blocking factor (8 by default; this generator never sets
+    # it). Caught here so it costs a render, not a queue wait (P7 smoke, 2026-10-12).
+    # A WARNING, not an error: five committed configs at n_cell 2100 would abort the same
+    # way, and raising here would make them unrenderable for the tests.
+    _bf = 8
+    _mgs = (cfg.get("numerics") or {}).get("max_grid_size")
+    if any(int(c) % _bf for c in n_cell) or (_mgs is not None and int(_mgs) % _bf):
+        warnings.warn(f"n_cell {list(n_cell)} / max_grid_size {_mgs}: not a multiple of the "
+                      f"AMReX blocking factor {_bf}; WarpX will abort at init. Adjust "
+                      "geometry lo_de/hi_de or numerics.max_grid_size.", stacklevel=2)
     (flo, fhi), (plo_bc, phi_bc) = _bc_tokens(cfg)
     plot_int, red_int, field_int, phase_int, chk_int = _diag_intervals(cfg)
     species = _species_table(cfg)
