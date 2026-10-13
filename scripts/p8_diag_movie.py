@@ -147,8 +147,9 @@ def main():
         for sp in species:
             r = F.get(f"rho_{sp}")
             if r is not None:
-                ax[1].semilogy(zum[w], np.maximum(r[w] / QE, 1e18), lw=0.8,
-                               color="tab:orange" if sp.startswith("targ") else "tab:blue",
+                col = ("tab:orange" if sp.startswith("targ") else
+                       "0.5" if sp.startswith("bg") else "tab:blue")   # bg: immobile background
+                ax[1].semilogy(zum[w], np.maximum(r[w] / QE, 1e18), lw=0.8, color=col,
                                ls="-" if sp.endswith(("C", "CH")) else "--", label=sp)
         if nfloor:
             ax[1].axhline(nfloor, color="r", lw=0.8, ls=":", label="n_floor")
