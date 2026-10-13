@@ -388,7 +388,8 @@ def render(cfg: dict) -> str:
     # way, and raising here would make them unrenderable for the tests.
     _bf = 8
     _mgs = (cfg.get("numerics") or {}).get("max_grid_size")
-    if any(int(c) % _bf for c in n_cell) or (_mgs is not None and int(_mgs) % _bf):
+    _mgl = [] if _mgs is None else (list(_mgs) if isinstance(_mgs, (list, tuple)) else [_mgs])
+    if any(int(c) % _bf for c in n_cell) or any(int(m) % _bf for m in _mgl):
         warnings.warn(f"n_cell {list(n_cell)} / max_grid_size {_mgs}: not a multiple of the "
                       f"AMReX blocking factor {_bf}; WarpX will abort at init. Adjust "
                       "geometry lo_de/hi_de or numerics.max_grid_size.", stacklevel=2)
