@@ -8838,3 +8838,15 @@ ppc-50000 run 4598). Splitting demonstrably ran: target macroparticles went 15,6
 target population delays the heater abort about as much as ppc 50000 does, and does nothing
 for the laser runs**, so weighting alone is not the whole cause. Movies:
 media/P8/P8_fix_split_*_p8diag.mp4.
+
+**P8 stabilizer scan staged (`P8_scan_*`, `submit.sh p8scan`).** These are single-variable
+changes on the Holmstrom configs, laser and heater CH, run to the full 4.5 ns:
+- `trust`: n_trust = n_amb.
+- `vacres`: eta = 1.6e-7 + 1e-4*(rho < e n_amb/2) Ohm m. The generator now accepts a
+  parser-expression resistivity, and --verify compares it as text.
+- `dt2`: dt 400 -> 200 fs.
+- `smooth`: shape 3 plus filter 4.
+- `floor`: n_floor = n_amb.
+- `lowI` (laser only): 1e13 W/cm^2.
+Every earlier P8 run aborts where near-empty cells at the plume/ambient interface let B and
+the fluid T_e run away. Laser runs never pass ~0.35 ns; heater runs reach ~1.8 ns at best.

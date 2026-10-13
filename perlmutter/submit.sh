@@ -216,6 +216,23 @@ case "$WHAT" in
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_split"
     export WARPX_BUILD_OVERRIDE="${PSCRATCH:-$HOME}/warpx-cda/.claude/worktrees/particle-splitter/build_split"
     ;;
+  p8scan)
+    # P8 stabilizer scan: single-variable changes (n_trust, vacuum resistivity, dt/2,
+    # shape 3 + filter, floor = n_amb, low laser intensity) on the laser and heater CH
+    # Holmstrom configs, full 4.5 ns. 11 runs: shared QOS (debug's submit cap is ~5).
+    RUNS=(runs/P8/P8_scan_trust_laser_CH
+          runs/P8/P8_scan_vacres_laser_CH
+          runs/P8/P8_scan_dt2_laser_CH
+          runs/P8/P8_scan_smooth_laser_CH
+          runs/P8/P8_scan_floor_laser_CH
+          runs/P8/P8_scan_lowI_laser_CH
+          runs/P8/P8_scan_trust_heater_CH
+          runs/P8/P8_scan_vacres_heater_CH
+          runs/P8/P8_scan_dt2_heater_CH
+          runs/P8/P8_scan_smooth_heater_CH
+          runs/P8/P8_scan_floor_heater_CH)
+    TIME="01:00:00"; QOS="shared"; JOBNAME="lp8_scan"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -255,7 +272,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p7|p8|p8hv|p8fix|p8split|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p8|p8hv|p8fix|p8split|p8scan|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

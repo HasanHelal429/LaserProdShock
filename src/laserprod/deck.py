@@ -766,8 +766,11 @@ def render(cfg: dict) -> str:
         if hyb.get("n0_ref_over_ncr") is not None:
             a(f"hybrid_pic_model.n0_ref = {_num(float(hyb['n0_ref_over_ncr']) * sc.n_cr)}")
         if hyb.get("plasma_resistivity") is not None:
+            eta = hyb["plasma_resistivity"]
+            # a string is a parser expression in (rho, J, t) -- e.g. a vacuum resistivity
+            # that switches on where rho is near zero; a number is a constant
             a(f"hybrid_pic_model.plasma_resistivity(rho,J,t) = "
-              f"{_num(hyb['plasma_resistivity'])}")
+              + (f'"{eta}"' if isinstance(eta, str) else f"{_num(eta)}"))
         if hyb.get("plasma_hyper_resistivity") is not None:
             a(f"hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "
               f"{_num(hyb['plasma_hyper_resistivity'])}")
@@ -1471,7 +1474,11 @@ def key_params(path: str) -> dict:
               "hybrid_pic_model.ue_cfl_max", "hybrid_pic_model.n_trust",
               "hybrid_pic_model.plasma_resistivity(rho,J,t)"):
         if k in d:
-            out[k] = _eval(d[k], ns)
+            try:
+                out[k] = _eval(d[k].strip('"'), ns)
+            except NameError:
+                # an expression in (rho, J, t): compare it as text
+                out[k] = d[k].strip('"').replace(" ", "")
     # --- electron-fluid heater (hybrid heating-operator piston) ---
     for k in ("particle_heater.target", "particle_heater.species",
               "particle_heater.profile"):
