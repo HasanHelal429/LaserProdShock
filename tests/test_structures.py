@@ -240,6 +240,10 @@ def test_vacuum_runs_have_only_target_species():
             expect = [*t_ions, *a_ions]
         else:
             expect = ["targ_electrons", *t_ions, "amb_electrons", *a_ions]
+        # optional immobile background ions (P8 fix for empty cells) come last
+        bg = cfg["plasma"].get("background")
+        if bg:
+            expect += ions("bg", bg if bg.get("composition") else cfg["plasma"].get("ambient"))
         assert names == expect, os.path.basename(run_dir)
 
 

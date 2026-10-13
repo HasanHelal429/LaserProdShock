@@ -138,6 +138,18 @@ def _species_table(cfg: dict) -> dict:
         if not hybrid:
             tab["amb_electrons"] = {"kind": "electron", "role": "ambient"}
         _ions("amb", "ambient", cfg["plasma"].get("ambient"))
+    # Optional IMMOBILE background ions (hybrid): a small uniform density everywhere that
+    # never moves (do_not_push), so no cell can ever hold zero particles. Its charge enters
+    # rho -- n_e = rho/e stays > 0 -- and it carries no current. Added because P8's hybrid
+    # runs abort once a cell's ion count goes to zero in BOTH species at the plume front.
+    bg = (cfg.get("plasma") or {}).get("background")
+    if bg:
+        bcomp = units.composition(bg) or units.composition(cfg["plasma"].get("ambient"))
+        for c in bcomp:
+            tab[f"bg_ions_{c['tag']}"] = {
+                "kind": "ion", "role": "background", "charge_state": c["Z"],
+                "mass_amu": c["mass_amu"], "per_ne": c["per_ne"],
+                "m_over_me": c["m_over_me"], "immobile": True}
     for name, over in (cfg.get("species_extra") or {}).items():
         tab.setdefault(name, {}).update(over)
     return tab
@@ -314,7 +326,8 @@ def _theta_expr(role: str, kind: str) -> str:
 def _ppc_str(cfg: dict, role: str) -> str:
     """``num_particles_per_cell_each_dim``: one entry per dimension."""
     ppc = cfg["numerics"]["ppc"]
-    n = int(ppc["target" if role == "target" else "ambient"])
+    # a role with its own entry (e.g. `background`) uses it; otherwise target / ambient
+    n = int(ppc.get(role, ppc["target" if role == "target" else "ambient"]))
     dims = int(cfg["geometry"]["dims"])
     if dims == 1:
         return str(n)
@@ -834,7 +847,10 @@ def render(cfg: dict) -> str:
     inject_hi_side = str(cfg["laser"].get("inject_side", "lo")) == "hi"
     for name, spec in species.items():
         kind, role = spec["kind"], spec["role"]
-        dens = t_expr if role == "target" else a_expr
+        if role == "background":
+            dens = f"{_num(float(cfg['plasma']['background']['density_over_ncr']))}*ncr"
+        else:
+            dens = t_expr if role == "target" else a_expr
         theta = _theta_expr(role, kind)
         floor = "namb" if amb else "nt"
         a(f"# --- {role} {kind}s ---")
@@ -872,6 +888,9 @@ def render(cfg: dict) -> str:
             ion_dens = dens if int(spec.get("charge_state", 1)) == 1 else \
                 f"({dens})/{int(spec.get('charge_state', 1))}"
         a(f'{name}.density_function(x,y,z) = "{dens if kind == "electron" else ion_dens}"')
+        if spec.get("immobile"):
+            # never pushed: its charge keeps rho > 0 in every cell, and it carries no current
+            a(f"{name}.do_not_push = 1")
         # density_min culls macroparticles below a floor. It must be scaled by the SAME
         # factor as the species' density function, or the two species are culled at
         # different PLASMA densities and the tenuous edge of every profile is left with

@@ -200,6 +200,14 @@ case "$WHAT" in
           runs/P8/P8_hyb_heater_CH_hv runs/P8/P8_hyb_heater_CpH_hv)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_hybrid_hv"
     ;;
+  p8fix)
+    # P8 fix tests for the empty-cell abort (both ion species reach zero particles in a
+    # cell): immobile 1% background (bg) and target ppc 50000 (ppc), on the laser and heater
+    # CH variants, Holmstrom on, full 4.5 ns. Run with --chain 2 (~25-40 min per run).
+    RUNS=(runs/P8/P8_fix_bg_laser_CH runs/P8/P8_fix_bg_heater_CH
+          runs/P8/P8_fix_ppc_laser_CH runs/P8/P8_fix_ppc_heater_CH)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_fix"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -239,7 +247,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p7|p8|p8hv|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p8|p8hv|p8fix|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

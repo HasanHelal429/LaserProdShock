@@ -8803,3 +8803,18 @@ drive nor the ion model avoids it; C⁶⁺ + H⁺ only delays it in the laser ca
 **Rerun as `P8_hyb_*_hv`** with `hybrid_pic_model.holmstrom_vacuum_region = 1` (the
 generator now emits it, and `--verify` checks it) and nothing else changed; launch with
 `submit.sh p8hv`. The first-pass READMEs record each abort.
+
+**P8 aborts traced (user, 2026-10-12, from the p8diag movies): every one starts in a cell where
+the particle number of BOTH ion species goes to zero.** The n_floor and the Holmstrom treatment
+do not protect that cell. There the fluid T_e runs to 1.6-40 keV, B to 1e4-1e5 T, and E goes
+non-finite. Root cause: target macroparticles carry the 10 n_cr target's weight, so one per
+2 um cell is already 4.5e26 m^-3 (500 n_amb). The thin plume front ahead of the dense plume is
+therefore unrepresentable, and the swept ambient leaves cells empty behind it. Of the
+Holmstrom reruns, only heater_CpH_hv survived (to 2.28 ns, stopped by the debug limit at
+chk005701); the others aborted at 0.33/0.91/1.11 ns. **Two fixes, tested as `P8_fix_*`** on the
+laser and heater CH variants (Holmstrom on, full 4.5 ns, `submit.sh p8fix --chain 2`):
+- **`bg`**: a new optional `plasma.background` block. It adds an immobile ion population
+  (`bg_ions_*`, `do_not_push = 1`, uniform, here 1% of n_amb, ppc 50), so rho > 0 in every
+  cell; it carries no current and adds 1% to n_e upstream.
+- **`ppc`**: target ppc 200 -> 50000, so one target macroparticle per cell is 1.8e24 m^-3
+  (2 n_amb) and the plume front stays represented.
