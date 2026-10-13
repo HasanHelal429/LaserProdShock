@@ -115,13 +115,27 @@ def _species_table(cfg: dict) -> dict:
     # double-count the charge the Ohm's-law solver already carries.
     hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
     tab = {}
+
+    def _ions(prefix: str, role: str, blk: dict | None):
+        # A `composition` gives one ion species per component (e.g. targ_ions_C and
+        # targ_ions_H for CH), each with its own Z, mass and share of the electron density.
+        comp = units.composition(blk)
+        if comp is None:
+            tab[f"{prefix}_ions"] = {"kind": "ion", "role": role, "charge_state": Z}
+            return
+        for c in comp:
+            tab[f"{prefix}_ions_{c['tag']}"] = {
+                "kind": "ion", "role": role, "charge_state": c["Z"],
+                "mass_amu": c["mass_amu"], "per_ne": c["per_ne"],
+                "m_over_me": c["m_over_me"]}
+
     if not hybrid:
         tab["targ_electrons"] = {"kind": "electron", "role": "target"}
-    tab["targ_ions"] = {"kind": "ion", "role": "target", "charge_state": Z}
+    _ions("targ", "target", cfg["plasma"]["target"])
     if not is_vacuum(cfg):
         if not hybrid:
             tab["amb_electrons"] = {"kind": "electron", "role": "ambient"}
-        tab["amb_ions"] = {"kind": "ion", "role": "ambient", "charge_state": Z}
+        _ions("amb", "ambient", cfg["plasma"].get("ambient"))
     for name, over in (cfg.get("species_extra") or {}).items():
         tab.setdefault(name, {}).update(over)
     return tab
@@ -205,7 +219,9 @@ def _density_exprs(cfg: dict) -> tuple[str, str | None]:
         """corona term for z on the laser side of the face; `sign` orients the decay."""
         if not expo:
             return f" + (z{'>' if sign > 0 else '<'}{zf})*exp(-((z-{zf})/Ln)^2)"
-        arg = f"({sign}*(z-{zf})-zcor)/Ln"
+        # `zcor` is only defined when corona_offset_de != 0; without one the ramp starts at
+        # the face (every earlier exponential config set an offset, so this path is new)
+        arg = (f"({sign}*(z-{zf})-zcor)/Ln" if zoff != 0.0 else f"({sign}*(z-{zf}))/Ln")
         return f" + (z{'>' if sign > 0 else '<'}{zf})*exp(-({arg}))"
 
     if hi:   # laser from +z travelling -z: slab is [face - wt, face], corona at z > face
@@ -326,7 +342,7 @@ def _diag_intervals(cfg: dict):
 # --------------------------------------------------------------------------- #
 # forward direction: config -> deck
 # --------------------------------------------------------------------------- #
-def _u_std_expr(theta: str, kind: str, sc) -> str:
+def _u_std_expr(theta: str, kind: str, sc, m_over_me: float | None = None) -> str:
     """WarpX ``u_std`` -- the spread in u = gamma v/c -- for one species.
 
     u_std = sqrt(kT/(m c^2)) for a species of mass ``m``. This project's ``theta`` is
@@ -347,6 +363,9 @@ def _u_std_expr(theta: str, kind: str, sc) -> str:
     """
     if kind == "electron":
         return f"sqrt({theta})" if sc.me_scale == 1.0 else f"sqrt(({theta})/me_scale)"
+    if m_over_me is not None:
+        # A composition ion carries its own real mass, so divide by that, not mass_ratio
+        return f"sqrt(({theta})/{_num(m_over_me)})"
     denom = "mass_ratio" if sc.me_scale == 1.0 else "(mass_ratio*me_scale)"
     return f"sqrt(({theta})/{denom})"
 
@@ -478,9 +497,18 @@ def render(cfg: dict) -> str:
     if sc.B0 is not None:
         a("# --- background field (perpendicular: B0 transverse to the z propagation")
         a(f"#     axis, along {_FIELD_AXIS[str(cfg['field']['orientation'])]}) ---")
-        a(f"my_constants.vA     = {_num(cfg['field']['vA_over_c'])}*clight")
-        a("my_constants.B0     = vA*sqrt(mu0*namb*Mi)"
-          f"      # {sc.B0:.4g} T")
+        if cfg["field"].get("profile"):
+            p = cfg["field"]["profile"]
+            a(f"my_constants.Bpk    = {_num(p['B_peak_T'])}"
+              f"      # applied field at the target face [T]")
+            a(f"my_constants.x0B    = {_num(float(p['x0_mm']) * 1e-3)}"
+              f"   # B = Bpk*x0B/(d+x0B), d = distance from the face [m]")
+            a(f"my_constants.B0     = {_num(sc.B0)}"
+              f"      # B at {float(p['ref_distance_mm']):g} mm, the reference [T]")
+        else:
+            a(f"my_constants.vA     = {_num(cfg['field']['vA_over_c'])}*clight")
+            a("my_constants.B0     = vA*sqrt(mu0*namb*Mi)"
+              f"      # {sc.B0:.4g} T")
         a("")
 
     # --- domain constants ------------------------------------------------
@@ -723,10 +751,23 @@ def render(cfg: dict) -> str:
     orient = str((cfg.get("field") or {}).get("orientation", "none"))
     a(f"# --- background field ({orient}) ---")
     fax = _FIELD_AXIS.get(orient)
+    bprof = (cfg.get("field") or {}).get("profile")
     for comp in ("x", "y", "z"):
-        val = "B0" if (sc.B0 is not None and comp == fax) else "0."
+        val = "B0" if (sc.B0 is not None and comp == fax and not bprof) else "0."
         a(f'warpx.B{comp}_external_grid_function(x,y,z) = "{val}"')
     a("warpx.B_ext_grid_init_style       = parse_B_ext_grid_function")
+    if bprof and sc.B0 is not None:
+        # A NON-UNIFORM applied (coil) field, B(d) = Bpk*x0B/(d+x0B). Loading it on the
+        # grid would give it a curl with no current to carry it, so it would radiate away
+        # at once. It is applied to the PARTICLES instead, as KinShock2020 does for its
+        # profiled B0: the grid starts at zero and holds only the plasma's response (the
+        # compression, the cavity), and the total field is that plus this one.
+        d = "max(z-zt,0.)" if inject_hi else "max(zt-z,0.)"
+        a("# Applied (coil) field felt by particles only; the grid holds the plasma response.")
+        a("particles.B_ext_particle_init_style = parse_B_ext_particle_function")
+        for comp in ("x", "y", "z"):
+            val = f"Bpk*x0B/({d}+x0B)" if comp == fax else "0."
+            a(f'particles.B{comp}_external_particle_function(x,y,z,t) = "{val}"')
     a("")
 
     # --- species ---------------------------------------------------------
@@ -749,7 +790,12 @@ def render(cfg: dict) -> str:
         else:
             Z = int(spec.get("charge_state", 1))
             a(f"{name}.charge = {'' if Z == 1 else f'{Z}*'}q_e")
-            a(f"{name}.mass   = Mi")
+            if spec.get("mass_amu") is not None:
+                # A composition ion is REAL: its own mass, independent of mass_ratio
+                a(f"{name}.mass   = {_num(float(spec['mass_amu']) * units.AMU)}"
+                  f"   # {float(spec['mass_amu']):g} amu")
+            else:
+                a(f"{name}.mass   = Mi")
         a(f'{name}.injection_style = "NUniformPerCell"')
         a(f"{name}.num_particles_per_cell_each_dim = {_ppc_str(cfg, role)}")
         a(f"{name}.profile = parse_density_function")
@@ -761,8 +807,13 @@ def render(cfg: dict) -> str:
         # runs. In a hybrid deck, which has no electron species at all, the same slip makes
         # n_e = rho/e = Z n_i come out Z times too LARGE. Both were live bugs found by
         # reading a movie of P4_lez_hyb (RESULTS 2026-08-12).
-        ion_dens = dens if int(spec.get("charge_state", 1)) == 1 else \
-            f"({dens})/{int(spec.get('charge_state', 1))}"
+        if spec.get("per_ne") is not None:
+            # Composition: n_i,k = n_e * f_k / sum_j(f_j Z_j), which is neutral by
+            # construction (sum_k Z_k n_i,k = n_e)
+            ion_dens = f"({dens})*{_num(spec['per_ne'])}"
+        else:
+            ion_dens = dens if int(spec.get("charge_state", 1)) == 1 else \
+                f"({dens})/{int(spec.get('charge_state', 1))}"
         a(f'{name}.density_function(x,y,z) = "{dens if kind == "electron" else ion_dens}"')
         # density_min culls macroparticles below a floor. It must be scaled by the SAME
         # factor as the species' density function, or the two species are culled at
@@ -792,8 +843,11 @@ def render(cfg: dict) -> str:
         # Phase-4 deck having been altered.
         dmf_s = _pow10(dmf)
         Zc = int(spec.get("charge_state", 1))
-        fmin = f"{dmf_s}*{floor}" if kind == "electron" or Zc == 1 else \
-            f"{dmf_s}*{floor}/{Zc}"
+        if kind == "ion" and spec.get("per_ne") is not None:
+            fmin = f"{dmf_s}*{floor}*{_num(spec['per_ne'])}"
+        else:
+            fmin = f"{dmf_s}*{floor}" if kind == "electron" or Zc == 1 else \
+                f"{dmf_s}*{floor}/{Zc}"
         a(f"{name}.density_min = {fmin}")
         a(f"{name}.momentum_distribution_type = maxwellian")
         # WarpX's u_std is the spread in u = gamma v/c, so for a species of mass m it is
@@ -804,7 +858,7 @@ def render(cfg: dict) -> str:
         # the config asked for, a ratio of 2704.6 against mass_ratio = 2698. That is every
         # ion in every run this project has produced (factor 100 at the Z=1 decks,
         # 2698 here), and it is what made the Phase-4 ions look numerically heated.
-        u_std = _u_std_expr(theta, kind, sc)
+        u_std = _u_std_expr(theta, kind, sc, spec.get("m_over_me"))
 
         # --- position-dependent temperature -------------------------------------
         # A real ablation snapshot is NOT isothermal across the target: FLASH's 0.1 ns
@@ -820,7 +874,7 @@ def render(cfg: dict) -> str:
         if _tab is not None:
             key = "Te_eV" if kind == "electron" else "Ti_eV"
             th = f"max(({_flash_profile_expr(_tab, key)})/{_num(511000.0)},thmin)"
-            u_std = _u_std_expr(th, kind, sc)
+            u_std = _u_std_expr(th, kind, sc, spec.get("m_over_me"))
             a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
@@ -834,7 +888,7 @@ def render(cfg: dict) -> str:
             th_s = "th_ts" if kind == "electron" else "th_tis"
             gate = f"(z>{_face_expr(cfg)})" if inject_hi_side else f"(z<{_face_expr(cfg)})"
             mix = f"({th_s}+({th_c}-{th_s})*{gate})"
-            u_std = _u_std_expr(mix, kind, sc)
+            u_std = _u_std_expr(mix, kind, sc, spec.get("m_over_me"))
             a(f'{name}.maxwellian_u_std_distribution_type = "parser"')
             for comp in ("ux_std", "uy_std", "uz_std"):
                 a(f'{name}.{comp}_function(x,y,z) = "{u_std}"')
@@ -874,7 +928,13 @@ def render(cfg: dict) -> str:
         a("")
 
     # --- the laser -------------------------------------------------------
-    heated = [n for n, s in species.items() if s["kind"] == "electron"]
+    # heat_species = target: the operator sees and heats only the TARGET electrons. In 1D
+    # the beam runs down the whole ambient column, and at 1e-4 n_cr that column is
+    # optically negligible but tenuous enough that its tiny absorption still heats each
+    # ambient electron by hundreds of eV per ns -- an artifact of the 1D line of sight,
+    # since a real oblique beam does not cross the measurement point.
+    heated = [n for n, s in species.items() if s["kind"] == "electron"
+              and (not units.heats_target_only(cfg) or s["role"] == "target")]
     beam = las.get("beam") or {}
     a("# " + "-" * 72)
     a("# --- LASER DEPOSITION (ray tracing) -- the operator under test ---")
@@ -1000,6 +1060,32 @@ def render(cfg: dict) -> str:
         a(f"laser_deposition.ray_step_stride      = "
           f"{int(las.get('ray_step_stride', 1))}")
     a("")
+
+    # --- particle splitting ------------------------------------------------
+    # Requires the warpx-cda feature/particle-splitter binary. The ablated plume carries
+    # the TARGET's macroparticle weight (n ~ 10 n_cr / ppc), so by the time it reaches an
+    # ambient 1e4 times less dense it has ~1e-3 particles per cell; splitting halves the
+    # weight in every under-sampled cell, conserving charge, momentum and energy exactly.
+    spl = (cfg.get("operators") or {}).get("splitter")
+    if spl:
+        sel = spl.get("species", "target")
+        if sel in ("target", "all"):
+            spl_sp = [n for n, s in species.items() if sel == "all" or s["role"] == "target"]
+        else:
+            spl_sp = list(sel)
+        a("# --- PARTICLE SPLITTING (density-triggered; keeps the far plume sampled) ---")
+        a(f"particle_splitter.species   = {' '.join(spl_sp)}")
+        a(f"particle_splitter.intervals = {str(spl.get('intervals', 1))}")
+        a(f"particle_splitter.min_ppc   = {int(spl['min_ppc'])}")
+        a(f"particle_splitter.offset    = {_num(spl.get('offset', 0.25))}")
+        if spl.get("min_weight") is not None:
+            a(f"particle_splitter.min_weight = {_num(spl['min_weight'])}")
+        for sp, v in (spl.get("min_ppc_species") or {}).items():
+            a(f"particle_splitter.{sp}.min_ppc = {int(v)}")
+        if spl.get("lo_de") is not None:
+            a(f"particle_splitter.lo = {' '.join(f'{_num(v)}*de' for v in spl['lo_de'])}")
+            a(f"particle_splitter.hi = {' '.join(f'{_num(v)}*de' for v in spl['hi_de'])}")
+        a("")
 
     # --- diagnostics -----------------------------------------------------
     a("# --- diagnostics ---")

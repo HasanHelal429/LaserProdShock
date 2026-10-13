@@ -443,6 +443,59 @@ def timestep(cfl: float, dz: float, dx: float | None) -> float:
 # --------------------------------------------------------------------------- #
 # the main entry point
 # --------------------------------------------------------------------------- #
+AMU = 1.66053906660e-27   # kg
+
+
+def composition(blk: dict | None) -> list[dict] | None:
+    """Ion components of a plasma population, or None for the single-ion default.
+
+    ``plasma.<role>.composition`` lists ``{tag, Z, mass_amu, atom_fraction}`` per ion
+    (e.g. CH: C6+ and H+ at 1:1). The population's density keys stay ELECTRON densities,
+    so each component's ion density is n_i,k = n_e * f_k / sum_j(f_j Z_j). That ratio is
+    returned as ``per_ne``; the mass in real electron masses as ``m_over_me``.
+    """
+    comp = (blk or {}).get("composition")
+    if not comp:
+        return None
+    fsum = sum(float(c["atom_fraction"]) for c in comp)
+    zbar = sum(float(c["atom_fraction"]) * float(c["Z"]) for c in comp) / fsum
+    out = []
+    for c in comp:
+        f = float(c["atom_fraction"]) / fsum
+        out.append(dict(tag=str(c["tag"]), Z=int(c["Z"]), mass_amu=float(c["mass_amu"]),
+                        frac=f, per_ne=f / zbar,
+                        m_over_me=float(c["mass_amu"]) * AMU / ME))
+    return out
+
+
+def z_eff(blk: dict | None) -> float | None:
+    """<Z^2>/<Z> of a composition: the inverse-bremsstrahlung Z_eff of the mixture."""
+    comp = composition(blk)
+    if comp is None:
+        return None
+    return (sum(c["frac"] * c["Z"] ** 2 for c in comp)
+            / sum(c["frac"] * c["Z"] for c in comp))
+
+
+def field_profile_B(fld: dict, d: float) -> float:
+    """Applied field [T] at distance ``d`` [m] from the target face (``field.profile``).
+
+    ``type: inverse`` is a coil field falling as 1/x from the target,
+    B(d) = B_peak * x0 / (max(d, 0) + x0): B_peak at the face and inside the target,
+    B_peak*x0/(d+x0) out in the ambient.
+    """
+    p = fld["profile"]
+    if str(p.get("type", "inverse")) != "inverse":
+        raise ValueError(f"field.profile.type {p.get('type')!r}: only 'inverse' is supported")
+    x0 = float(p["x0_mm"]) * 1e-3
+    return float(p["B_peak_T"]) * x0 / (max(d, 0.0) + x0)
+
+
+def heats_target_only(cfg: dict) -> bool:
+    """True when the laser heats (and sees) only the target electrons."""
+    return str((cfg.get("laser") or {}).get("heat_species", "all")) == "target"
+
+
 def derive(cfg: dict) -> Scales:
     """Compute all derived scales from a loaded config dict."""
     las, ref = cfg["laser"], cfg["reference"]
@@ -519,15 +572,21 @@ def derive(cfg: dict) -> Scales:
     # Evaluate K at the GROUP temperature the operator will actually measure, not at the
     # target's cold theta: with an ambient in the heated species list the group theta in
     # the corona is far hotter and K falls by 1-2 orders of magnitude (see theta_group).
-    th_grp_targ = theta_group(n_targ, theta_e_targ, n_amb, theta_e_amb)
-    n_at_targ = min(n_targ + (n_amb or 0.0), 0.999 * n_cr)
+    # With heat_species = target the ambient electrons are not in the operator's species
+    # list, so they enter neither its density nor its group temperature.
+    target_only = heats_target_only(cfg)
+    th_grp_targ = (theta_e_targ if target_only
+                   else theta_group(n_targ, theta_e_targ, n_amb, theta_e_amb))
+    n_at_targ = min(n_targ + (0.0 if target_only else (n_amb or 0.0)), 0.999 * n_cr)
     K_targ = K_ib(n_at_targ, th_grp_targ, n_cr, Z_eff, lnL, lnL_mode)
     abs_depth = 1.0 / K_targ if K_targ > 0 else float("inf")
     tau_est = K_targ * thickness
     f_abs_est = 1.0 - math.exp(-2.0 * min(tau_est, 500.0))
 
     tau_amb = f_abs_amb = None
-    if amb:
+    if amb and target_only:
+        tau_amb = f_abs_amb = 0.0          # the operator never sees the ambient
+    elif amb:
         # the beam crosses the ambient from the injection face to the target
         z_t = float(tgt.get("center_de", 0.0)) * de_ref
         path = abs((z_hi if str(las.get("inject_side", "lo")) == "hi" else z_lo) - z_t)
@@ -542,9 +601,19 @@ def derive(cfg: dict) -> Scales:
     rho_i0 = vp_model = MA = Mms = steps_per_wci0 = n_gyro = None
     orientation = str(fld.get("orientation", "none"))
     vA_over_c = float(fld.get("vA_over_c", 0.0) or 0.0)
-    if orientation != "none" and vA_over_c and n_amb:
+    # Ambient MASS density: the reference ion at n_amb unless the ambient has a composition
+    amb_comp = composition(amb)
+    rho_amb = (sum(c["per_ne"] * c["mass_amu"] * AMU for c in amb_comp) * n_amb
+               if (amb_comp and n_amb) else (n_amb * mi if n_amb else None))
+    if orientation != "none" and fld.get("profile") and n_amb:
+        # Field given in tesla as a profile; B0 is its value at the reference distance
+        # (e.g. the measurement point), and v_A follows from the ambient's mass density.
+        B0 = field_profile_B(fld, float(fld["profile"]["ref_distance_mm"]) * 1e-3)
+        vA = B0 / math.sqrt(MU0 * rho_amb)
+    elif orientation != "none" and vA_over_c and n_amb:
         vA = vA_over_c * C
         B0 = vA * math.sqrt(MU0 * n_amb * mi)
+    if B0 is not None:
         wci0 = QE * B0 / mi
         wci0_inv = 1.0 / wci0
         v_ms = math.sqrt(vA * vA + Cs_amb * Cs_amb)

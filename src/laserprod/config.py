@@ -672,7 +672,17 @@ def gates(cfg: dict, sc: units.Scales | None = None) -> list[Gate]:
     # by mu^(-1/2) gave T_e 322.7 eV against a predicted 416 because f_abs fell. Only
     # more ion mass fixes it, and raising the ELECTRON mass at fixed mass_ratio is the
     # cheap way to buy it. See HANDOFF.md 7.4.
-    if sc is not None:
+    # A target `composition` carries REAL ion masses (mass_amu per species), independent of
+    # mass_ratio, so mu is 1 by construction and the aluminium comparison does not apply.
+    if sc is not None and units.composition(cfg["plasma"]["target"]) is not None:
+        comp = units.composition(cfg["plasma"]["target"])
+        out.append(Gate("G9", "ion mass is physical", "pass", 1.0,
+                        "target composition "
+                        + ", ".join(f"{c['tag']}{c['Z']}+ {c['mass_amu']:g} amu" for c in comp)
+                        + ": every ion species carries its real mass (mu = 1); "
+                        f"mass_ratio {sc.mass_ratio:g} only sets the electron and the "
+                        "reference scales."))
+    elif sc is not None:
         me_scale = float(getattr(sc, "me_scale", 1.0))
         mi_over_me_real = sc.mass_ratio * me_scale
         mu = mi_over_me_real / units.MI_OVER_ME_REAL_AL

@@ -225,12 +225,21 @@ def test_vacuum_runs_have_only_target_species():
         # carries (it forms J_e by subtraction, so a stray electron species is counted
         # as an ion and subtracted twice).
         hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
+
+        def ions(prefix, blk):
+            # A `composition` gives one ion species per component, in config order
+            comp = (blk or {}).get("composition")
+            return ([f"{prefix}_ions_{c['tag']}" for c in comp] if comp
+                    else [f"{prefix}_ions"])
+
+        t_ions = ions("targ", cfg["plasma"]["target"])
+        a_ions = ions("amb", cfg["plasma"].get("ambient"))
         if lpconfig.is_vacuum(cfg):
-            expect = ["targ_ions"] if hybrid else ["targ_electrons", "targ_ions"]
+            expect = t_ions if hybrid else ["targ_electrons", *t_ions]
         elif hybrid:
-            expect = ["targ_ions", "amb_ions"]
+            expect = [*t_ions, *a_ions]
         else:
-            expect = ["targ_electrons", "targ_ions", "amb_electrons", "amb_ions"]
+            expect = ["targ_electrons", *t_ions, "amb_electrons", *a_ions]
         assert names == expect, os.path.basename(run_dir)
 
 
