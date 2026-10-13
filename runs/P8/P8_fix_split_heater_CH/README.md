@@ -11,7 +11,7 @@ As `P8_hyb_heater_CH_hv`.
 `perlmutter/submit.sh p8split` (binary: warpx-cda particle-splitter build, which also carries the hybrid solver, the hybrid laser, the electron-fluid heater and Holmstrom).
 
 ## Result
-Pending.
+**ABORTED** at step 4258 (t = 1.70 ns; debug array 59726909), same non-finite E. The unsplit Holmström twin aborted at step 2785. Splitting did run (heater: target macroparticles 15,600 → 61,087 at step 1900 → 331,896 at 3900; the unsplit twin stays at 15,600). Movie: `media/P8/P8_fix_split_heater_CH_p8diag.mp4`.
 
 ## Retracted
 Nothing yet.

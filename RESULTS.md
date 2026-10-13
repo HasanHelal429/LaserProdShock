@@ -8830,3 +8830,11 @@ Remedy under test: **`P8_fix_split_{laser,heater}_CH`**, density-triggered split
 target species (min_ppc 50, every 5 steps, offset 0.25). They run on the particle-splitter
 build, which also has the hybrid solver, the hybrid laser, the electron-fluid heater and
 Holmstrom; launch with `submit.sh p8split`.
+
+**P8 split tests ran (debug array 59726909): both aborted, same non-finite E.** split_laser died
+at step 849 (Holmstrom twin 836, so unchanged). split_heater died at 4258, 1.70 ns (twin 2785,
+ppc-50000 run 4598). Splitting demonstrably ran: target macroparticles went 15,600 -> 61,087
+(step 1900) -> 331,896 (step 3900) while the unsplit twin stays at 15,600. **Lightening the
+target population delays the heater abort about as much as ppc 50000 does, and does nothing
+for the laser runs**, so weighting alone is not the whole cause. Movies:
+media/P8/P8_fix_split_*_p8diag.mp4.
