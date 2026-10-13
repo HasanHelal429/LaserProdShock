@@ -174,6 +174,15 @@ case "$WHAT" in
           runs/P6/P6_mr_heavy runs/P6/P6_mr_heavy_off)
     JOBNAME="lp6_cheap"
     ;;
+  p7)
+    # OMEGA 2019 shot, laser-driven, intensity calibration rung(s). Needs the particle
+    # splitter, which only the warpx-cda feature/particle-splitter build has (1D only), so
+    # the binary is overridden for this target alone. ~10 ms/step x 1.8e7 steps ~ 55-75 h
+    # on one A100 (10 ps smoke, job 59722824): run with --chain 2.
+    RUNS=(runs/P7/P7_omega19_I5e13)
+    JOBNAME="lp7_omega19"
+    export WARPX_BUILD_OVERRIDE="${PSCRATCH:-$HOME}/warpx-cda/.claude/worktrees/particle-splitter/build_split"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -213,7 +222,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

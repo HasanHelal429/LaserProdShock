@@ -18,6 +18,11 @@ set +u
 # shellcheck disable=SC1090
 source "$LP_PM/site.conf"
 set -u
+# Per-target binary: a submit.sh target that needs code site.conf's build lacks (P7's
+# particle splitter) sets WARPX_BUILD_OVERRIDE; sbatch --export=ALL carries it to the job.
+if [[ -n "${WARPX_BUILD_OVERRIDE:-}" ]]; then
+    WARPX_BUILD="$WARPX_BUILD_OVERRIDE"
+fi
 
 : "${NERSC_ACCOUNT:?set NERSC_ACCOUNT in site.conf (must end in _g for GPU)}"
 : "${LASERPROD_ROOT:?set LASERPROD_ROOT in site.conf}"
@@ -109,8 +114,11 @@ run_warpx() {
     strings -a "$bin" > "$_kd" 2>/dev/null || true
     local _missing=""
     local _k
-    for _k in $(grep -oE '^[[:space:]]*laser_deposition\.[a-z_]+' "$deck" 2>/dev/null \
-                | sed 's/.*laser_deposition\.//' | sort -u); do
+    # particle_splitter.* too: a binary without the splitter would ignore the whole block,
+    # and the far plume would simply thin out with nothing to say why.
+    for _k in $(grep -oE '^[[:space:]]*(laser_deposition|particle_splitter)\.[a-z_]+' \
+                "$deck" 2>/dev/null \
+                | sed -E 's/.*(laser_deposition|particle_splitter)\.//' | sort -u); do
         grep -qF "$_k" "$_kd" || _missing="$_missing $_k"
     done
     rm -f "$_kd"
