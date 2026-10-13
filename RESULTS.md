@@ -8850,3 +8850,25 @@ changes on the Holmstrom configs, laser and heater CH, run to the full 4.5 ns:
 - `lowI` (laser only): 1e13 W/cm^2.
 Every earlier P8 run aborts where near-empty cells at the plume/ambient interface let B and
 the fluid T_e run away. Laser runs never pass ~0.35 ns; heater runs reach ~1.8 ns at best.
+
+**P8 stabilizer scan ran (shared array 59728350). Two heater variants complete 4.5 ns; the laser
+is still unsolved.** Times at abort, against the Holmstrom twins (laser 0.33 ns, heater 1.11 ns):
+
+| change | laser CH | heater CH |
+|---|---|---|
+| n_trust = n_amb | 0.23 ns | 1.05 ns |
+| vacuum resistivity 1e-4 Ohm m | 0.33 ns | **4.5 ns, completed** |
+| dt/2 | 0.19 ns | 1.12 ns |
+| shape 3 + filter 4 | **1.34 ns** (4x) | **4.5 ns, completed** |
+| n_floor = n_amb | 0.24 ns | 4.43 ns |
+| intensity 1e13 W/cm^2 | 0.29 ns | n/a |
+
+- **dt/2 and n_trust do not help.** Halving dt aborts at the same physical time, so this is
+  not a time-step CFL failure. It is a spatial one: the cells are empty and the weights heavy.
+- Low intensity does not help either, so the laser abort is not driven by the strength of
+  the drive.
+- Spreading each macroparticle's charge over several cells (shape 3 + filter) is the only
+  change that helps both drives.
+- Vacuum resistivity rescues the heater but not the laser.
+- Next: laser with shape 3 + filter + vacuum resistivity combined (and possibly the
+  splitter). Physics read of the two completed heater runs from their movies.

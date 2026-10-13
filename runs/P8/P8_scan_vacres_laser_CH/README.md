@@ -8,7 +8,7 @@
 As `P8_hyb_laser_CH_hv`.
 
 ## Result
-Pending.
+**ABORTED** at step 828 (t = 0.33 ns; shared array 59728350), same non-finite E. The Holmström twin aborted at step 836 (0.33 ns). Movie: `media/P8/P8_scan_vacres_laser_CH_p8diag.mp4`.
 
 ## Retracted
 Nothing yet.

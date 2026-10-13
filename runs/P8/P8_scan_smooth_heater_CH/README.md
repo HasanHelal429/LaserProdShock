@@ -8,7 +8,7 @@
 As `P8_hyb_heater_CH_hv`.
 
 ## Result
-Pending.
+**COMPLETED** the full 4.5 ns (11250 steps, shared array 59728350). The Holmström twin aborted at step 2785 (1.11 ns). Movie: `media/P8/P8_scan_smooth_heater_CH_p8diag.mp4`.
 
 ## Retracted
 Nothing yet.

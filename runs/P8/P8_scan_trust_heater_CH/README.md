@@ -8,7 +8,7 @@
 As `P8_hyb_heater_CH_hv`.
 
 ## Result
-Pending.
+**ABORTED** at step 2633 (t = 1.05 ns; shared array 59728350), same non-finite E. The Holmström twin aborted at step 2785 (1.11 ns). Movie: `media/P8/P8_scan_trust_heater_CH_p8diag.mp4`.
 
 ## Retracted
 Nothing yet.
