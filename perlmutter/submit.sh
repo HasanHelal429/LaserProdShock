@@ -183,6 +183,16 @@ case "$WHAT" in
     JOBNAME="lp7_omega19"
     export WARPX_BUILD_OVERRIDE="${PSCRATCH:-$HOME}/warpx-cda/.claude/worktrees/particle-splitter/build_split"
     ;;
+  p8)
+    # OMEGA 2019 shot, HYBRID (kinetic ions, fluid electrons): drive {laser, heater} x ions
+    # {effective CH, C6+ + H+}. Default build (warpx-fix build_fix carries the hybrid
+    # solver, the hybrid laser swaps and the electron-fluid heater); no splitter needed.
+    # 2544 cells x 11250 steps x 194 substeps: expected minutes per run on one A100.
+    # Each carries checkpoints, so --chain 2 extends any that outlive debug's 30 min.
+    RUNS=(runs/P8/P8_hyb_laser_CH runs/P8/P8_hyb_laser_CpH
+          runs/P8/P8_hyb_heater_CH runs/P8/P8_hyb_heater_CpH)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_hybrid"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -222,7 +232,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p7|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p8|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

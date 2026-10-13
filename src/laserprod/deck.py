@@ -35,7 +35,8 @@ CONSTS = {
     "pi": math.pi, "m_p": 1.67262192369e-27,
 }
 _FUNCS = {"sqrt": math.sqrt, "abs": abs, "exp": math.exp, "log": math.log,
-          "sin": math.sin, "cos": math.cos, "tan": math.tan, "pow": pow}
+          "sin": math.sin, "cos": math.cos, "tan": math.tan, "pow": pow,
+          "max": max, "min": min}   # max: the hybrid's grid coil field, Bpk*x0B/(max(z-zt,0)+x0B)
 
 
 def _pow10(x: float) -> str:
@@ -710,6 +711,28 @@ def render(cfg: dict) -> str:
                  else "sqrt(th_tis/(mass_ratio*me_scale))"))
         a("")
 
+    # --- electron-fluid heater (hybrid only): a heating-operator piston ----------
+    # The drive the paper's own simulation used (a PSC heating operator), here into the
+    # hybrid's electron-fluid energy equation: S = (3/2) n_e m_e H over a fixed window at
+    # the target face, switched off after the drive time. Mutually compatible with the
+    # laser (set laser.intensity = 0 for a heater-only run).
+    heat = ((cfg.get("operators") or {}).get("heater") or {})
+    if heat.get("enabled", bool(heat)):
+        hsp = str(heat["species"])
+        a("# --- electron-fluid heater (heating-operator piston) -------------------")
+        a("particle_heater.target    = electron_fluid")
+        a(f"particle_heater.species   = {hsp}")
+        a(f"particle_heater.intervals = {int(heat.get('intervals', 5))}")
+        a("particle_heater.profile   = parser")
+        a(f"my_constants.Hheat  = {_num(heat['rate_m2_s3'])}"
+          "   # m^2/s^3; the fluid receives (3/2) n_e m_e Hheat per unit volume")
+        a(f"my_constants.heatlo = {_num(heat['lo_de'])}*de")
+        a(f"my_constants.heathi = {_num(heat['hi_de'])}*de")
+        a(f"my_constants.heatoff = {_num(float(heat['t_off_ns']) * 1e-9)}   # s")
+        a(f'particle_heater.{hsp}.heating_rate_function(x,y,z,t) = '
+          f'"(z>heatlo)*(z<heathi)*(t<heatoff)*Hheat"')
+        a("")
+
     solver = (cfg.get("solver") or {})
     if str(solver.get("type", "em")) == "hybrid":
         hyb = solver.get("hybrid") or {}
@@ -765,21 +788,35 @@ def render(cfg: dict) -> str:
     a(f"# --- background field ({orient}) ---")
     fax = _FIELD_AXIS.get(orient)
     bprof = (cfg.get("field") or {}).get("profile")
+    hybrid = str((cfg.get("solver") or {}).get("type", "em")) == "hybrid"
+    dprof = "max(z-zt,0.)" if inject_hi else "max(zt-z,0.)"
     for comp in ("x", "y", "z"):
-        val = "B0" if (sc.B0 is not None and comp == fax and not bprof) else "0."
+        if sc.B0 is not None and comp == fax and bprof and hybrid:
+            val = f"Bpk*x0B/({dprof}+x0B)"
+        elif sc.B0 is not None and comp == fax and not bprof:
+            val = "B0"
+        else:
+            val = "0."
         a(f'warpx.B{comp}_external_grid_function(x,y,z) = "{val}"')
     a("warpx.B_ext_grid_init_style       = parse_B_ext_grid_function")
-    if bprof and sc.B0 is not None:
+    if bprof and sc.B0 is not None and hybrid:
+        # HYBRID: the profiled coil field goes ON THE GRID. Ohm's law only sees the grid B,
+        # so a particle-applied field would leave the solver at B = 0. Without displacement
+        # current nothing radiates: the profile's curl is carried as electron-fluid current
+        # (J = curl B / mu0). What remains is the unbalanced -grad(B^2/2mu0) force on the
+        # ambient, a 1D artifact (a real coil field is curl-free in 3D): ~5% of v_sh by 10 ns
+        # for the OMEGA profile.
+        a("# Applied (coil) field ON THE GRID: the hybrid's Ohm's law sees only the grid B.")
+    elif bprof and sc.B0 is not None:
         # A NON-UNIFORM applied (coil) field, B(d) = Bpk*x0B/(d+x0B). Loading it on the
         # grid would give it a curl with no current to carry it, so it would radiate away
         # at once. It is applied to the PARTICLES instead, as KinShock2020 does for its
         # profiled B0: the grid starts at zero and holds only the plasma's response (the
         # compression, the cavity), and the total field is that plus this one.
-        d = "max(z-zt,0.)" if inject_hi else "max(zt-z,0.)"
         a("# Applied (coil) field felt by particles only; the grid holds the plasma response.")
         a("particles.B_ext_particle_init_style = parse_B_ext_particle_function")
         for comp in ("x", "y", "z"):
-            val = f"Bpk*x0B/({d}+x0B)" if comp == fax else "0."
+            val = f"Bpk*x0B/({dprof}+x0B)" if comp == fax else "0."
             a(f'particles.B{comp}_external_particle_function(x,y,z,t) = "{val}"')
     a("")
 
@@ -1408,6 +1445,16 @@ def key_params(path: str) -> dict:
               "hybrid_pic_model.plasma_resistivity(rho,J,t)"):
         if k in d:
             out[k] = _eval(d[k], ns)
+    # --- electron-fluid heater (hybrid heating-operator piston) ---
+    for k in ("particle_heater.target", "particle_heater.species",
+              "particle_heater.profile"):
+        if k in d:
+            out[k] = str(d[k]).strip().lower()
+    if "particle_heater.intervals" in d:
+        out["particle_heater.intervals"] = int(float(d["particle_heater.intervals"]))
+    for k in [k for k in d if k.startswith("particle_heater.")
+              and k.endswith(".heating_rate_function(x,y,z,t)")]:
+        out[k] = d[k].strip('"').replace(" ", "")
     cn = d.get("collisions.collision_names", "").strip()
     if cn:
         out["collisions.collision_names"] = cn

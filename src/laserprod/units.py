@@ -541,7 +541,13 @@ def derive(cfg: dict) -> Scales:
 
     # --- geometry / numerics ---
     n_cell, lo, hi, dz, dx = cells_and_extent(geo, de_ref)
-    dt = timestep(float(num["cfl"]), dz, dx)
+    # A fixed timestep (warpx.const_dt, mandatory for the hybrid solver) overrides the CFL
+    # one -- otherwise the header, steps_per_wci0 and the run length in t*w_ci0 describe a
+    # timestep WarpX never takes (a hybrid P8 run read "11250 steps = 37.5 ps" for 4.5 ns).
+    if num.get("const_dt_de_over_c") is not None:
+        dt = float(num["const_dt_de_over_c"]) * de_ref / C
+    else:
+        dt = timestep(float(num["cfl"]), dz, dx)
     max_step = int(num["max_step"])
     dims = int(geo["dims"])
     z_lo, z_hi = lo[-1], hi[-1]                      # propagation axis is last

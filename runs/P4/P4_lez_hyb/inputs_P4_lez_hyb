@@ -15,8 +15,8 @@
 # Derived scales (1D, lengths in d_e,critical = 0.1693 um):
 #   n_cr = 9.848e+26 m^-3   d_e,cr = lam0/2pi = 0.1693 um
 #   target 10 n_cr (d_e = 0.0536 um)   ambient: VACUUM
-#   dt = 0.0989 fs   t_end = 27.3302 ps   n_cell = 5000
-#   GATE G1 omega_pe*dt: 0.553 initial, 0.783 at compression; hits 2 at 130.61 n_cr
+#   dt = 0.1977 fs   t_end = 54.6604 ps   n_cell = 5000
+#   GATE G1 omega_pe*dt: 1.107 initial, 1.565 at compression; hits 2 at 32.65 n_cr
 #   GATE G2 dz/lambda_D: target(cold) 113
 #   predicted absorption: tau(flat top) = 188, f_abs ~ 1.000
 # ==========================================================================
@@ -56,8 +56,8 @@ my_constants.zhi = 2450.*de
 # which then COMPRESSED under its own ablation to 2.43 -- total particle energy
 # grew 21x while the laser had supplied 1/1400 of it, and every number measured
 # past t ~ 0.1 gyroperiods was a measurement of that instability.
-#   here: omega_pe*dt = 0.553 initially, 0.783 at the assumed compression,
-#   and the limit of 2 is not touched until 130.61 n_cr.
+#   here: omega_pe*dt = 1.107 initially, 1.565 at the assumed compression,
+#   and the limit of 2 is not touched until 32.65 n_cr.
 max_step      = 276480
 warpx.const_dt = 1.9770110696854765e-16   # 0.35 d_e/c
 warpx.cfl     = 0.35

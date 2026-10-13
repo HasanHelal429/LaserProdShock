@@ -301,6 +301,30 @@ def validate(cfg: dict) -> list[str]:
                     raise ValueError(
                         f"collisions.pairs names unknown species {str(nm)!r}; "
                         f"this run has {sorted(known)}")
+    # --- electron-fluid heater (optional, hybrid only) ---
+    # It deposits into the hybrid's electron-fluid energy equation, which only exists under
+    # solver.type = hybrid with electron_energy_mode = advected; an explicit run would abort
+    # in WarpX at startup. The named species carries the profile and must exist.
+    heat = ((cfg.get("operators") or {}).get("heater") or {})
+    if heat.get("enabled", bool(heat)):
+        from . import deck as _deck          # local import: deck imports config
+        sol = cfg.get("solver") or {}
+        if str(sol.get("type", "em")) != "hybrid":
+            raise ValueError("operators.heater (electron_fluid) requires solver.type: hybrid")
+        if str((sol.get("hybrid") or {}).get("electron_energy_mode", "none")) != "advected":
+            raise ValueError("operators.heater requires solver.hybrid.electron_energy_mode: "
+                             "advected (the heater feeds the energy equation)")
+        for key in ("species", "lo_de", "hi_de", "rate_m2_s3", "t_off_ns"):
+            if heat.get(key) is None:
+                raise ValueError(f"operators.heater requires operators.heater.{key}")
+        known = set(_deck._species_table(cfg))
+        if str(heat["species"]) not in known:
+            raise ValueError(f"operators.heater.species names unknown species "
+                             f"{str(heat['species'])!r}; this run has {sorted(known)}")
+        if float(heat["hi_de"]) <= float(heat["lo_de"]):
+            raise ValueError("operators.heater.hi_de must exceed lo_de")
+        if float(heat["rate_m2_s3"]) < 0 or float(heat["t_off_ns"]) <= 0:
+            raise ValueError("operators.heater: rate_m2_s3 >= 0 and t_off_ns > 0 required")
     # --- target injector block (optional) ---
     # Same principle as the collisions block: a species name the deck never creates, or a
     # box outside the domain, aborts inside WarpX at startup -- after the queue has handed
