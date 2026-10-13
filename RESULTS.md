@@ -8761,3 +8761,32 @@ tracks FLASH in n_e, T_e and v at every frame. WarpX's corona runs hotter beyond
 heavy_dz025 sits low in n_e. **The PSC velocity is now the ION flow** `NVzi/NNi`. The
 electron flow `NVze/NNe` (what `paper_fig3` uses) has the same mean (n_e/n_i = 13.0 = Z) but
 5–12× the per-cell scatter at keV T_e, and it drowned the panel.
+
+## 2026-10-12 — P8 staged: the OMEGA 2019 shot in HYBRID (kinetic ions, fluid electrons), 2×2
+
+Four hybrid twins of `P7_omega19_I5e13`: drive {laser at P7's 5e13 W/cm², electron-fluid
+heating operator} × ions {effective CH (Z 3.5, A 6.50), C⁶⁺ + H⁺}. They use the same physics
+as P7 at real ion masses and real densities, with no electron kinetics. Numerics: dz 2 µm
+(2,544 cells), dt 400 fs (particle CFL 0.4 at 2000 km/s), 11,250 steps to 4.5 ns, 194
+whistler substeps (10× the 10 T-ambient requirement, 1× at the 0.1 n_amb floor), advected
+electrons at a uniform 40 eV, η = Spitzer at 400 eV, ppc 200/200. Launch with
+`perlmutter/submit.sh p8` on `build_fix`.
+
+**Generator changes (branch `hybrid-omega`, tests 969 pass):**
+- A profiled coil field goes **on the grid** when the solver is hybrid, because Ohm's law sees
+  only the grid B, and stays particle-applied for explicit runs. In 1D the unbalanced
+  ∇B²/2µ₀ pushes the ambient, ~5% of v_sh by 10 ns.
+- New `operators.heater`: an electron-fluid heater as a parser rate over a window, switched
+  off at `t_off_ns`. It is validated to need hybrid with advected energy and a known species,
+  and it is included in `--verify`.
+- `units.derive` now takes dt from `const_dt_de_over_c` when it is set. **The P4 hybrid
+  headers had been quoting the CFL timestep, half the real one** (P4_lez_hyb: 0.0989 fs and
+  27.3 ps claimed against 0.1977 fs and 54.7 ps run). Their decks were regenerated; only the
+  header comments changed.
+- The `key_params` evaluator gains `max`/`min`.
+
+**Caveat on the laser variants:** hybrid deposition (`deposit_to: electron_fluid`) cannot be
+restricted to the target. In 1D the beam therefore also heats the ambient column (~400 eV/ns
+at 40 eV), which P7 avoids with `heat_species: target`. Measure the upstream T_e before using
+it. The heater variants do not have this problem; their H (3.2e23 m²/s³, the laser's absorbed
+flux in a 10 µm window) is a first guess to be calibrated to v_sh ≈ 750 km/s.
