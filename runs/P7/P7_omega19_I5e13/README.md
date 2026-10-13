@@ -56,7 +56,19 @@ only the plasma's response.
   species); 30 subsampled particle dumps; checkpoints every 0.5 ns.
 
 ## Cost
-*(from the 10 ps smoke run, job 59722579, then the run itself)*
+- **Smoke run** (job 59722824, 40,000 steps = 10 ps, 1 A100): **10.3 ms/step** at
+  5.33e6 macroparticles.
+  - Clean: no NaN; f_abs 0.82 at 10 ps.
+  - Ambient e⁻/H⁺ held at 40.0 eV: no grid heating yet.
+  - The splitter had added 19,501 particles.
+  - `lnLmean` ≈ 1.0 is the n_e²-weighted mean over the whole box, dominated by the 1 eV
+    solid (P6 heavy reports the same 1.007 → 1.13).
+  - An earlier attempt (59722579) aborted at init: 33,900 cells is not a multiple of the
+    blocking factor 8. The domain is now 33,920 cells.
+- **Run:** 33,920 cells × (100 target / 50 ambient ppc, split to ≥ 40) × 1.8e7 steps.
+  Estimated ~55–75 h on one A100 as the plume grows.
+  `perlmutter/submit.sh p7 --time 47:30:00 --chain 2`, jobs 59723061 → 59723064, launched
+  2026-10-12.
 
 ## Gates
 | Gate | Value | Pass? |
