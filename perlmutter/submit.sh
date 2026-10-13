@@ -208,6 +208,14 @@ case "$WHAT" in
           runs/P8/P8_fix_ppc_laser_CH runs/P8/P8_fix_ppc_heater_CH)
     TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_fix"
     ;;
+  p8split)
+    # P8 fix test for the target-population weighting (user diagnosis): split the heavy
+    # target macroparticles. Needs the particle-splitter build, which also carries the hybrid
+    # solver, the hybrid laser, the electron-fluid heater and Holmstrom (checked 2026-10-12).
+    RUNS=(runs/P8/P8_fix_split_laser_CH runs/P8/P8_fix_split_heater_CH)
+    TIME="00:30:00"; QOS="debug"; JOBNAME="lp8_split"
+    export WARPX_BUILD_OVERRIDE="${PSCRATCH:-$HOME}/warpx-cda/.claude/worktrees/particle-splitter/build_split"
+    ;;
   offctl)
     # TIER 1c on its own, so it fits debug's 5-job cap alongside nothing else.
     RUNS=(runs/P5/P5_raycfl_off)
@@ -247,7 +255,7 @@ case "$WHAT" in
     JOBNAME="lp5_all"
     ;;
   *)
-    echo "usage: $0 {p7|p8|p8hv|p8fix|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
+    echo "usage: $0 {p7|p8|p8hv|p8fix|p8split|p6|p6cheap|p6light|p6dz|raycfl|raycfl2|dzladder|rampcfl|offctl|seedrep|tier3|tier3fine|tier3a|tier3b|gridheat|ckpt|controls|spine|ladder|cap|all} [--dry] [--qos Q] [--time HH:MM:SS]" >&2
     exit 2 ;;
 esac
 

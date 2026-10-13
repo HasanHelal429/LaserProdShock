@@ -8818,3 +8818,15 @@ laser and heater CH variants (Holmstrom on, full 4.5 ns, `submit.sh p8fix --chai
   cell; it carries no current and adds 1% to n_e upstream.
 - **`ppc`**: target ppc 200 -> 50000, so one target macroparticle per cell is 1.8e24 m^-3
   (2 n_amb) and the plume front stays represented.
+
+**P8 fix tests ran (debug array 59726201): all four aborted with the same non-finite E.**
+bg_laser died at step 572 and ppc_laser at 637 (the Holmstrom-only twin reached 836).
+bg_heater died at 2843 (twin 2785) and **ppc_heater at 4598, 1.84 ns** (twin 2785). The 1%
+immobile background makes no difference. Target ppc 50000 delays the heater abort but not the
+laser one. **User's diagnosis: the severe weighting of the target population.** At ppc 200 a
+target macroparticle carries ~1e5x an ambient one's weight (~400x even at ppc 50000), so single
+heavy particles entering the tenuous region dump grainy charge and current into one cell.
+Remedy under test: **`P8_fix_split_{laser,heater}_CH`**, density-triggered splitting of the
+target species (min_ppc 50, every 5 steps, offset 0.25). They run on the particle-splitter
+build, which also has the hybrid solver, the hybrid laser, the electron-fluid heater and
+Holmstrom; launch with `submit.sh p8split`.

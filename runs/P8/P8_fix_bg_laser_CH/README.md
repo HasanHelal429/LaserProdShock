@@ -8,7 +8,7 @@
 As `P8_hyb_laser_CH_hv`.
 
 ## Result
-Pending.
+**ABORTED** at step 572 (t = 0.23 ns; debug array 59726201), same non-finite E. The Holmström-only twin aborted at step 836. Movie: `media/P8/P8_fix_bg_laser_CH_p8diag.mp4`. Neither fix stops the blow-up; the user's next diagnosis is the target population's weighting (see `P8_fix_split_*`).
 
 ## Retracted
 Nothing yet.
